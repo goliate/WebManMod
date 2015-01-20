@@ -452,13 +452,17 @@ int main()
 cont:
 
 	// update dev_flash (rebug)
-	if((sysLv2FsStat("/dev_flash/vsh/module/webftp_server.sprx", &stat) == SUCCESS))
+	if((sysLv2FsStat("/dev_flash/vsh/module/webftp_server.sprx", &stat) == SUCCESS) || (sysLv2FsStat("/dev_flash/vsh/module/webftp_server.sprx.bak", &stat) == SUCCESS))
 	{
-		if(sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx", &stat) != SUCCESS)
+		if(!((sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx", &stat) == SUCCESS) || (sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx.bak", &stat) == SUCCESS)))
 			sys_fs_mount("CELL_FS_IOS:BUILTIN_FLSH1", "CELL_FS_FAT", "/dev_blind", 0);
 
 		sysLv2FsChmod("/dev_blind/vsh/module/webftp_server.sprx", 0777);
 		sysLv2FsUnlink("/dev_blind/vsh/module/webftp_server.sprx");
+
+		sysLv2FsChmod("/dev_blind/vsh/module/webftp_server.sprx.bak", 0777);
+		sysLv2FsUnlink("/dev_blind/vsh/module/webftp_server.sprx.bak");
+
 		if(is_ps3mapi())
 			CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_rebug_cobra_ps3mapi.sprx", "/dev_blind/vsh/module/webftp_server.sprx");
 		else
@@ -466,7 +470,8 @@ cont:
 
 
 		// delete webMAN from hdd0
-		if((sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx", &stat) == SUCCESS)) {
+		if((sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx", &stat) == SUCCESS))
+		{
 			sysLv2FsChmod("/dev_hdd0/webftp_server.sprx", 0777);
 			sysLv2FsUnlink("/dev_hdd0/webftp_server.sprx");
 

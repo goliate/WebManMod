@@ -608,10 +608,9 @@ int main(int argc, const char* argv[])
 	rawseciso_args *p_args;
 
 	sysFSDirent dir;
-    DIR_ITER *pdir = NULL;
+    DIR_ITER *pdir = NULL, *psubdir= NULL;
     struct stat st;
 	char c_path[4][8]={"PS3ISO", "BDISO", "DVDISO", "PSXISO"};
-	char extensions[8][8]={".iso", ".ISO", ".bin", ".BIN", ".img", ".IMG", ".mdf", ".MDF"};
 	char cover_ext[4][8]={".jpg", ".png", ".PNG", ".JPG"};
 
 	snprintf(path, sizeof(path), "/dev_hdd0/tmp/wmtmp");
@@ -622,7 +621,7 @@ int main(int argc, const char* argv[])
 
 	int fd=-1;
 	u64 read = 0;
-	char path0[512];
+	char path0[512], subpath[512];
 	char direntry[1024];
 	char filename[512];
 	bool is_iso = false;
@@ -693,61 +692,50 @@ int main(int argc, const char* argv[])
 			{
 				for(u8 m=0;m<4;m++) //0="PS3ISO", 1="BDISO", 2="DVDISO", 3="PSXISO"
 				{
-					bool has_dirs = false; u8 d0 = 0; u16 flen;
+					bool has_dirs; u16 flen; has_dirs = false;
 
-		read_folder_ntfs:
-
-					if(d0==0)
-						snprintf(path, sizeof(path), "%s:/%s%s", mounts[i].name, c_path[m], SUFIX(profile));
-					else
-						snprintf(path, sizeof(path), "%s:/%s%s/%c", mounts[i].name, c_path[m], SUFIX(profile), d0);
+					snprintf(path, sizeof(path), "%s:/%s%s", mounts[i].name, c_path[m], SUFIX(profile));
 
 					pdir = ps3ntfs_diropen(path);
 					if(pdir!=NULL)
 					{
 						while(ps3ntfs_dirnext(pdir, dir.d_name, &st) == 0)
 						{
-							flen = strlen(dir.d_name)-1; if(flen<3) continue;
+							sprintf(direntry, "%s", dir.d_name);
+							sprintf(filename, "%s", dir.d_name);
+							flen = strlen(filename)-1; if(flen<3) continue;
 
-							is_iso =	((strcasestr(dir.d_name + flen - 3, ".iso")) && (dir.d_name[flen]=='o' || dir.d_name[flen]=='O')) ||
-							  (m>1 && ( ((strcasestr(dir.d_name + flen - 3, ".bin")) && (dir.d_name[flen]=='n' || dir.d_name[flen]=='N')) ||
-										((strcasestr(dir.d_name + flen - 3, ".img")) && (dir.d_name[flen]=='g' || dir.d_name[flen]=='G')) ||
-										((strcasestr(dir.d_name + flen - 3, ".mdf")) && (dir.d_name[flen]=='f' || dir.d_name[flen]=='F')) ));
+							is_iso =	((strcasestr(filename + flen - 3, ".iso")) && (filename[flen]=='o' || filename[flen]=='O')) ||
+							  (m>1 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
+										((strcasestr(filename + flen - 3, ".img")) && (filename[flen]=='g' || filename[flen]=='G')) ||
+										((strcasestr(filename + flen - 3, ".mdf")) && (filename[flen]=='f' || filename[flen]=='F')) ));
 
-							if(is_iso)
-                            {
-								sprintf(filename, "%s", dir.d_name);
-								//sprintf(extension, "%s", filename + strlen(filename) - 4);
-
-								filename[strlen(filename)-4]=0;
-								//extension[4]=0;
-
-								sprintf(direntry, "%s", dir.d_name);
-                            }
-							else if(!strstr(dir.d_name, "."))
+////////////////////////////////////////////////////////
+							if(!is_iso)
 							{
-								for(u8 e=0;e<8;e++)
-								{
-									if(e>1 && m==0) break;
-									sprintf(filename, "%s%s", dir.d_name, extensions[e]);
-									sprintf(direntry, "%s/%s", dir.d_name, filename);
+								sprintf(subpath, "%s:/%s%s/%s", mounts[i].name, c_path[m], SUFIX(profile), dir.d_name);
+								psubdir = ps3ntfs_diropen(subpath);
+								if(psubdir==NULL) continue;
+								sprintf(subpath, "%s", filename); has_dirs=true;
+next_ntfs_entry:
+								if(ps3ntfs_dirnext(psubdir, dir.d_name, &st) < 0) {has_dirs=false; continue;}
+								if(dir.d_name[0]=='.') goto next_ntfs_entry;
 
-									sprintf(filename, "%s", dir.d_name);
-									//sprintf(extension, "%s", extensions[e]);
+								sprintf(direntry, "%s/%s", subpath, dir.d_name);
+								sprintf(filename, "[%s] %s", subpath, dir.d_name);
+								flen = strlen(filename)-1;
 
-									snprintf(path, sizeof(path), "%s:/%s%s/%s", mounts[i].name, c_path[m], SUFIX(profile), direntry);
-									parts = ps3ntfs_file_to_sectors(path, sections, sections_size, MAX_SECTIONS, 1);
-									if(parts>0 && parts<MAX_SECTIONS) {is_iso = true; break;}
-								}
-								if(!has_dirs) has_dirs = (strlen(dir.d_name)==1);
+								is_iso =	((strcasestr(filename + flen - 3, ".iso")) && (filename[flen]=='o' || filename[flen]=='O')) ||
+								  (m>1 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
+											((strcasestr(filename + flen - 3, ".img")) && (filename[flen]=='g' || filename[flen]=='G')) ||
+											((strcasestr(filename + flen - 3, ".mdf")) && (filename[flen]=='f' || filename[flen]=='F')) ));
 							}
+////////////////////////////////////////////////////////
 
 							if( is_iso )
 							{
-								if(d0==0)
-									snprintf(path, sizeof(path), "%s:/%s%s/%s", mounts[i].name, c_path[m], SUFIX(profile), direntry);
-								else
-									snprintf(path, sizeof(path), "%s:/%s%s/%c/%s", mounts[i].name, c_path[m], SUFIX(profile), d0, direntry);
+								filename[strlen(filename)-4]=0;
+								snprintf(path, sizeof(path), "%s:/%s%s/%s", mounts[i].name, c_path[m], SUFIX(profile), direntry);
 
 								if (m==0)
 								{
@@ -895,13 +883,11 @@ int main(int argc, const char* argv[])
 									}
 								}
 							}
+//////////////////////////////////////////////////////////////
+							if(has_dirs) goto next_ntfs_entry;
+//////////////////////////////////////////////////////////////
 						}
 						ps3ntfs_dirclose(pdir);
-					}
-					if(has_dirs && (d0<'Z'))
-					{
-						if(d0==0) d0='0'; else if(d0=='9') d0='A'; else d0++;
-						goto read_folder_ntfs;
 					}
 				}
 			}

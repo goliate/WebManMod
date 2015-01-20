@@ -23,6 +23,10 @@
 
 #define SWAP32(x) ((((x) & 0xff) << 24) | (((x) & 0xff00) << 8) | (((x) & 0xff0000) >> 8) | (((x) >> 24) & 0xff))
 
+#define KB			   1024
+#define  _16KB_		  16384UL
+#define _128KB_		 131072UL
+
 #define PSPL_ICON		"/dev_hdd0/game/PSPC66820/ICON0.PNG"
 #define PSPL_PATH		"/dev_hdd0/game/PSPC66820"
 #define PSPL_LAMBDA		"/dev_hdd0/game/PSPC66820/USRDIR/CONTENT/lambda.db"
@@ -350,11 +354,11 @@ static char *get_blank_iso_path(void)
 static void build_blank_iso(char *title_id)
 {
 	sys_addr_t sysmem=0;
-	if(sys_memory_allocate(128*1024, SYS_MEMORY_PAGE_SIZE_64K, &sysmem)!=0) return;
-	//uint8_t buf_[128*1024];
-	uint8_t *buf = (uint8_t*)sysmem;//malloc(128*1024);
+	if(sys_memory_allocate(_128KB_, SYS_MEMORY_PAGE_SIZE_64K, &sysmem)!=0) return;
+	//uint8_t buf_[_128KB_];
+	uint8_t *buf = (uint8_t*)sysmem;//malloc(_128KB_);
 
-	memset(buf, 0, 128*1024);
+	memset(buf, 0, _128KB_);
 
 	buf[3] = 2;
 	buf[0x17] = 0x3F;
@@ -494,17 +498,7 @@ static void build_blank_iso(char *title_id)
 	int f=0;
 	uint64_t nwritten=0;
 	cellFsOpen((char*)"/dev_hdd0/vsh/task.dat", CELL_FS_O_WRONLY | CELL_FS_O_CREAT | CELL_FS_O_TRUNC, &f, NULL, 0);
-	cellFsWrite(f, buf, 128*1024, &nwritten);
-	/*if (fwrite(buf, 1, 128*1024, f) != (128*1024))
-	{
-		fclose(f);
-		free(buf);
-		free(ret);
-		return NULL;
-	}
-
-	fclose(f);
-	free(buf);*/
+	cellFsWrite(f, buf, _128KB_, &nwritten);
 	cellFsClose(f);
 	if(sysmem) sys_memory_free(sysmem);
 	return;
@@ -515,27 +509,25 @@ static int copy_file(char *src, char *dst)
 
 	int ret;
 	int fd_s, fd_d;
-	const uint32_t buf_size = 32*1024;
-	uint8_t _buf[32*1024];
+	const uint32_t buf_size = _16KB_;
+	uint8_t _buf[_16KB_];
 	uint8_t *buf = (uint8_t *)_buf;
 
 	ret = cellFsOpen(src, CELL_FS_O_RDONLY, &fd_s, NULL, 0);
-	if (ret == 0)
+	if(ret == 0)
 	{
 		ret = cellFsOpen(dst, CELL_FS_O_WRONLY | CELL_FS_O_CREAT | CELL_FS_O_TRUNC, &fd_d, NULL, 0);
-		if (ret == 0)
+		if(ret == 0)
 		{
-			while (1)
+			while(1)
 			{
 				uint64_t nread, nwritten;
 
 				ret = cellFsRead(fd_s, buf, buf_size, &nread);
-				if (ret != 0 || nread == 0)
-					break;
+				if (ret != 0 || nread == 0) break;
 
 				ret = cellFsWrite(fd_d, buf, nread, &nwritten);
-				if (ret != 0)
-					break;
+				if (ret != 0) break;
 
 				if (nwritten != nread)
 				{
@@ -549,16 +541,13 @@ static int copy_file(char *src, char *dst)
 
 		cellFsClose(fd_s);
 
-		if (ret != 0)
+		if(ret)
 		{
 			cellFsUnlink(dst);
 		}
 		else
 		{
-			if (cellFsChmod(dst, CELL_FS_S_IFMT | 0777) != 0)
-			{
-				//DPRINTF("Chmod failed.\n");
-			}
+			cellFsChmod(dst, CELL_FS_S_IFMT | 0777);
 		}
 	}
 
@@ -573,7 +562,7 @@ static int sys_get_hw_config(uint8_t *ret, uint8_t *config)
 	system_call_2(393, (uint64_t)(uint32_t)ret, (uint64_t)(uint32_t)config);
 	return (int)p1;
 }
-
+/*
 static int sys_get_version(uint32_t *version)
 {
 	system_call_2(8, SYSCALL8_OPCODE_GET_VERSION, (uint64_t)(uint32_t)version);
@@ -585,7 +574,7 @@ static int sys_get_version2(uint16_t *version)
 	system_call_2(8, SYSCALL8_OPCODE_GET_VERSION2, (uint64_t)(uint32_t)version);
 	return (int)p1;
 }
-
+*/
 static inline int sys_read_cobra_config(CobraConfig *cfg)
 {
 	cfg->size = sizeof(CobraConfig);
@@ -682,7 +671,7 @@ static int parse_param_sfo(char *file, const char *field, char *title_name)
 	return -1;
 }
 */
-
+/*
 static inline int sys_permissions_get_access(void)
 {
 	system_call_1(8, SYSCALL8_OPCODE_GET_ACCESS);
@@ -710,7 +699,7 @@ int cobra_lib_finalize(void)
 {
 	return sys_permissions_remove_access();
 }
-
+*/
 int cobra_get_disc_type(unsigned int *real_disctype, unsigned int *effective_disctype, unsigned int *iso_disctype)
 {
 	sys_emu_state_t emu_state;
@@ -801,7 +790,7 @@ int cobra_disc_auth(void)
 
 	if (real_disctype == DEVICE_TYPE_PS3_BD || real_disctype == DEVICE_TYPE_PS3_DVD)
 	{
-		static uint8_t buf[1024];
+		static uint8_t buf[KB];
 
 		memset(buf, 0, 0124);
 
@@ -846,16 +835,14 @@ int cobra_send_fake_disc_insert_event(void)
 
 int cobra_mount_ps3_disc_image(char *files[], unsigned int num)
 {
-	if (!files)
-		return EINVAL;
+	if(!files) return EINVAL;
 
 	return sys_storage_ext_mount_ps3_discfile(num, files);
 }
 
 int cobra_mount_dvd_disc_image(char *files[], unsigned int num)
 {
-	if (!files)
-		return EINVAL;
+	if(!files) return EINVAL;
 
 	return sys_storage_ext_mount_dvd_discfile(num, files);
 }
@@ -1383,7 +1370,7 @@ exit_loop:
 	return 0;
 }
 */
-
+/*
 int cobra_create_cue(char *path, char *filename, TrackDef *tracks, unsigned int num_tracks)
 {
 	if (!path || !tracks || !num_tracks)
@@ -1435,7 +1422,7 @@ int cobra_create_mds(char *path, uint64_t size_in_sectors, DiscPhysInfo *layer0,
 
 	return 0;
 }
-
+*/
 int cobra_map_game(char *path, char *title_id, int *special_mode)
 {
 	int sm = 0;
@@ -1734,7 +1721,7 @@ static int get_emu(char *title_id, char *title_name)
 
 static int check_lambda(void)
 {
-	uint8_t *buf = malloc(512*1024);
+	uint8_t *buf = malloc(512*KB);
 	int fd;
 	int ret;
 
@@ -1750,7 +1737,7 @@ static int check_lambda(void)
 		{
 			uint64_t nread;
 
-			cellFsRead(fd, buf, 512*1024, &nread);
+			cellFsRead(fd, buf, 512*KB, &nread);
 
 			if (nread == 0)
 				break;
@@ -2120,7 +2107,7 @@ int cobra_get_ps2_emu_type(void)
 
 	return ret;
 }
-
+/*
 int cobra_get_version(uint16_t *cobra_version, uint16_t *ps3_version)
 {
 	uint32_t version1;
@@ -2185,11 +2172,10 @@ int cobra_get_version(uint16_t *cobra_version, uint16_t *ps3_version)
 
 	return 0;
 }
-
+*/
 int cobra_read_config(CobraConfig *cfg)
 {
-	if (!cfg)
-		return EINVAL;
+	if(!cfg) return EINVAL;
 
 	cfg->size = sizeof(CobraConfig);
 	return sys_read_cobra_config(cfg);
@@ -2197,8 +2183,7 @@ int cobra_read_config(CobraConfig *cfg)
 
 int cobra_write_config(CobraConfig *cfg)
 {
-	if (!cfg)
-		return EINVAL;
+	if(!cfg) return EINVAL;
 
 	cfg->size = sizeof(CobraConfig);
 	return sys_write_cobra_config(cfg);
