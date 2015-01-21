@@ -5052,8 +5052,8 @@ read_folder_xml:
 
 							if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 							{
-								sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=0;
-								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
+								sprintf(tempstr, "%s/%s/%s.iso", param, data[v3_entry].name, data[v3_entry].name); fdw=0;
+								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s/%s/%s.bin", param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
 								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
 								if(fdw) sprintf(tempstr, "/%s.bin", enc_dir_name); else sprintf(tempstr, "/%s.iso", enc_dir_name);
 								strcat(enc_dir_name, tempstr);
@@ -8203,8 +8203,8 @@ just_leave:
 
 											if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 											{
-												sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=0;
-												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
+												sprintf(tempstr, "%s/%s/%s.iso", param, data[v3_entry].name, data[v3_entry].name); fdw=0;
+												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s/%s/%s.bin", param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
 												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
 												if(fdw) sprintf(tempstr, "/%s.bin", enc_dir_name); else sprintf(tempstr, "/%s.iso", enc_dir_name);
 												strcat(enc_dir_name, tempstr);
