@@ -113,7 +113,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.11 MOD"						// webMAN version
+#define WM_VERSION			"1.41.12 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -145,6 +145,9 @@ SYS_MODULE_STOP(wwwd_stop);
 #define XML_PAIR(key, value) 	"<Pair key=\"" key "\"><String>" value "</String></Pair>"
 #define QUERY_XMB(key, src) 	"<Query class=\"type:x-xmb/folder-pixmap\" key=\"" key "\" attr=\"" key "\" src=\"" src "\"/>"
 #define ADD_XMB_ITEM(key)		"<Item class=\"type:x-xmb/module-action\" key=\"" key "\" attr=\"" key "\"/>"
+
+#define ITEM_CHECKED			" checked=\"checked\""
+#define ITEM_SELECTED			" selected=\"selected\""
 
 #define WEB_LINK_PAIR			XML_PAIR("module_name", "webbrowser_plugin")
 #define STR_NOITEM_PAIR			XML_PAIR("str_noitem", "msg_error_no_content") "</Table>"
@@ -3534,7 +3537,7 @@ static int read_remote_dir(int s, sys_addr_t *data /*netiso_read_dir_result_data
 static void add_radio_button(const char *name, const char *value, const char *id, const char *label, const char *sufix, bool checked, char *buffer)
 {
 	char templn[256];
-	sprintf(templn, "<label><input type=\"radio\" name=\"%s\" value=\"%s\" id=\"%s\"%s/> %s%s</label>", name, value, id, checked?" checked=\"checked\"":"", label, (!sufix)?"<br>":sufix);
+	sprintf(templn, "<label><input type=\"radio\" name=\"%s\" value=\"%s\" id=\"%s\"%s/> %s%s</label>", name, value, id, checked?ITEM_CHECKED:"", label, (!sufix)?"<br>":sufix);
 	strcat(buffer, templn);
 }
 
@@ -3553,14 +3556,14 @@ static void add_check_box(const char *name, const char *value, const char *label
 		p=strstr(label, AUTOBOOT_PATH)+strlen(AUTOBOOT_PATH);
 		strcat(clabel, p);
 	}
-	sprintf(templn, "<label><input type=\"checkbox\" name=\"%s\" value=\"%s\"%s/> %s%s</label>", name, value, checked?(char*)" checked=\"checked\"" :"", clabel, (!sufix)?"<br>":sufix);
+	sprintf(templn, "<label><input type=\"checkbox\" name=\"%s\" value=\"%s\"%s/> %s%s</label>", name, value, checked?ITEM_CHECKED:"", clabel, (!sufix)?"<br>":sufix);
 	strcat(buffer, templn);
 }
 
 static void add_option_item(const char *value, const char *label, bool selected, char *buffer)
 {
 	char templn[256];
-	sprintf(templn, "<option value=\"%s\"%s/>%s</option>", value, selected?" selected":"", label);
+	sprintf(templn, "<option value=\"%s\"%s/>%s</option>", value, selected?ITEM_SELECTED:"", label);
 	strcat(buffer, templn);
 }
 
@@ -6037,7 +6040,7 @@ html_response:
 					else
 					for(uint8_t i=22; i>0; i--)
 					{
-						sprintf(buffer, "&l=%i", i); if(strstr(param, buffer)) {webman_config->lang=i; break;}
+						sprintf(templn, "&l=%i", i); if(strstr(param, templn)) {webman_config->lang=i; break;}
 					}
 
 					update_language();
@@ -6838,7 +6841,7 @@ just_leave:
 					else
 					if(strstr(param, "setup.ps3"))
 					{
-						sprintf(templn, "<form action=\"/setup.ps3#top\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
+						sprintf(templn, "<form action=\"/setup.ps3\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
 										"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
 										"<tr><td width=\"220\"><u>%s:</u><br>", STR_SCAN1); strcat(buffer, templn);
 
@@ -6916,7 +6919,7 @@ just_leave:
 
 						strcat(buffer, "<tr class=\"propfont\"><td>");
 						add_radio_button("temp", "0", "t_0", STR_AUTOAT , " : ", (webman_config->temp0==0), buffer);
-						sprintf(templn, HTML_INPUT("step", "%i", "2", "3") " °C</td><td><label><input type=\"checkbox\"%s/> %s</label> : " HTML_INPUT("mfan", "%i", "2", "3") " %% %s </td></tr>", webman_config->temp1, (webman_config->fanc && webman_config->temp0==0)?" checked":"", STR_LOWEST, webman_config->minfan, STR_FANSPEED); strcat(buffer, templn);
+						sprintf(templn, HTML_INPUT("step", "%i", "2", "3") " °C</td><td><label><input type=\"checkbox\"%s/> %s</label> : " HTML_INPUT("mfan", "%i", "2", "3") " %% %s </td></tr>", webman_config->temp1, (webman_config->fanc && webman_config->temp0==0)?ITEM_CHECKED:"", STR_LOWEST, webman_config->minfan, STR_FANSPEED); strcat(buffer, templn);
 
 						strcat(buffer, "<tr class=\"propfont\"><td>");
 						add_radio_button("temp", "1", "t_1", STR_MANUAL , " : ", (webman_config->temp0!=0), buffer);
@@ -6953,7 +6956,7 @@ just_leave:
 
 						add_check_box("id2", "1", "PSID", " : ", (webman_config->spsid), buffer);
 						sprintf(templn, HTML_INPUT("vPS1", "%s", "16", "22")       , webman_config->vPSID1); strcat(buffer, templn);
-						sprintf(templn, HTML_INPUT("vPS2", "%s", "16", "2") "<br><br>", webman_config->vPSID2); strcat(buffer, templn);
+						sprintf(templn, HTML_INPUT("vPS2", "%s", "16", "22") "<br><br>", webman_config->vPSID2); strcat(buffer, templn);
 
 						sprintf(templn, " : " HTML_INPUT("hurl", "%s", "255", "50") "<br>", webman_config->home_url);
 						add_check_box("hm", "hom", STR_HOME, templn, webman_config->homeb, buffer);
