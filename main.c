@@ -10621,7 +10621,7 @@ void reset_settings()
 	webman_config->lang=0; //english
 	strcpy(webman_config->autoboot_path, DEFAULT_AUTOBOOT_PATH);
 
-    int fdwm=0;
+    int fdwm=0; cellFsStat(WMCONFIG, &buf);
 
 	for(u8 n=0;n<10;n++)
 	{
