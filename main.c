@@ -32,17 +32,17 @@
 #include <time.h>
 #include <unistd.h>
 
-#define ENGLISH_ONLY	1	// uncomment for english only version
+//#define ENGLISH_ONLY	1	// uncomment for english only version
 
 //#define CCAPI			1	// uncomment for ccapi release
 #define COBRA_ONLY	1	// comment out for ccapi/non-cobra release
 //#define REX_ONLY		1	// shortcuts for REBUG REX CFWs / comment out for usual CFW
 
 //#define PS3MAPI		1
-#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
-//#define WEB_CHAT		1
+//#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
+#define WEB_CHAT		1
 #define FIX_GAME		1
-//#define DEBUG_MEM		1
+#define DEBUG_MEM		1
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
 //#define NOSINGSTAR	1
 //#define SWAP_KERNEL	1
@@ -5052,7 +5052,10 @@ read_folder_xml:
 
 							if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 							{
-								sprintf(tempstr, "/%s.iso", enc_dir_name);
+								sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=0;
+								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
+								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
+								if(fdw) sprintf(tempstr, "/%s.bin", enc_dir_name); else sprintf(tempstr, "/%s.iso", enc_dir_name);
 								strcat(enc_dir_name, tempstr);
 							}
 
@@ -6218,19 +6221,31 @@ html_response:
 						game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+4); strcat(buffer, templn);
 					}
 
-					sprintf( templn, "<hr><font size=42px><b>CPU: %i°C (MAX: %i°C)<br>"
+					char max_temp1[50], max_temp2[50];
+					if(max_temp)
+					{
+						sprintf(max_temp1, " (MAX: %i°C)", max_temp);
+						sprintf(max_temp2, " (MAX: %i°F)", (int)(1.8f*(float)max_temp+32.f));
+					}
+					else
+					{
+						sprintf(max_temp1, " <small>%s %s</small>", STR_FANCTRL3, STR_DISABLED); max_temp2[0]=0;
+					}
+
+					sprintf( templn, "<hr><font size=42px><b>CPU: %i°C%s<br>"
 															"RSX: %i°C<hr>"
-															"CPU: %i°F (MAX: %i°F)<br>"
-															"RSX: %i°F<hr>MEM: %iKB  HDD: %i %s<hr>"
+															"CPU: %i°F%s<br>"
+															"RSX: %i°F<hr>"
+                                                            "MEM: %iKB  HDD: %i %s<hr>"
 															"FAN SPEED: 0x%X (%i%%)<hr><small>"
 															"PSID LV2 : %016llX%016llX<hr>"
 															"IDPS EID0: %016llX%016llX<br>"
 															"IDPS LV2 : %016llX%016llX<br>"
                                                             "MAC Addr : %010llX</b>"
 									"</small></font><hr>",
-									t1, max_temp, t2,
-									t1f, (int)(1.8f*(float)max_temp+32.f),
-									t2f, (meminfo.avail>>10), (int)((blockSize*freeSize)>>20), STR_MBFREE,
+									t1, max_temp1, t2,
+									t1f, max_temp2, t2f,
+                                    (meminfo.avail>>10), (int)((blockSize*freeSize)>>20), STR_MBFREE,
 									fan_speed, (int)((int)fan_speed*100)/255,
 									PSID[0], PSID[1],
 									eid0_idps[0], eid0_idps[1],
@@ -8187,7 +8202,13 @@ just_leave:
 											snprintf(ename, 6, "%s    ", templn);
 
 											if(data[v3_entry].is_directory && IS_ISO_FOLDER)
-											{sprintf(enc_dir_name, "%s/%s.iso", data[v3_entry].name, data[v3_entry].name);}
+											{
+												sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=0;
+												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s%s/%s/%s.iso", neth, param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
+												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
+												if(fdw) sprintf(tempstr, "/%s.bin", enc_dir_name); else sprintf(tempstr, "/%s.iso", enc_dir_name);
+												strcat(enc_dir_name, tempstr);
+											}
 
 											sprintf(tempstr, "%c%c%c%c<div class=\"gc\"><div class=\"ic\"><a href=\"/mount.ps3%s%s/%s?random=%x\"><img src=\"%s\" class=\"gi\"></a></div><div class=\"gn\"><a href=\"%s%s/%s\">%s</a></div></div>",
 												ename[0], ename[1], ename[2], ename[3],
