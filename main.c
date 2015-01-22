@@ -79,7 +79,7 @@ char search_url[50] = "http://google.com/search?q=";
 	#ifdef REX_ONLY
 		#define EDITION " [Rebug-PS3MAPI]"
 	#else
-		#define EDITION " [PS3M API]"
+		#define EDITION " [PS3MAPI]"
 	#endif
   #else
    #ifdef REX_ONLY
@@ -413,7 +413,8 @@ static uint32_t cached_cd_sector=0x80000000;
 
 #define NTFS 		 	(10)
 
-#define MIN_FANSPEED	(25)
+#define MIN_FANSPEED	(20)
+#define DEFAULT_MIN_FANSPEED	(25)
 #define MAX_FANSPEED	(0xE6)
 #define MY_TEMP 		(68)
 static u8 fan_speed=0x33;
@@ -3556,7 +3557,7 @@ static void add_check_box(const char *name, const char *value, const char *label
 		p=strstr(label, AUTOBOOT_PATH)+strlen(AUTOBOOT_PATH);
 		strcat(clabel, p);
 	}
-	sprintf(templn, "<label><input type=\"checkbox\" name=\"%s\" value=\"%s\"%s/> %s%s</label>", name, value, checked?ITEM_CHECKED:"", clabel, (!sufix)?"<br>":sufix);
+	sprintf(templn, "<label><input type=\"checkbox\" name=\"%s\" value=\"%s\"%s/> %s</label>%s", name, value, checked?ITEM_CHECKED:"", clabel, (!sufix)?"<br>":sufix);
 	strcat(buffer, templn);
 }
 
@@ -5943,7 +5944,7 @@ html_response:
 
 					char *pos; char mytemp[3];
 
-					webman_config->minfan=MIN_FANSPEED;
+					webman_config->minfan=DEFAULT_MIN_FANSPEED;
 					pos=strstr(param, "mfan=");
 					if(pos)
 					{
@@ -5951,7 +5952,7 @@ html_response:
 
 						webman_config->minfan=val(mytemp);
 					}
-					webman_config->minfan=RANGE(webman_config->minfan, 20, 99);
+					webman_config->minfan=RANGE(webman_config->minfan, MIN_FANSPEED, 99); //%
 
 					webman_config->bind=0;
 					if(strstr(param, "bind")) webman_config->bind=1;
@@ -5970,7 +5971,7 @@ html_response:
 
 						webman_config->temp1=val(mytemp);
 					}
-					webman_config->temp1=RANGE(webman_config->temp1, 40, 83);
+					webman_config->temp1=RANGE(webman_config->temp1, 40, 83); //°C
 
 					pos=strstr(param, "fsp0=");
 					if(pos)
@@ -5979,7 +5980,7 @@ html_response:
 
 						webman_config->ps2temp=val(mytemp);
 					}
-					webman_config->ps2temp=RANGE(webman_config->ps2temp, 20, 99);
+					webman_config->ps2temp=RANGE(webman_config->ps2temp, 20, 99); //%
 
 					pos=strstr(param, "manu=");
 					if(pos)
@@ -5988,7 +5989,7 @@ html_response:
 
 						webman_config->manu=val(mytemp);
 					}
-					webman_config->manu=RANGE(webman_config->manu, 20, 99);
+					webman_config->manu=RANGE(webman_config->manu, 20, 99); //%
 
 					if(strstr(param, "temp=1"))
 						webman_config->temp0= (u8)(((float)webman_config->manu * 255.f)/100.f);
@@ -6170,7 +6171,7 @@ html_response:
 #endif
 
 				u32 t1=0, t2=0, t1f=0, t2f=0;
-				get_temperature(0, &t1); // 3E030000 -> 3E.03'C -> 62.(03/256)'C
+				get_temperature(0, &t1); // 3E030000 -> 3E.03°C -> 62.(03/256)°C
 				get_temperature(1, &t2);
 				t1=t1>>24;
 				t2=t2>>24;
@@ -6224,23 +6225,24 @@ html_response:
 						game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+4); strcat(buffer, templn);
 					}
 
-					char max_temp1[50], max_temp2[50];
-					if(max_temp)
+					char max_temp1[50], max_temp2[50]; max_temp2[0]=0;
+
+					if(!webman_config->fanc || (!webman_config->temp0 && !max_temp))
+						sprintf(max_temp1, " <small>[%s %s]</small>", STR_FANCTRL3, STR_DISABLED);
+					else if(max_temp)
 					{
 						sprintf(max_temp1, " (MAX: %i°C)", max_temp);
 						sprintf(max_temp2, " (MAX: %i°F)", (int)(1.8f*(float)max_temp+32.f));
 					}
 					else
-					{
-						sprintf(max_temp1, " <small>%s %s</small>", STR_FANCTRL3, STR_DISABLED); max_temp2[0]=0;
-					}
+						sprintf(max_temp1, " <small>[FAN: %i%% %s]</small>", webman_config->manu, STR_MANUAL);
 
 					sprintf( templn, "<hr><font size=42px><b>CPU: %i°C%s<br>"
 															"RSX: %i°C<hr>"
 															"CPU: %i°F%s<br>"
 															"RSX: %i°F<hr>"
                                                             "MEM: %iKB  HDD: %i %s<hr>"
-															"FAN SPEED: 0x%X (%i%%)<hr><small>"
+															"FAN SPEED: %i%% (0x%X)<hr><small>"
 															"PSID LV2 : %016llX%016llX<hr>"
 															"IDPS EID0: %016llX%016llX<br>"
 															"IDPS LV2 : %016llX%016llX<br>"
@@ -6249,7 +6251,7 @@ html_response:
 									t1, max_temp1, t2,
 									t1f, max_temp2, t2f,
                                     (meminfo.avail>>10), (int)((blockSize*freeSize)>>20), STR_MBFREE,
-									fan_speed, (int)((int)fan_speed*100)/255,
+									(int)((int)fan_speed*100)/255, fan_speed,
 									PSID[0], PSID[1],
 									eid0_idps[0], eid0_idps[1],
 									IDPS[0], IDPS[1], MAC);
@@ -6350,7 +6352,7 @@ html_response:
 						}
 
 						// show msg log
-						sprintf(templn, "<iframe src=\"%s\" width=\"99%c\" height=\"300\"></iframe>", WMCHATFILE,'%'); strcat(buffer, templn);
+						sprintf(templn, "<iframe src=\"%s\" width=\"99%%\" height=\"300\"></iframe>", WMCHATFILE); strcat(buffer, templn);
 
 						// prompt msg
 						sprintf(templn, "<hr>"
@@ -9624,13 +9626,13 @@ static void poll_thread(uint64_t poll)
 		if(max_temp)
 		{
 			t1=0;
-			get_temperature(0, &t1); // 3E030000 -> 3E.03'C -> 62.(03/256)'C
+			get_temperature(0, &t1); // 3E030000 -> 3E.03°C -> 62.(03/256)°C
 			t2=t1;
 			sys_timer_usleep(300000);
 
 			//if(webman_config->fanm)
 			{
-				get_temperature(1, &t2); // 3E030000 -> 3E.03'C -> 62.(03/256)'C
+				get_temperature(1, &t2); // 3E030000 -> 3E.03°C -> 62.(03/256)°C
 				sys_timer_usleep(200000);
 			}
 			t1=t1>>24;
@@ -10579,7 +10581,7 @@ void reset_settings()
 	webman_config->manu=35;      //manual temp
 	webman_config->ps2temp=37;   //ps2 temp
 
-	webman_config->minfan=MIN_FANSPEED;
+	webman_config->minfan=DEFAULT_MIN_FANSPEED;
 
 	webman_config->bind=0;       //enable remote access to FTP/WWW services
 	webman_config->ftpd=0;       //enable ftp server
@@ -10642,7 +10644,7 @@ void reset_settings()
 	if(strlen(webman_config->autoboot_path)==0) strcpy(webman_config->autoboot_path, DEFAULT_AUTOBOOT_PATH);
 
 	if(webman_config->warn>1) webman_config->warn=0;
-	if(webman_config->minfan<MIN_FANSPEED) webman_config->minfan=MIN_FANSPEED;
+	webman_config->minfan=RANGE(webman_config->minfan, MIN_FANSPEED, 99);
 
 	profile=webman_config->profile;
 }
