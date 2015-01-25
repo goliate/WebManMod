@@ -113,7 +113,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.12 MOD"						// webMAN version
+#define WM_VERSION			"1.41.14 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -982,7 +982,7 @@ bool language(const char *file_str, char *default_str);
 void block_online_servers();
 
 char h2a(char hex);
-void strenc(char *dst, char *src);
+void urlenc(char *dst, char *src);
 int val(const char *c);
 
 #ifdef PS2_DISC
@@ -1507,13 +1507,14 @@ char h2a(char hex)
 	return c;
 }
 
-void strenc(char *dst, char *src)
+void urlenc(char *dst, char *src)
 {
 	size_t j=0;
     size_t n=strlen(src);
 	for(size_t i=0; i<n; i++,j++)
 	{
-		if(src[i] & 0x80)
+		if(src[i]==' ') {dst[j++] = '%'; dst[j++] = '2'; dst[j] = '0';}
+		else if(src[i] & 0x80)
 		{
 			dst[j++] = '%';
 			dst[j++] = h2a((unsigned char)src[i]>>4);
@@ -1524,6 +1525,72 @@ void strenc(char *dst, char *src)
 	dst[j] = '\0';
 }
 
+void utf8enc(char *dst, char *src)
+{
+	size_t j=0;
+	size_t n=strlen(src); u8 c;
+	for(size_t i=0; i<n; i++)
+	{
+		c=(src[i]&0xFF);
+
+		if(c<0x80) dst[j++]=c;
+		else //if(c>=0x80 && c<0x800)
+		{
+			dst[j++]=0xC0|(0x0F&(c>>6));
+			dst[j++]=0x80|(0x3F&c);
+		}
+/*
+		else
+		{
+			dst[j++]=(0xE0|((0x0F&(c>>12))));
+			dst[j++]=(0x80|((0x3F&(c>>06))));
+			dst[j++]=(0x80|((0x3F&(c    ))));
+		}
+*/
+	}
+
+	dst[j] = '\0';
+	strncpy(src, dst, MAX_LINE_LEN);
+}
+
+void htmlenc(char *dst, char *src, u8 cpy2src)
+{
+	size_t j=0;
+    size_t n=strlen(src); char tmp[8]; memset(dst, 4*n, 0); u8 t, c;
+	for(size_t i=0; i<n; i++)
+	{
+		if(src[i] & 0x80)
+		{
+			dst[j++] = '&';
+			dst[j++] = '#';
+			sprintf(tmp, "%i;", (int)(unsigned char)src[i]); t=strlen(tmp); c=0;
+			while(t--) {dst[j++] = tmp[c++];}
+		}
+		else dst[j++] = src[i];
+	}
+	dst[j] = '\0';
+
+	if(cpy2src) strncpy(src, dst, MAX_LINE_LEN);
+}
+
+/*
+void utf8dec(char *dst, char *src)
+{
+	size_t j=0;
+	size_t n=strlen(src); u8 c;
+	for(size_t i=0; i<n; i++)
+	{
+		c=(src[i]&0xFF);
+		if(c<0x80)
+			dst[j++]=c;
+		else if(c & 0x20)
+			dst[j++]=(((src[i++] & 0x1F)<<6)+(c & 0x3F));
+		else
+			dst[j++]=(((src[i++] & 0xF)<<12)+((src[i++] & 0x3F)<<6)+(c & 0x3F));
+	}
+	dst[j] = '\0';
+}
+*/
 int val(const char *c)
 {
     int previous_result=0, result=0;
@@ -4157,7 +4224,7 @@ static int get_title_and_id_from_sfo(char *templn, char *tempID, char *entry_nam
 		return 0;
 	}
 	else
-		get_name(templn, entry_name, 0); //use file name as title
+		{get_name(templn, entry_name, 0); utf8enc(data, templn);} //use file name as title
 
 		return 1;
 }
@@ -4321,6 +4388,9 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 	else if(sz<2147483648U) {sprintf(sf, "%s", STR_MEGABYTE); sz>>=20;}
 	else {sprintf(sf, "%s", STR_GIGABYTE); sz>>=30;}
 
+	urlenc(tempstr, templn); strncpy(templn, tempstr, MAX_LINE_LEN);
+	strcpy(tempstr, name); htmlenc(name,  tempstr, 0);
+
 	flen=strlen(name);
 
 	if(is_dir)
@@ -4353,16 +4423,12 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 	else
 		sprintf(fsize, "%llu %s", sz, sf);
 
-	snprintf(ename, 6, "%s    ", name); sprintf(templn, "%s", name);
+	snprintf(ename, 6, "%s    ", name); urlenc(templn, tempstr);
 
 	sprintf(tempstr, "%c%c%c%c%c%c<tr>"
-                      "<td><a %shref=\"%s\">%s</a></td>"
-                      "<td> %s &nbsp; </td>"
-                      "<td>%02i-%s-%04i %02i:%02i</td></tr>",
+                      "<td><a %shref=\"%s\">%s</a></td>",
 	is_dir ? '0' : '1', ename[0], ename[1], ename[2], ename[3], ename[4],
-	is_dir ? "class=\"f\" " : "", templn, name,
-	fsize,
-	rDate.day, smonth[rDate.month-1], rDate.year, rDate.hour, rDate.minute);
+	is_dir ? "class=\"f\" " : "", templn, name);
 
 	flen=strlen(tempstr);
 	if(flen>=LINELEN)
@@ -4370,13 +4436,9 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 		if(is_dir) sprintf(fsize, "&lt;dir&gt;"); else sprintf(fsize, "%llu %s", sz, sf);
 
 		sprintf(tempstr, "%c%c%c%c%c%c<tr>"
-                          "<td><a %shref=\"%s\">%s</a></td>"
-                          "<td> %s &nbsp; </td>"
-                          "<td>%02i-%s-%04i %02i:%02i</td></tr>",
+                          "<td><a %shref=\"%s\">%s</a></td>",
 		is_dir ? '0' : '1', ename[0], ename[1], ename[2], ename[3], ename[4],
-		is_dir ? "class=\"f\" " : "", templn, name,
-		fsize,
-		rDate.day, smonth[rDate.month-1], rDate.year, rDate.hour, rDate.minute);
+		is_dir ? "class=\"f\" " : "", templn, name);
 
 		flen=strlen(tempstr);
 		if(flen>=LINELEN)
@@ -4384,18 +4446,20 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 			if(is_dir) sprintf(fsize, "&lt;dir&gt;"); else sprintf(fsize, "%llu %s", sz, sf);
 
 			sprintf(tempstr, "%c%c%c%c%c%c<tr>"
-                              "<td>%s</td>"
-                              "<td> %s &nbsp; </td>"
-                              "<td>%02i-%s-%04i %02i:%02i</td></tr>",
+                              "<td>%s</td>",
 			is_dir ? '0' : '1', ename[0], ename[1], ename[2], ename[3], ename[4],
-			name,
-			fsize,
-			rDate.day, smonth[rDate.month-1], rDate.year, rDate.hour, rDate.minute);
-
-			flen=strlen(tempstr);
-			if(flen>=LINELEN) {flen=0; tempstr[0]=0;} //ignore file if it is still too long
+			name);
 		}
 	}
+
+	sprintf(templn, "<td> %s &nbsp; </td>"
+					"<td>%02i-%s-%04i %02i:%02i</td></tr>",
+					fsize,
+					rDate.day, smonth[rDate.month-1], rDate.year, rDate.hour, rDate.minute);
+	strcat(tempstr, templn);
+
+	flen=strlen(tempstr);
+	if(flen>=LINELEN) {flen=0; tempstr[0]=0;} //ignore file if it is still too long
 }
 
 void add_query_html(char *buffer, char *param, char *label)
@@ -5048,11 +5112,11 @@ read_folder_xml:
 								get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
 							}
 							else
-								get_name(templn, data[v3_entry].name, 0); //use file name as title
+								{get_name(templn, data[v3_entry].name, 0); utf8enc(tempstr, templn);} //use file name as title
 
 							get_default_icon(icon, param, data[v3_entry].name, data[v3_entry].is_directory, tempID, ns, abort_connection);
 
-							strenc(enc_dir_name, data[v3_entry].name);
+							urlenc(enc_dir_name, data[v3_entry].name);
 
 							if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 							{
@@ -5155,9 +5219,9 @@ next_xml_entry:
 											if(f1==3 && !strstr(entry.d_name+flen, ".ntfs[BDISO]" )) continue;
 											if(f1==4 && !strstr(entry.d_name+flen, ".ntfs[DVDISO]")) continue;
 											if(f1==6 && !strstr(entry.d_name+flen, ".ntfs[PSXISO]")) continue;
-									}
+										}
 #endif
-										get_name(templn, entry.d_name, 0);
+										get_name(templn, entry.d_name, 0); utf8enc(tempstr, templn);
 									}
 
 									if(f0<NTFS && tempID[0]==0 && strstr(param, "/PS3ISO"))
@@ -5214,7 +5278,7 @@ next_xml_entry:
 
 								get_default_icon(icon, param, entry.d_name, 0, tempID, ns, abort_connection);
 
-								strenc(enc_dir_name, entry.d_name);
+								urlenc(enc_dir_name, entry.d_name);
 
 								// subfolder name
 								if(f0==NTFS && entry.d_name[0]=='[')
@@ -6116,15 +6180,14 @@ html_response:
 				strcpy(buffer,  "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">"
 								"<html xmlns=\"http://www.w3.org/1999/xhtml\">"
 								"<meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\">"
-								"<META HTTP-EQUIV=\"CACHE-CONTROL\" CONTENT=\"NO-CACHE\">");
+								"<meta http-equiv=\"cache-control\" content=\"no-cache\">");
 				if(is_cpursx) strcat(buffer, "<meta http-equiv=\"refresh\" content=\"5\">");
 				strcat(buffer,	"<head><title>webMAN MOD</title>"
 								"<style type=\"text/css\"><!--\r\n"
-								"a:visited{color:#909090;text-decoration:none;}a:link:hover{color:#FFFFFF;}"
-								"a:hover{color:#C0C0C0;text-decoration:none;}"
-								"a:active{color:#F0F0F0;text-decoration:none;}"
+								"a:visited{color:#909090;text-decoration:none;}"
+								"a:active{color:#F0F0F0;text-decoration:none;}a:hover{color:#C0C0C0;}"
 								"a:link{color:#909090;text-decoration:none;}a:link:hover{color:#FFFFFF;}"
-								"a.f:visited{color:#E0E0E0;text-decoration:none;}a.f:hover{color:#F0F0F0;text-decoration:none;}"
+								"a.f:visited{color:#E0E0E0;text-decoration:none;}a.f:hover{color:#F0F0F0;}"
 								"a.f:active{color:#F8F8F8;text-decoration:none;}"
 								"a.f:link{color:#D0D0D0;text-decoration:none;}a.f:link:hover{color:#FFFFFF;}"
 								"body,td,th{color:#F0F0F0;}"
@@ -6652,10 +6715,10 @@ just_leave:
 					else
 					if(strstr(param, "extgd.ps3"))
 					{
-						if(strstr(param,"?s")); else
-						if(strstr(param,"?e") || strstr(param, "?1")) extgd=1; else
-						if(strstr(param,"?d") || strstr(param, "?0")) extgd=0; else
-																	  extgd=extgd^1;
+						if(strstr(param,"?s" /*status */ )); else
+						if(strstr(param,"?e" /*enable */ ) || strstr(param, "?1"))  extgd=1; else
+						if(strstr(param,"?d" /*disable*/ ) || strstr(param, "?0"))  extgd=0; else
+																					extgd=extgd^1;
 
 						strcat(buffer, "External Game DATA: ");
 						if(set_gamedata_status(extgd, true))
@@ -6672,10 +6735,10 @@ just_leave:
 
 						if(strlen(param+10))
 						{
-							if(strstr(param,"?lv1")) {size=16;} else
-							if(strstr(param,"?lv2")) {start=0x1000000;} else
-							if(strstr(param,"?f"))   {size=256;} else
-							if(strstr(param,"?m"))   {size=256;} else
+							if(strstr(param,"?lv1")       ) {size=16;} else
+							if(strstr(param,"?lv2")       ) {start=0x1000000;} else
+							if(strstr(param,"?f") /*full*/) {size=256;} else
+							if(strstr(param,"?m") /*mem */) {size=256;} else
 							{
 								start= convertH(param+10);
 								if(start>=LV1_UPPER_MEMORY-((uint64_t)(size*_1MB_))) start=LV1_UPPER_MEMORY-((uint64_t)(size*_1MB_));
@@ -7604,9 +7667,11 @@ just_leave:
 						if (strlen(val_tmp) < 1) sprintf(val_tmp, "%02X", 0);
 						sprintf(templn, "<b><u>%s:</u></b> "  HTML_INPUT("addr", "%X", "16", "18")
 										"<br><br><b><u>%s:</u></b><br><br>"
-						                "<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\"><tr><td style=\"text-align: left; float: left;\">"
-						                "<textarea name=\"val\" cols=\"111\" rows=\"3\" maxlength=\"199\">%s</textarea></td></tr>"
-						                "<tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></table></form>", "Address", address, "Value", val_tmp, "Set");
+										"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
+										"<tr><td style=\"text-align: left; float: left;\">"
+										"<textarea name=\"val\" cols=\"111\" rows=\"3\" maxlength=\"199\">%s</textarea></td></tr>"
+										"<tr><td style=\"text-align: right; float: right;\"><br>"
+										"<input type=\"submit\" value=\" %s \"/></td></tr></table></form>", "Address", address, "Value", val_tmp, "Set");
 						strcat(buffer, templn);
 						if(pid != 0 && length != 0)
 						{
@@ -7650,7 +7715,7 @@ just_leave:
 							int plen=10;
 							if(strstr(param, "copy.ps3")) plen=IS_COPY;
 
-							char target[MAX_PATH_LEN], enc_dir_name[1024];;
+							char target[MAX_PATH_LEN], enc_dir_name[1024];
 							bool mounted=false; max_mapped=0;
 							is_binary=1;
 
@@ -7686,6 +7751,7 @@ just_leave:
 							}
 							else
 							{
+								htmlenc(templn, param+plen, 0);
 								sprintf(tempstr, "%s/PS3_GAME/ICON0.PNG", param+plen);
 
 								if(cellFsStat(tempstr, &buf)!=CELL_FS_SUCCEEDED)
@@ -7699,7 +7765,7 @@ just_leave:
 									get_default_icon(tempstr, fpath, fname, 0, tempID, -1, 0);
 								}
 
-								strenc(enc_dir_name, tempstr);
+								urlenc(enc_dir_name, tempstr);
 
 								if(plen==IS_COPY)
 								{
@@ -7839,24 +7905,25 @@ just_leave:
 										}
 									}
 
-									sprintf(templn, "%s <a href=\"%s\">%s</a><hr>"
-													"<a href=\"%s\"><img src=\"%s\" border=0></a><hr>"
-													"%s: <a href=\"%s\">%s</a>",
-													STR_COPYING, param+plen, param+plen,
-													target, enc_dir_name,
-													STR_CPYDEST, target, target);
+									sprintf(tempstr, "%s <a href=\"%s\">%s</a><hr>"
+													 "<a href=\"%s\"><img src=\"%s\" border=0></a><hr>"
+													 "%s: <a href=\"%s\">%s</a>",
+													 STR_COPYING, param+plen, templn,
+													 target, enc_dir_name,
+													 STR_CPYDEST, target, target);
 
-									if(strstr(target, "/webftp_server.")) {strcat(buffer, templn); strcat(buffer, "<HR>"); sprintf(templn, "%s", STR_SETTINGSUPD);}
+									if(strstr(target, "/webftp_server.")) {strcat(buffer, tempstr); sprintf(tempstr, "<HR>%s", STR_SETTINGSUPD);}
 								}
 								else if(!extcmp(param, ".BIN.ENC", 8))
-									sprintf(templn, "%s: %s<hr><img src=\"%s\"><hr>%s", STR_GAMETOM, param+plen, enc_dir_name, mounted?STR_PS2LOADED:STR_ERROR);
+									sprintf(tempstr, "%s: %s<hr><img src=\"%s\"><hr>%s", STR_GAMETOM, templn, enc_dir_name, mounted?STR_PS2LOADED:STR_ERROR);
 								else if(strstr(param, "/PSPISO") || strstr(param, "/ISO/"))
-									sprintf(templn, "%s: %s<hr><img src=\"%s\" height=%i><hr>%s", STR_GAMETOM, param+plen, enc_dir_name, strcasestr(enc_dir_name,".png")?200:300, mounted?STR_PSPLOADED:STR_ERROR);
+									sprintf(tempstr, "%s: %s<hr><img src=\"%s\" height=%i><hr>%s", STR_GAMETOM, templn, enc_dir_name, strcasestr(enc_dir_name,".png")?200:300, mounted?STR_PSPLOADED:STR_ERROR);
 								else if(strstr(param, "/BDISO") || strstr(param, "/DVDISO") || !extcmp(param, ".ntfs[BDISO]", 12) || !extcmp(param, ".ntfs[DVDISO]", 13))
-									sprintf(templn, "%s: %s<hr><img src=\"%s\"><hr>%s", STR_MOVIETOM,param+plen, enc_dir_name, mounted?STR_MOVIELOADED:STR_ERROR);
+									sprintf(tempstr, "%s: %s<hr><a href=\"/dev_bdvd\"><img src=\"%s\" border=0></a><hr>%s", STR_MOVIETOM, templn, enc_dir_name, mounted?STR_MOVIELOADED:STR_ERROR);
 								else
-									sprintf(templn, "%s: %s<hr><a href=\"/dev_bdvd\"><img src=\"%s\" border=0></a><hr>%s", STR_GAMETOM, param+plen, enc_dir_name, mounted?STR_GAMELOADED:STR_ERROR);
-								strcat(buffer, templn);
+									sprintf(tempstr, "%s: %s<hr><a href=\"/dev_bdvd\"><img src=\"%s\" border=0></a><hr>%s", STR_GAMETOM, templn, enc_dir_name, mounted?STR_GAMELOADED:STR_ERROR);
+
+								strcat(buffer, tempstr);
 
 #ifdef PS2_DISC
 								if(mounted && (strstr(param+plen, "/GAME") || strstr(param+plen, "/PS3ISO") || strstr(param+plen, ".ntfs[PS3ISO]")))
@@ -7880,7 +7947,7 @@ just_leave:
 											if (is_iso || strstr(entry.d_name, "[PS2")!=NULL)
 											{
 												if(pcount==0) strcat(buffer, "<br><HR>");
-												strenc(enc_dir_name, entry.d_name);
+												urlenc(enc_dir_name, entry.d_name);
 												sprintf(templn, "<a href=\"/mount.ps2%s/%s\">%s</a><br>", target, enc_dir_name, entry.d_name);
 
 												tlen+=strlen(tempstr);
@@ -8199,11 +8266,11 @@ just_leave:
 												get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
 											}
 											else
-												get_name(templn, data[v3_entry].name, 0);
+												{get_name(templn, data[v3_entry].name, 0); htmlenc(tempstr, templn, 1);}
 
 											get_default_icon(icon, param, data[v3_entry].name, data[v3_entry].is_directory, tempID, ns, abort_connection);
-											strenc(enc_dir_name, data[v3_entry].name);
 
+											urlenc(enc_dir_name, data[v3_entry].name);
 											snprintf(ename, 6, "%s    ", templn);
 
 											if(data[v3_entry].is_directory && IS_ISO_FOLDER)
@@ -8322,6 +8389,7 @@ next_html_entry:
 															if(f1==4 && !strstr(entry.d_name+flen, ".ntfs[DVDISO]")) continue;
 															if(f1==6 && !strstr(entry.d_name+flen, ".ntfs[PSXISO]")) continue;
 														}
+														htmlenc(tempstr, templn, 1);
 													}
 #endif
 												}
@@ -8362,10 +8430,11 @@ next_html_entry:
 
 												get_default_icon(icon, param, entry.d_name, 0, tempID, ns, abort_connection);
 
-												strenc(enc_dir_name, entry.d_name);
+												urlenc(enc_dir_name, entry.d_name);
 												templn[64]=0; flen=strlen(templn);
 
 												snprintf(ename, 6, "%s    ", templn);
+
 												do
 												{
 													sprintf(tempstr, "%c%c%c%c<div class=\"gc\"><div class=\"ic\"><a href=\"/mount.ps3%s%s/%s?random=%x\"><img src=\"%s\" class=\"gi\"></a></div><div class=\"gn\"><a href=\"%s%s/%s\">%s</a></div></div>",
@@ -10547,22 +10616,22 @@ void reset_settings()
 
 	webman_config->usb0=1;
 	webman_config->usb1=1;
-	webman_config->usb2=0;
-	webman_config->usb3=0;
+	//webman_config->usb2=0;
+	//webman_config->usb3=0;
 	webman_config->usb6=1;
-	webman_config->usb7=0;
+	//webman_config->usb7=0;
 
-	webman_config->lastp=0;      //disable last play
-	webman_config->autob=0;      //disable check for AUTOBOOT.ISO
-	webman_config->delay=0;      //don't delay loading of AUTOBOOT.ISO/last-game (Disc Auto-start)
+	//webman_config->lastp=0;      //disable last play
+	//webman_config->autob=0;      //disable check for AUTOBOOT.ISO
+	//webman_config->delay=0;      //don't delay loading of AUTOBOOT.ISO/last-game (Disc Auto-start)
 
-	webman_config->bootd=0;      //don't wait for any USB device to be ready
+	//webman_config->bootd=0;      //don't wait for any USB device to be ready
 	webman_config->boots=3;      //wait 3 additional seconds for each selected USB device to be ready
 
-	webman_config->nogrp=0;      //group content on XMB
-	webman_config->wmdn=0;       //enable start up message (webMAN Loaded!)
-	webman_config->tid=0;        //don't include the ID as part of the title of the game
-	webman_config->noset=0;      //enable webMAN Setup entry in "webMAN Games"
+	//webman_config->nogrp=0;      //group content on XMB
+	//webman_config->wmdn=0;       //enable start up message (webMAN Loaded!)
+	//webman_config->tid=0;        //don't include the ID as part of the title of the game
+	//webman_config->noset=0;      //enable webMAN Setup entry in "webMAN Games"
 
 #ifdef COBRA_ONLY
 	webman_config->cmask=0;
@@ -10571,24 +10640,24 @@ void reset_settings()
 #endif
 
 	webman_config->poll=1;       //disable USB polling
-	webman_config->nopad=0;      //enable all PAD shortcuts
-	webman_config->nocov=0;      //enable multiMAN covers
+	//webman_config->nopad=0;      //enable all PAD shortcuts
+	//webman_config->nocov=0;      //enable multiMAN covers
 
 //	webman_config->fanm=3;		 //unused
 	webman_config->fanc=1;       //fan control enabled
-	webman_config->temp0=0;      //auto
+	//webman_config->temp0=0;      //auto
 	webman_config->temp1=MY_TEMP;
 	webman_config->manu=35;      //manual temp
 	webman_config->ps2temp=37;   //ps2 temp
 
 	webman_config->minfan=DEFAULT_MIN_FANSPEED;
 
-	webman_config->bind=0;       //enable remote access to FTP/WWW services
-	webman_config->ftpd=0;       //enable ftp server
-	webman_config->refr=0;       //enable content scan on startup
+	//webman_config->bind=0;       //enable remote access to FTP/WWW services
+	//webman_config->ftpd=0;       //enable ftp server
+	//webman_config->refr=0;       //enable content scan on startup
 
-	webman_config->netd1    = webman_config->netd2    = webman_config->netd0=0;
-	webman_config->neth1[0] = webman_config->neth2[0] = webman_config->neth0[0]=0;
+	//webman_config->netd1    = webman_config->netd2    = webman_config->netd0=0;
+	//webman_config->neth1[0] = webman_config->neth2[0] = webman_config->neth0[0]=0;
 	webman_config->netp1    = webman_config->netp2    = webman_config->netp0=38008;
 
 	webman_config->foot=1;       //MIN
@@ -10597,16 +10666,16 @@ void reset_settings()
 	webman_config->pspl=1;       //Show PSP Launcher
 	webman_config->ps2l=1;       //Show PS2 Classic Launcher
 
-	webman_config->spp=0;        //disable removal of syscalls
+	//webman_config->spp=0;        //disable removal of syscalls
 	webman_config->fixgame=FIX_GAME_AUTO;
 
-	webman_config->sidps=0;      //spoof IDPS
-	webman_config->spsid=0;      //spoof PSID
+	//webman_config->sidps=0;      //spoof IDPS
+	//webman_config->spsid=0;      //spoof PSID
 
-	webman_config->vIDPS1[0]=webman_config->vIDPS2[0]=0;
-	webman_config->vPSID1[0]=webman_config->vPSID2[0]=0;
+	//webman_config->vIDPS1[0]=webman_config->vIDPS2[0]=0;
+	//webman_config->vPSID1[0]=webman_config->vPSID2[0]=0;
 
-	webman_config->bus=0;      //enable reset USB bus
+	//webman_config->bus=0;      //enable reset USB bus
 
 	webman_config->combo=DISACOBRA; //disable combo for cobra toggle
 	webman_config->combo2|=(REBUGMODE|NORMAMODE|DEBUGMENU|PS2SWITCH); //disable combos for rebug/ps2 switch

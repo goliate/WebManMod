@@ -706,7 +706,7 @@ int main(int argc, const char* argv[])
 							flen = strlen(filename)-1; if(flen<3) continue;
 
 							is_iso =	((strcasestr(filename + flen - 3, ".iso")) && (filename[flen]=='o' || filename[flen]=='O')) ||
-							  (m>1 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
+							  (m>0 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
 										((strcasestr(filename + flen - 3, ".img")) && (filename[flen]=='g' || filename[flen]=='G')) ||
 										((strcasestr(filename + flen - 3, ".mdf")) && (filename[flen]=='f' || filename[flen]=='F')) ));
 
@@ -726,7 +726,7 @@ next_ntfs_entry:
 								flen = strlen(filename)-1;
 
 								is_iso =	((strcasestr(filename + flen - 3, ".iso")) && (filename[flen]=='o' || filename[flen]=='O')) ||
-								  (m>1 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
+								  (m>0 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
 											((strcasestr(filename + flen - 3, ".img")) && (filename[flen]=='g' || filename[flen]=='G')) ||
 											((strcasestr(filename + flen - 3, ".mdf")) && (filename[flen]=='f' || filename[flen]=='F')) ));
 							}
