@@ -200,7 +200,7 @@ static void plugin_thread(uint64_t arg)
 						recording = false;
 					}
 				}
-				delay = 3*6; // 3 seconds
+				delay = 3*60; // 3 seconds
 			}
 		}
 		sys_timer_usleep(16668);
