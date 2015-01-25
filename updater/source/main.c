@@ -392,6 +392,12 @@ int main()
 	if(sysLv2FsStat("/dev_hdd0/tmp/wm_lang/LANG_XX.TXT", &stat))
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/LANG_XX.TXT","/dev_hdd0/tmp/wm_lang/LANG_XX.TXT");
 
+
+	if((sysLv2FsStat("/dev_hdd0/plugins", &stat) == SUCCESS))
+		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/video_rec.sprx","/dev_hdd0/plugins/video_rec.sprx");
+	else
+		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/video_rec.sprx","/dev_hdd0/video_rec.sprx");
+
 	// update PRX+Mamba Loader
 	if((sysLv2FsStat("/dev_hdd0/game/IRISMAN01/USRDIR/webftp_server.sprx", &stat) == SUCCESS))
 	{

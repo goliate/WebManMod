@@ -2227,6 +2227,7 @@ int cobra_build_netiso_params(void *param_buf, char *server, uint16_t port, char
 
 	return 0;
 }
+*/
 
 int cobra_load_vsh_plugin(unsigned int slot, char *path, void *arg, uint32_t arg_size)
 {
@@ -2240,4 +2241,4 @@ int cobra_unload_vsh_plugin(unsigned int slot)
 	return (int)p1;
 }
 
-*/
+

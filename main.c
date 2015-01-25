@@ -32,22 +32,22 @@
 #include <time.h>
 #include <unistd.h>
 
-//#define ENGLISH_ONLY	1	// uncomment for english only version
+#define ENGLISH_ONLY	1	// uncomment for english only version
 
 //#define CCAPI			1	// uncomment for ccapi release
 #define COBRA_ONLY	1	// comment out for ccapi/non-cobra release
 //#define REX_ONLY		1	// shortcuts for REBUG REX CFWs / comment out for usual CFW
 
 //#define PS3MAPI		1
-//#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
-#define WEB_CHAT		1
+#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
+//#define WEB_CHAT		1
 #define FIX_GAME		1
-#define DEBUG_MEM		1
+//#define DEBUG_MEM		1
+#define VIDEO_REC		1
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
 //#define NOSINGSTAR	1
 //#define SWAP_KERNEL	1
 //#define EXTRA_FEAT	1	// save XMB to bmp, eject disc holding SELECT on mount,
-//#define VIDEO_REC		1	//not working
 //#define USE_DEBUG		1
 
 #include "types.h"
@@ -59,10 +59,6 @@
 
 #ifdef EXTRA_FEAT
 #include "vsh/system_plugin.h"
-#endif
-
-#ifdef VIDEO_REC
-#include "vsh/rec_plugin.h"
 #endif
 
 char _game_name[0x120];
@@ -113,7 +109,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.14 MOD"						// webMAN version
+#define WM_VERSION			"1.41.15 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -399,6 +395,10 @@ static u8 loading_html=0;
 static u8 loading_games=0;
 static u8 init_running=0;
 
+#ifdef VIDEO_REC
+static u8 is_video_rec_loaded=0;
+#endif
+
 #ifdef COBRA_ONLY
 #ifndef LITE_EDITION
 static int g_socket = -1;
@@ -548,6 +548,7 @@ typedef struct
 #define BLOCKSVRS (1<<5)
 #define XMLREFRSH (1<<6)
 #define UMNT_GAME (1<<7)
+#define VIDRECORD (1<<8)
 
 #define REBUGMODE (1<<13)
 #define NORMAMODE (1<<14)
@@ -1110,6 +1111,34 @@ void saveBMP()
 #endif
 
 #ifdef VIDEO_REC
+bool toggle_video_rec(u8 msg)
+{
+	struct CellFsStat s;
+	char vsh_plugin[40];
+
+	strcpy(vsh_plugin, "/dev_hdd0/plugins/video_rec.sprx\0");
+	if(cellFsStat(vsh_plugin, &s)!=CELL_FS_SUCCEEDED) strcpy(vsh_plugin, "/dev_hdd0/video_rec.sprx\0");
+
+	if(cellFsStat(vsh_plugin, &s)==CELL_FS_SUCCEEDED)
+	{
+		cobra_unload_vsh_plugin(6); // unload slot 6 (reserved for rec_plugin)
+
+		if(!is_video_rec_loaded)
+		{
+			if(msg) show_msg((char*)"Loading rec_plugin...");
+			cobra_load_vsh_plugin(6, vsh_plugin, NULL, 0);
+		}
+		else
+			show_msg((char*)"rec_plugin unloaded!");
+
+		sys_timer_sleep(2);
+		is_video_rec_loaded^=1;
+		return true;
+	}
+	return false;
+}
+#endif
+
 /*
 void log(const char *fmt, char *text)
 {
@@ -1128,78 +1157,6 @@ void log(const char *fmt, char *text)
 	cellFsClose(fd);
 }
 */
-bool rec_start()
-{
-	if(game_name()==0) return false; // XMB
-
-    reco_open = (void*)((int)getNIDfunc("vshmain",0xBEF63A14));	// open memory container
-	reco_open -= (50*2);
-
-	// fetch recording utility vsh options
-	//int* func_start = (int*&)(*((int*&)reco_open));
-    int* func_start = (int*)(*((int*)reco_open));
-	func_start += 3;
-	int dword1 = ((*func_start) & 0x0000FFFF) - 1;
-	func_start += 2;
-	recOpt = (uint32_t*)((dword1 << 16) + ((*func_start) & 0x0000FFFF));//(uint32_t*)0x72EEC0;
-
-	recOpt[1] = 0x4660;//CELL_REC_PARAM_VIDEO_FMT_M4HD_HD720_5000K_30FPS | 0x2100; //CELL_REC_PARAM_VIDEO_FMT_AVC_BL_MIDDLE_512K_30FPS
-	recOpt[2] = 0x0000; //CELL_REC_PARAM_AUDIO_FMT_AAC_96K
-
-    vsh_E7C34044 = (void*)((int)getNIDfunc("vsh",0xE7C34044));	// getMemoryContainer
-	recOpt[5] = (vsh_E7C34044(1) == -1 ) ? vsh_E7C34044(0) : vsh_E7C34044(1);
-	recOpt[0x208] = 0x80; // 0x90 show XMB || reduce memsize // 0x80; // allow show XMB
-
-	CellRtcDateTime t;
-	cellRtcGetCurrentClockLocalTime(&t);
-
-	cellFsMkdir((char*)"/dev_hdd0/plugins", MODE);
-    game_name(); vsh_sprintf((char*)&recOpt[0x6],"/dev_hdd0/plugins/%s_%04d.%02d.%02d_%02d_%02d_%02d.mp4",_game_name+4,t.year,t.month,t.day,t.hour,t.minute,t.second);
-
-	reco_open(-1); // memory container
-	sys_timer_sleep(4);
-
-	if(View_Find("rec_plugin") == 0)
-	{
-		reco_open(-1); //retry //reco_open((vsh_E7C34044(1) == -1 ) ? vsh_E7C34044(0) : vsh_E7C34044(1));
-		sys_timer_sleep(3);
-	}
-
-	if(View_Find("rec_plugin") != 0)
-	{
-		rec_interface = (rec_plugin_interface *)plugin_GetInterface(View_Find("rec_plugin"),1);
-		if(rec_interface != 0)
-		{
-			rec_interface->start();
-			return true;
-		}
-	}
-
-	show_msg("No rec_plugin view found.");
-	return false;
-}
-
-bool recording=false;
-void toggle_rec()
-{
-	if(game_name())
-	{
-		if(recording == false)
-		{
-			show_msg("Recording started.");
-			recording = rec_start();
-			if(recording==false) show_msg("Recording Error.");
-		}
-		else
-		{
-			recording = false;
-			rec_interface->stop();
-			rec_interface->close(0);
-			show_msg("Recording finished.");
-		}
-	}
-}
-#endif
 
 #ifndef COBRA_ONLY
 void string_to_lv2(char* path, u64 addr);
@@ -1527,28 +1484,26 @@ void urlenc(char *dst, char *src)
 
 void utf8enc(char *dst, char *src)
 {
-	size_t j=0;
-	size_t n=strlen(src); u8 c;
+	size_t j=0, n=strlen(src); u16 c;
 	for(size_t i=0; i<n; i++)
 	{
 		c=(src[i]&0xFF);
 
-		if(c<0x80) dst[j++]=c;
-		else //if(c>=0x80 && c<0x800)
+		if(!(c & 0xff80)) dst[j++]=c;
+		else //if(!(c & 0xf800))
 		{
-			dst[j++]=0xC0|(0x0F&(c>>6));
+			dst[j++]=0xC0|(c>>6);
 			dst[j++]=0x80|(0x3F&c);
 		}
 /*
 		else
 		{
-			dst[j++]=(0xE0|((0x0F&(c>>12))));
-			dst[j++]=(0x80|((0x3F&(c>>06))));
-			dst[j++]=(0x80|((0x3F&(c    ))));
+			dst[j++]=0xE0|(0x0F&(c>>12));
+			dst[j++]=0x80|(0x3F&(c>>06));
+			dst[j++]=0x80|(0x3F&(c    ));
 		}
 */
 	}
-
 	dst[j] = '\0';
 	strncpy(src, dst, MAX_LINE_LEN);
 }
@@ -3637,6 +3592,8 @@ static void add_option_item(const char *value, const char *label, bool selected,
 
 static void parse_param_sfo(unsigned char *mem, char *titleID, char *title)
 {
+	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return; //is sfo header?
+
 	u8 fcount=0;
 
 	u16 pos, str, dat, indx=0;
@@ -3675,6 +3632,8 @@ static void parse_param_sfo(unsigned char *mem, char *titleID, char *title)
 
 static bool fix_param_sfo(unsigned char *mem, char *titleID, u8 msg)
 {
+	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return false; //is sfo header?
+
 #ifdef FIX_GAME
 	u8 fcount=0;
 #endif
@@ -3724,6 +3683,8 @@ static bool fix_param_sfo(unsigned char *mem, char *titleID, u8 msg)
 #ifdef FIX_GAME
 static bool fix_ps3_extra(unsigned char *mem)
 {
+	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return false; //is sfo header?
+
 	u16 pos, str, dat, indx=0;
 
 	str=(mem[0x8]+(mem[0x9]<<8));
@@ -3795,7 +3756,7 @@ static void fix_game(char *path)
 }
 
 #ifdef COBRA_ONLY
-uint64_t getlba(const unsigned char *s1, u16 n1, const unsigned char *s2, u16 n2, u16 start)
+uint64_t getlba(const char *s1, u16 n1, const char *s2, u16 n2, u16 start)
 {
     u16 c=0; u32 lba=0;
     for(u16 n=start+0x1F; n<n1-n2; n++)
@@ -3824,7 +3785,7 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 
 	if(cellFsOpen((char*)iso_file, CELL_FS_O_RDWR, &fd, 0, 0)==CELL_FS_SUCCEEDED)
 	{
-		uint64_t chunk_size=_4KB_; unsigned char chunk[_4KB_], ps3_sys_version[8];
+		uint64_t chunk_size=_4KB_; char chunk[_4KB_], ps3_sys_version[8];
 		uint64_t msiz1 = 0, msiz2 = 0, lba = 0, pos=0xA000ULL;
 
 		bool fix_sfo=true, fix_eboot=true;
@@ -3842,7 +3803,7 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 				cellFsLseek(fd, pos, CELL_FS_SEEK_SET, &msiz2);
 				cellFsRead(fd, chunk, chunk_size, &msiz1); if(msiz1<=0) break;
 
-				lba=getlba(chunk, msiz1, (unsigned char)"PARAM.SFO;1", 11, 0);
+				lba=getlba(chunk, msiz1, "PARAM.SFO;1", 11, 0);
 
 				if(lba)
 				{
@@ -3859,10 +3820,10 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 
 					if(size>lba) size=lba;
 
-					sprintf((char*)chunk, STR_FIXING, iso_file);
+					sprintf(chunk, STR_FIXING, iso_file);
 					show_msg(chunk);
 
-					lba=getlba(chunk, msiz1, (unsigned char)"PS3_DISC.SFB;1", 14, 0); lba*=0x800ULL; chunk_size=0x800; //1 sector
+					lba=getlba(chunk, msiz1, "PS3_DISC.SFB;1", 14, 0); lba*=0x800ULL; chunk_size=0x800; //1 sector
 					if(lba>0 && size>lba) size=lba;
 				}
 			}
@@ -3881,11 +3842,11 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 					sys_timer_usleep(1);
 					if(fix_aborted) goto exit_fix;
 
-					if(t==0) lba=getlba(chunk, msiz1, (unsigned char)"EBOOT.BIN;1", 11, start);
-					if(t==1) lba=getlba(chunk, msiz1, (unsigned char)".SELF;1", 7, start);
-					if(t==2) lba=getlba(chunk, msiz1, (unsigned char)".self;1", 7, start);
-					if(t==3) lba=getlba(chunk, msiz1, (unsigned char)".SPRX;1", 7, start);
-					if(t==4) lba=getlba(chunk, msiz1, (unsigned char)".sprx;1", 7, start);
+					if(t==0) lba=getlba(chunk, msiz1, "EBOOT.BIN;1", 11, start);
+					if(t==1) lba=getlba(chunk, msiz1, ".SELF;1", 7, start);
+					if(t==2) lba=getlba(chunk, msiz1, ".self;1", 7, start);
+					if(t==3) lba=getlba(chunk, msiz1, ".SPRX;1", 7, start);
+					if(t==4) lba=getlba(chunk, msiz1, ".sprx;1", 7, start);
 
 					if(lba)
 					{
@@ -5983,8 +5944,11 @@ html_response:
 					if(!strstr(param, "psv=1")) webman_config->combo2|=BLOCKSVRS;
 					if(!strstr(param, "pxr=1")) webman_config->combo2|=XMLREFRSH;
 					if(!strstr(param, "umt=1")) webman_config->combo2|=UMNT_GAME;
-
-
+#ifdef VIDEO_REC
+					if(!strstr(param, "vrc=1")) webman_config->combo2|=VIDRECORD;
+					if( ( (webman_config->combo2 & VIDRECORD) &&  is_video_rec_loaded ) ||
+						(!(webman_config->combo2 & VIDRECORD) && !is_video_rec_loaded ) ) toggle_video_rec(1);
+#endif
 					if(strstr(param, "wmdn")) webman_config->wmdn=1;
 					if(strstr(param, "tid=1")) webman_config->tid=1;
 					if(strstr(param, "pl=1")) webman_config->poll=1;
@@ -7141,7 +7105,10 @@ just_leave:
 						if(is_rebug && (c_firmware==4.65f || c_firmware==4.66f))
 						add_check_box("p2c", "1", "PS2 CLASSIC",  " : <b>SELECT+L2+&#8710;</b><br>", !(webman_config->combo2 & PS2TOGGLE), buffer);
 #endif
-						add_check_box("p2s", "1", "PS2 SWITCH",   " : <b>SELECT+L2+R2</b>"         , !(webman_config->combo2 & PS2SWITCH), buffer);
+						add_check_box("p2s", "1", "PS2 SWITCH",   " : <b>SELECT+L2+R2</b><br>"     , !(webman_config->combo2 & PS2SWITCH), buffer);
+#ifdef VIDEO_REC
+						add_check_box("vrc", "1", "VIDEO REC (in-game)",    " : <b>R3</b><br>"     , !(webman_config->combo2 & VIDRECORD), buffer);
+#endif
 
 						sprintf(templn, "</td></tr></table><hr color=\"#FF0000\"/><input type=\"submit\" value=\" %s \"/></form>", STR_SAVE); strcat(buffer, templn);
 
@@ -10022,17 +9989,14 @@ static void poll_thread(uint64_t poll)
 							refresh_xml(msg);
 						}
                         else
-#ifdef VIDEO_REC
-						if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3) // SELECT+R3
-						{
-                            toggle_rec();
-						}
-                        else
-						if(!(webman_config->combo & SHOW_TEMP) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & (/*CELL_PAD_CTRL_R3 |*/ CELL_PAD_CTRL_START))) // SELECT+START show temperatures / hdd space
-#else
 						if(!(webman_config->combo & SHOW_TEMP) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & (CELL_PAD_CTRL_R3 | CELL_PAD_CTRL_START))) // SELECT+START show temperatures / hdd space
-#endif
 						{
+#ifdef VIDEO_REC
+							if(!(webman_config->combo2 & VIDRECORD) && data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3)
+							{
+								if(toggle_video_rec(1)) break;
+							}
+#endif
 #ifdef EXTRA_FEAT
 							if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] == (CELL_PAD_CTRL_R2 | CELL_PAD_CTRL_L2) )
 								saveBMP();
@@ -10678,7 +10642,7 @@ void reset_settings()
 	//webman_config->bus=0;      //enable reset USB bus
 
 	webman_config->combo=DISACOBRA; //disable combo for cobra toggle
-	webman_config->combo2|=(REBUGMODE|NORMAMODE|DEBUGMENU|PS2SWITCH); //disable combos for rebug/ps2 switch
+	webman_config->combo2|=(REBUGMODE|NORMAMODE|DEBUGMENU|PS2SWITCH|VIDRECORD); //disable combos for rebug/ps2 switch/video record
 
 	char upath[24];
 	struct CellFsStat buf;
@@ -11478,6 +11442,10 @@ static void wwwd_thread(uint64_t arg)
 	{struct CellFsStat buf; from_reboot = (cellFsStat((char*)WMNOSCAN, &buf)==CELL_FS_SUCCEEDED); is_rebug=isDir("/dev_flash/rebug");}
 
 	if(webman_config->blind) enable_dev_blind(NULL);
+
+#ifdef VIDEO_REC
+	if(!(webman_config->combo2 & VIDRECORD)) toggle_video_rec(0);
+#endif
 
 	set_buffer_sizes();
 
@@ -13394,7 +13362,7 @@ exit_mount:
 #ifdef FIX_GAME
 	if(ret && (c_firmware<4.66f) && cellFsOpen("/dev_bdvd/PS3_GAME/PARAM.SFO", CELL_FS_O_RDONLY, &fs, 0, 0)==CELL_FS_SUCCEEDED)
 	{
-		unsigned char *mem = (u8*)paramsfo; uint64_t msiz = 0;
+		uint64_t msiz = 0;
 
 		cellFsLseek(fs, 0, CELL_FS_SEEK_SET, &msiz);
 		cellFsRead(fs, (void *)&paramsfo, _4KB_, &msiz);
