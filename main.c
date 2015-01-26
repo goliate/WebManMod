@@ -39,10 +39,10 @@
 //#define REX_ONLY		1	// shortcuts for REBUG REX CFWs / comment out for usual CFW
 
 //#define PS3MAPI		1
-#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
-//#define WEB_CHAT		1
+//#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
+#define WEB_CHAT		1
 #define FIX_GAME		1
-//#define DEBUG_MEM		1
+#define DEBUG_MEM		1
 #define VIDEO_REC		1
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
 //#define NOSINGSTAR	1
@@ -394,10 +394,6 @@ static u8 profile = 0;
 static u8 loading_html=0;
 static u8 loading_games=0;
 static u8 init_running=0;
-
-#ifdef VIDEO_REC
-static u8 is_video_rec_loaded=0;
-#endif
 
 #ifdef COBRA_ONLY
 #ifndef LITE_EDITION
@@ -1107,35 +1103,6 @@ void saveBMP()
 
 		show_msg(bmp);
 	}
-}
-#endif
-
-#ifdef VIDEO_REC
-bool toggle_video_rec(u8 msg)
-{
-	struct CellFsStat s;
-	char vsh_plugin[40];
-
-	strcpy(vsh_plugin, "/dev_hdd0/plugins/video_rec.sprx\0");
-	if(cellFsStat(vsh_plugin, &s)!=CELL_FS_SUCCEEDED) strcpy(vsh_plugin, "/dev_hdd0/video_rec.sprx\0");
-
-	if(cellFsStat(vsh_plugin, &s)==CELL_FS_SUCCEEDED)
-	{
-		cobra_unload_vsh_plugin(6); // unload slot 6 (reserved for rec_plugin)
-
-		if(!is_video_rec_loaded)
-		{
-			if(msg) show_msg((char*)"Loading rec_plugin...");
-			cobra_load_vsh_plugin(6, vsh_plugin, NULL, 0);
-		}
-		else
-			show_msg((char*)"rec_plugin unloaded!");
-
-		sys_timer_sleep(2);
-		is_video_rec_loaded^=1;
-		return true;
-	}
-	return false;
 }
 #endif
 
@@ -2663,6 +2630,82 @@ uint64_t peek_lv1(uint64_t addr)
 	system_call_1(SC_PEEK_LV1, (uint64_t) addr);
 	return (uint64_t) p1;
 }
+
+
+//////////////////////////////////////////////////////////////////////////////
+#ifdef VIDEO_REC
+
+#include "vsh/vsh.h"
+#include "vsh/vshmain.h"
+#include "vsh/rec_plugin.h"
+
+#define PLUGIN_NAME "rec_plugin"
+
+bool recording = false;
+
+uint32_t *recOpt = NULL;              // recording utility vsh options struct
+int32_t (*reco_open)(int32_t) = NULL; // base pointer
+
+bool rec_start(void);
+
+bool rec_start()
+{
+	recOpt[1] = 0x4660;//CELL_REC_PARAM_VIDEO_FMT_M4HD_HD720_5000K_30FPS | 0x2100; //CELL_REC_PARAM_VIDEO_FMT_AVC_BL_MIDDLE_512K_30FPS
+	recOpt[2] = 0x0000; //CELL_REC_PARAM_AUDIO_FMT_AAC_96K
+	recOpt[5] = (vsh_memory_container_by_id(1) == -1 ) ? vsh_memory_container_by_id(0) : vsh_memory_container_by_id(1);
+	recOpt[0x208] = 0x80; // 0x90 show XMB || reduce memsize // 0x80; // allow show XMB
+
+	CellRtcDateTime t;
+	cellRtcGetCurrentClockLocalTime(&t);
+
+	char g[0x120];
+	game_interface = (game_plugin_interface *)plugin_GetInterface(View_Find("game_plugin"), 1);
+
+	game_interface->DoUnk8(g);
+
+	cellFsMkdir((char*)"/dev_hdd0/VIDEO", 0777);
+	sprintf((char*)&recOpt[0x6], "/dev_hdd0/VIDEO/%s_04d.%02d.%02d_%02d_%02d_%02d.mp4",
+								   g+0x04, t.year, t.month, t.day, t.hour, t.minute, t.second);
+
+	reco_open(-1); // memory container
+	sys_timer_sleep(4);
+
+
+	if(View_Find("rec_plugin") != 0)
+	{
+		rec_interface = (rec_plugin_interface *)plugin_GetInterface(View_Find("rec_plugin"), 1);
+
+		if(rec_interface != 0)
+		{
+			rec_interface->start();
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	else
+	{
+		reco_open(-1); //reco_open((vsh_memory_container_by_id(1) == -1 ) ? vsh_memory_container_by_id(0) : vsh_memory_container_by_id(1));
+		sys_timer_sleep(3);
+
+		if(View_Find("rec_plugin") != 0)
+		{
+			rec_interface = (rec_plugin_interface *)plugin_GetInterface(View_Find("rec_plugin"), 1);
+
+			rec_interface->start();
+			return true;
+		}
+		else
+		{
+			show_msg("No rec_plugin view found.");
+			return false;
+		}
+	}
+}
+#endif
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef ENGLISH_ONLY
 bool language(const char *file_str, char *default_str)
@@ -5946,8 +5989,6 @@ html_response:
 					if(!strstr(param, "umt=1")) webman_config->combo2|=UMNT_GAME;
 #ifdef VIDEO_REC
 					if(!strstr(param, "vrc=1")) webman_config->combo2|=VIDRECORD;
-					if( ( (webman_config->combo2 & VIDRECORD) &&  is_video_rec_loaded ) ||
-						(!(webman_config->combo2 & VIDRECORD) && !is_video_rec_loaded ) ) toggle_video_rec(1);
 #endif
 					if(strstr(param, "wmdn")) webman_config->wmdn=1;
 					if(strstr(param, "tid=1")) webman_config->tid=1;
@@ -6248,8 +6289,8 @@ html_response:
 					if(game_name())
 					{
 						sprintf(templn, "<hr><H2><a href=\"%s", search_url); strcat(buffer, templn);
-						game_name(); sprintf(templn, "%s\">", _game_name+20); strcat(buffer, templn);
-						game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+4); strcat(buffer, templn);
+						game_name(); sprintf(templn, "%s\">", _game_name+0x14); strcat(buffer, templn);
+						game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+0x04); strcat(buffer, templn);
 					}
 
 					char max_temp1[50], max_temp2[50]; max_temp2[0]=0;
@@ -7077,6 +7118,10 @@ just_leave:
 						sprintf(templn, "%s XML", STR_REFRESH);
 						add_check_box("pxr", "1", templn,         " : <b>SELECT+L3</b><br>"        , !(webman_config->combo2 & XMLREFRSH), buffer);
 
+#ifdef VIDEO_REC
+						add_check_box("vrc", "1", "VIDEO REC (in-game)", " : <b>SELECT+R3</b><br>" , !(webman_config->combo2 & VIDRECORD), buffer);
+#endif
+
 #ifdef REX_ONLY
 						add_check_box("pid", "1", STR_SHOWIDPS,   " : <b>R2+O</b><br>"             , !(webman_config->combo & SHOW_IDPS), buffer);
 						add_check_box("psd", "1", STR_SHUTDOWN2,  " : <b>L3+R2+X</b><br>"          , !(webman_config->combo & SHUT_DOWN), buffer);
@@ -7106,9 +7151,6 @@ just_leave:
 						add_check_box("p2c", "1", "PS2 CLASSIC",  " : <b>SELECT+L2+&#8710;</b><br>", !(webman_config->combo2 & PS2TOGGLE), buffer);
 #endif
 						add_check_box("p2s", "1", "PS2 SWITCH",   " : <b>SELECT+L2+R2</b><br>"     , !(webman_config->combo2 & PS2SWITCH), buffer);
-#ifdef VIDEO_REC
-						add_check_box("vrc", "1", "VIDEO REC (in-game)",    " : <b>R3</b><br>"     , !(webman_config->combo2 & VIDRECORD), buffer);
-#endif
 
 						sprintf(templn, "</td></tr></table><hr color=\"#FF0000\"/><input type=\"submit\" value=\" %s \"/></form>", STR_SAVE); strcat(buffer, templn);
 
@@ -7705,7 +7747,7 @@ just_leave:
 #endif
 								if(!forced_mount && game_name())
 								{
-									sprintf(templn, "<H3>%s : <a href=\"/mount.ps3/unmount\">%s %s</a></H3><hr><a href=\"/mount_ps3%s\">", STR_UNMOUNTGAME, _game_name+4, _game_name+20, param+plen); strcat(buffer, templn);
+									sprintf(templn, "<H3>%s : <a href=\"/mount.ps3/unmount\">%s %s</a></H3><hr><a href=\"/mount_ps3%s\">", STR_UNMOUNTGAME, _game_name+0x04, _game_name+0x14, param+plen); strcat(buffer, templn);
 								}
 								else
 									mounted=mount_with_mm(param+plen, 1);
@@ -9994,7 +10036,45 @@ static void poll_thread(uint64_t poll)
 #ifdef VIDEO_REC
 							if(!(webman_config->combo2 & VIDRECORD) && data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3)
 							{
-								if(toggle_video_rec(1)) break;
+								if(View_Find("game_plugin") != 0)    // if game_plugin is loaded -> there is a game/app running and we can recording...
+								{
+									if(!reco_open)
+									{
+										// get functions pointer for sub_163EB0() aka reco_open()
+										reco_open = vshmain_BEF63A14; // base pointer, the export nearest to sub_163EB0()
+
+										reco_open -= (50*8); // reco_open_opd (50 opd's above vshmain_BEF63A14_opd)
+
+										// fetch recording utility vsh options struct (build address from instructions...)
+										uint32_t addr = (*(uint32_t*)(*(uint32_t*)reco_open+0xC) & 0x0000FFFF) -1;
+										recOpt = (uint32_t*)((addr << 16) + ((*(uint32_t*)(*(uint32_t*)reco_open+0x14)) & 0x0000FFFF)); // (uint32_t*)0x72EEC0;
+									}
+
+									if(recording == false)
+									{
+									  // not recording yet
+										show_msg("Recording started");
+
+										if(rec_start() == false)
+										{
+											show_msg("Recording Error!");
+										}
+										else
+										{
+											recording = true;
+										}
+									}
+									else
+									{
+										// we are already recording
+										rec_interface->stop();
+										rec_interface->close(0);
+										show_msg("Recording finished");
+										recording = false;
+									}
+								}
+								sys_timer_sleep(2);
+								break;
 							}
 #endif
 #ifdef EXTRA_FEAT
@@ -11442,10 +11522,6 @@ static void wwwd_thread(uint64_t arg)
 	{struct CellFsStat buf; from_reboot = (cellFsStat((char*)WMNOSCAN, &buf)==CELL_FS_SUCCEEDED); is_rebug=isDir("/dev_flash/rebug");}
 
 	if(webman_config->blind) enable_dev_blind(NULL);
-
-#ifdef VIDEO_REC
-	if(!(webman_config->combo2 & VIDRECORD)) toggle_video_rec(0);
-#endif
 
 	set_buffer_sizes();
 
