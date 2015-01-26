@@ -44,6 +44,7 @@
 #define FIX_GAME		1
 #define DEBUG_MEM		1
 #define VIDEO_REC		1
+#define LOAD_PRX		1
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
 //#define NOSINGSTAR	1
 //#define SWAP_KERNEL	1
@@ -109,7 +110,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.15 MOD"						// webMAN version
+#define WM_VERSION			"1.41.16 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -2704,6 +2705,48 @@ bool rec_start()
 		}
 	}
 }
+
+void toggle_video_rec()
+{
+	if(View_Find("game_plugin") != 0)    // if game_plugin is loaded -> there is a game/app running and we can recording...
+	{
+		if(!reco_open)
+		{
+			// get functions pointer for sub_163EB0() aka reco_open()
+			reco_open = vshmain_BEF63A14; // base pointer, the export nearest to sub_163EB0()
+
+			reco_open -= (50*8); // reco_open_opd (50 opd's above vshmain_BEF63A14_opd)
+
+			// fetch recording utility vsh options struct (build address from instructions...)
+			uint32_t addr = (*(uint32_t*)(*(uint32_t*)reco_open+0xC) & 0x0000FFFF) -1;
+			recOpt = (uint32_t*)((addr << 16) + ((*(uint32_t*)(*(uint32_t*)reco_open+0x14)) & 0x0000FFFF)); // (uint32_t*)0x72EEC0;
+		}
+
+		if(recording == false)
+		{
+		  // not recording yet
+			show_msg("Recording started");
+
+			if(rec_start() == false)
+			{
+				show_msg("Recording Error!");
+			}
+			else
+			{
+				recording = true;
+			}
+		}
+		else
+		{
+			// we are already recording
+			rec_interface->stop();
+			rec_interface->close(0);
+			show_msg("Recording finished");
+			recording = false;
+		}
+	}
+	else recording = false;
+}
 #endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -4424,6 +4467,10 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 	else if(!is_net && ( !extcmp(name, ".pkg", 4) || !extcmp(name, ".edat", 5) || !extcmp(name, ".p3t", 4) || !memcmp(name, "webftp_server", 13) || !memcmp(name, "boot_plugins_", 13) ))
 #endif
 		sprintf(fsize, "<a href=\"/copy.ps3%s\">%llu %s</a>", templn, sz, sf);
+#ifdef LOAD_PRX
+	else if(!is_net && ( !extcmp(name, ".sprx", 5)))
+		sprintf(fsize, "<a href=\"/loadprx.ps3?slot=6&prx=%s\">%llu %s</a>", templn, sz, sf);
+#endif
 	else
 		sprintf(fsize, "%llu %s", sz, sf);
 
@@ -5705,10 +5752,13 @@ again3:
 
 #ifndef LITE_EDITION
 #ifdef WEB_CHAT
-			if(strstr(param, "/popup.ps3") || strstr(param, "/chat.ps3"))
-#else
-			if(strstr(param, "/popup.ps3"))
+			if(strstr(param, "/chat.ps3"))
+			{
+				is_popup=1; is_binary=0;
+				goto html_response;
+			}
 #endif
+			if(strstr(param, "/popup.ps3"))
 			{
 				is_popup=1; is_binary=0;
 				goto html_response;
@@ -5716,6 +5766,7 @@ again3:
 #endif
 			if(strstr(param, "quit.ps3"))
 			{
+quit:
 				restore_fan(1);
 				show_msg((char*)STR_WMUNL);
 				working=0;
@@ -5743,7 +5794,7 @@ restart:
 				//sys_memory_free(sysmem);
 				working=0;
 				{DELETE_TURNOFF}
- 				if(strstr(param,"?0")==NULL) savefile((char*)WMNOSCAN, NULL, 0);
+				if(strstr(param,"?0")==NULL) savefile((char*)WMNOSCAN, NULL, 0);
 				{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
 				sys_ppu_thread_exit(0);
 				break;
@@ -5772,7 +5823,7 @@ restart:
 							strstr(param, "buzzer.ps3mapi")   ||
 							strstr(param, "notify.ps3mapi")   ||
 							strstr(param, "syscall.ps3mapi")  ||
-							strstr(param, "syscall8.ps3mapi")  ||
+							strstr(param, "syscall8.ps3mapi") ||
 #endif
 							strstr(param, "copy.ps3/")))
 				is_binary=0;
@@ -5785,8 +5836,14 @@ restart:
 					strstr(param, "mount.ps2/")  ||
 					strstr(param, "mount_ps2/")  ||
 #endif
+#ifdef VIDEO_REC
+					strstr(param, "videorec.ps3") ||
+#endif
 					strstr(param, "eject.ps3")   ||
 					strstr(param, "extgd.ps3")   ||
+#ifdef LOAD_PRX
+					strstr(param, "loadprx.ps3") ||
+#endif
 					strstr(param, "insert.ps3"))
 				is_binary=0;
 			else
@@ -6288,7 +6345,11 @@ html_response:
 
 					if(game_name())
 					{
+#ifdef VIDEO_REC
+						sprintf(templn, " [<a href=\"/videorec.ps3\">REC</a>]<hr><H2><a href=\"%s", search_url); strcat(buffer, templn);
+#else
 						sprintf(templn, "<hr><H2><a href=\"%s", search_url); strcat(buffer, templn);
+#endif
 						game_name(); sprintf(templn, "%s\">", _game_name+0x14); strcat(buffer, templn);
 						game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+0x04); strcat(buffer, templn);
 					}
@@ -6717,6 +6778,55 @@ just_leave:
 						eject_insert(0, 1);
 						strcat(buffer, STR_LOADED);
 					}
+#ifdef LOAD_PRX
+					else
+					if(strstr(param, "loadprx.ps3"))
+					{
+						char *pos; unsigned int slot=6;
+
+						pos=strstr(param, "slot=");
+						if(pos)
+						{
+							get_value(templn, pos + 5, 2);
+							slot=RANGE((unsigned int)val(templn), 1, 6);
+						}
+
+						if(param[12]=='/') sprintf(templn, "%s", param+12);
+						else
+						{
+							sprintf(templn, "/dev_hdd0/plugins/webftp_server.sprx");
+							if(cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED) sprintf(templn, "/dev_hdd0/webftp_server.sprx");
+
+							pos=strstr(param, "prx=");
+							if(pos) get_value(templn, pos + 4, MAX_PATH_LEN);
+						}
+
+						if(cellFsStat(templn, &buf)==CELL_FS_SUCCEEDED)
+							sprintf(param, "slot: %i<br>load prx: %s", slot, templn);
+						else
+							sprintf(param, "unload slot: %i", slot);
+
+						strcat(buffer, param); strcat(buffer, "</font></body></html>");
+
+						cobra_unload_vsh_plugin(slot);
+
+						if(cellFsStat(templn, &buf)==CELL_FS_SUCCEEDED)
+							{cobra_load_vsh_plugin(slot, templn, NULL, 0); if(strstr(templn, "/webftp_server")) goto quit;}
+
+						break;
+					}
+#endif
+#ifdef VIDEO_REC
+					else
+					if(strstr(param, "videorec.ps3"))
+					{
+						toggle_video_rec();
+						strcat(buffer,	"<a class=\"f\" href=\"/dev_hdd0\">/dev_hdd0/</a><a href=\"/dev_hdd0/VIDEO\">VIDEO</a>:<p>"
+										"Video recording: <a href=\"/videorec.ps3\">");
+						strcat(buffer, recording?STR_ENABLED:STR_DISABLED);
+						strcat(buffer, "</a>");
+					}
+#endif
 					else
 					if(strstr(param, "extgd.ps3"))
 					{
@@ -7921,7 +8031,7 @@ just_leave:
 													 target, enc_dir_name,
 													 STR_CPYDEST, target, target);
 
-									if(strstr(target, "/webftp_server.")) {strcat(buffer, tempstr); sprintf(tempstr, "<HR>%s", STR_SETTINGSUPD);}
+									if(strstr(target, "/webftp_server")) {strcat(buffer, tempstr); sprintf(tempstr, "<HR>%s", STR_SETTINGSUPD);}
 								}
 								else if(!extcmp(param, ".BIN.ENC", 8))
 									sprintf(tempstr, "%s: %s<hr><img src=\"%s\"><hr>%s", STR_GAMETOM, templn, enc_dir_name, mounted?STR_PS2LOADED:STR_ERROR);
@@ -8515,7 +8625,7 @@ send_response:
 				else
 					strcat(buffer, "</font></body></html>"); //end-html
 
-				sprintf(templn, "Content-Length: %i\r\n\r\n", strlen(buffer)); strcat(header, templn);
+				sprintf(templn, "Content-Length: %llu\r\n\r\n", (unsigned long long)strlen(buffer)); strcat(header, templn);
 				ssend(conn_s, header);
 				ssend(conn_s, buffer);
 				buffer[0]=0;
@@ -10036,43 +10146,7 @@ static void poll_thread(uint64_t poll)
 #ifdef VIDEO_REC
 							if(!(webman_config->combo2 & VIDRECORD) && data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3)
 							{
-								if(View_Find("game_plugin") != 0)    // if game_plugin is loaded -> there is a game/app running and we can recording...
-								{
-									if(!reco_open)
-									{
-										// get functions pointer for sub_163EB0() aka reco_open()
-										reco_open = vshmain_BEF63A14; // base pointer, the export nearest to sub_163EB0()
-
-										reco_open -= (50*8); // reco_open_opd (50 opd's above vshmain_BEF63A14_opd)
-
-										// fetch recording utility vsh options struct (build address from instructions...)
-										uint32_t addr = (*(uint32_t*)(*(uint32_t*)reco_open+0xC) & 0x0000FFFF) -1;
-										recOpt = (uint32_t*)((addr << 16) + ((*(uint32_t*)(*(uint32_t*)reco_open+0x14)) & 0x0000FFFF)); // (uint32_t*)0x72EEC0;
-									}
-
-									if(recording == false)
-									{
-									  // not recording yet
-										show_msg("Recording started");
-
-										if(rec_start() == false)
-										{
-											show_msg("Recording Error!");
-										}
-										else
-										{
-											recording = true;
-										}
-									}
-									else
-									{
-										// we are already recording
-										rec_interface->stop();
-										rec_interface->close(0);
-										show_msg("Recording finished");
-										recording = false;
-									}
-								}
+								toggle_video_rec();
 								sys_timer_sleep(2);
 								break;
 							}
