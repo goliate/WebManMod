@@ -38,21 +38,21 @@
 #define COBRA_ONLY	1	// comment out for ccapi/non-cobra release
 //#define REX_ONLY		1	// shortcuts for REBUG REX CFWs / comment out for usual CFW
 
-//#define PS3MAPI		1
+//#define PS3MAPI		1	// ps3 manager API & webGUI by _NzV_
 //#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
-#define WEB_CHAT		1
-#define FIX_GAME		1
-#define EXT_GDATA		1
-#define COPY_PS3		1
-#define DEBUG_MEM		1
-#define VIDEO_REC		1
-#define LOAD_PRX		1
+#define FIX_GAME		1	// Auto-Fix game
+#define EXT_GDATA		1	// /extgd.ps3?status /extgd.ps3?enable /extgd.ps3?disable (external gameDATA)
+#define COPY_PS3		1	// /copy.ps3/<path>
+#define WEB_CHAT		1	// /chat.ps3
+#define DEBUG_MEM		1	// /dump.ps3 / peek.lv1 / poke.lv1 / find.lv1 / peek.lv2 / poke.lv2 / find.lv2
+#define VIDEO_REC		1	// /videorec.ps3  start/stop video recording (in-game only)
+#define LOAD_PRX		1	// /loadprx.ps3?slot=n&prx=path/file.sprx  (load prx)
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
-//#define NOSINGSTAR	1
-//#define SWAP_KERNEL	1
+//#define NOSINGSTAR	1	// remove SingStar icon from XMB
+//#define SWAP_KERNEL	1	// load custom lv2_kernel.self patching LV1 and soft rebooting (use /copy.ps3)
 //#define EXTRA_FEAT	1	// save XMB to bmp, eject disc holding SELECT on mount,
 //#define SYS_BGM		1	// system background music (may freeze the system when enabled)
-//#define USE_DEBUG		1
+//#define USE_DEBUG		1	// debug using telnet
 
 #include "types.h"
 #include "common.h"
@@ -5818,7 +5818,6 @@ restart:
 			}
 
 			if(!is_busy && (strstr(param, "index.ps3?")  ||
-							strstr(param, "refresh.ps3") ||
 #ifdef DEBUG_MEM
 							strstr(param, "peek.lv2?")   ||
 							strstr(param, "poke.lv2?")   ||
@@ -5843,9 +5842,9 @@ restart:
 							strstr(param, "syscall8.ps3mapi") ||
 #endif
 #ifdef COPY_PS3
-							strstr(param, "copy.ps3/")
+							strstr(param, "copy.ps3/") ||
 #endif
-			))
+							strstr(param, "refresh.ps3") ))
 				is_binary=0;
 			else if(strstr(param, "cpursx.ps3")  ||
 					strstr(param, "index.ps3")   ||
@@ -6427,11 +6426,11 @@ html_response:
 									HTML_BUTTON_FMT
 									HTML_BUTTON_FMT
 #ifdef EXT_GDATA
-									HTML_BUTTON_FMT,
+									HTML_BUTTON_FMT
 #endif
-									HTML_BUTTON, STR_EJECT, HTML_ONCLICK, "/eject.ps3",
-									HTML_BUTTON, STR_INSERT, HTML_ONCLICK, "/insert.ps3",
-									HTML_BUTTON, STR_UNMOUNT, HTML_ONCLICK, "/mount.ps3/unmount"
+									, HTML_BUTTON, STR_EJECT, HTML_ONCLICK, "/eject.ps3"
+									, HTML_BUTTON, STR_INSERT, HTML_ONCLICK, "/insert.ps3"
+									, HTML_BUTTON, STR_UNMOUNT, HTML_ONCLICK, "/mount.ps3/unmount"
 #ifdef EXT_GDATA
 									, HTML_BUTTON, "gameDATA", HTML_ONCLICK, "/extgd.ps3"
 #endif
@@ -10039,7 +10038,6 @@ static void poll_thread(uint64_t poll)
 							{if(webman_config->netp1 && webman_config->neth1[0]) mount_with_mm((char*)"/net1", 1);}
 							else
 #endif
-
 #ifdef EXT_GDATA
 							set_gamedata_status(extgd^1, true);
 							sys_timer_sleep(2);
