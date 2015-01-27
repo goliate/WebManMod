@@ -32,7 +32,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define ENGLISH_ONLY	1	// uncomment for english only version
+//#define ENGLISH_ONLY	1	// uncomment for english only version
 
 //#define CCAPI			1	// uncomment for ccapi release
 #define COBRA_ONLY	1	// comment out for ccapi/non-cobra release
@@ -42,6 +42,8 @@
 //#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
 #define WEB_CHAT		1
 #define FIX_GAME		1
+#define EXT_GDATA		1
+#define COPY_PS3		1
 #define DEBUG_MEM		1
 #define VIDEO_REC		1
 #define LOAD_PRX		1
@@ -49,6 +51,7 @@
 //#define NOSINGSTAR	1
 //#define SWAP_KERNEL	1
 //#define EXTRA_FEAT	1	// save XMB to bmp, eject disc holding SELECT on mount,
+//#define SYS_BGM		1	// system background music (may freeze the system when enabled)
 //#define USE_DEBUG		1
 
 #include "types.h"
@@ -326,7 +329,9 @@ static sys_ppu_thread_t thread_id		=-1;
 #define IS_COPY				9
 #define COPY_WHOLE_FILE		0
 
+#ifdef EXT_GDATA
 #define MOUNT_EXT_GDATA		2
+#endif
 
 #define START_DAEMON		(0xC0FEBABE)
 #define REFRESH_CONTENT		(0xC0FEBAB0)
@@ -389,8 +394,11 @@ typedef struct {
 } _meminfo;
 
 static bool is_rebug = false;
-static u8 extgd = 0;       //external gameDATA
 static u8 profile = 0;
+
+#ifdef EXT_GDATA
+static u8 extgd = 0;       //external gameDATA
+#endif
 
 static u8 loading_html=0;
 static u8 loading_games=0;
@@ -1006,14 +1014,19 @@ void show_msg(char* msg);
 //int (*_cellGcmIoOffsetToAddress)(uint32_t, void**) = NULL;
 int (*vshtask_notify)(int, const char *) = NULL;
 
+#ifdef SYS_BGM
+uint32_t (*BgmPlaybackDisable)(int, void *) = NULL;
+uint32_t (*BgmPlaybackEnable)(int, void *) = NULL;
+#endif
+
 int (*vshmain_is_ss_enabled)() = NULL;
 int (*set_SSHT_)(int) = NULL;
 
 int opd[2] = {0,0};
 
-void * getNIDfunc(const char * vsh_module, uint32_t fnid);
+void * getNIDfunc(const char * vsh_module, uint32_t fnid, uint32_t offset);
 
-void * getNIDfunc(const char * vsh_module, uint32_t fnid)
+void * getNIDfunc(const char * vsh_module, uint32_t fnid, uint32_t offset)
 {
 	// 0x10000 = ELF
 	// 0x10080 = segment 2 start
@@ -1040,8 +1053,8 @@ void * getNIDfunc(const char * vsh_module, uint32_t fnid)
 			{
 				if(fnid == *(uint32_t*)((char*)lib_fnid_ptr + i*4))
 				{
-					// take adress from OPD
-					return (void**)*((uint32_t*)(lib_func_ptr) + i);
+					// take address from OPD
+					return (void**)*((uint32_t*)(lib_func_ptr) + i) + offset;
 				}
 			}
 		}
@@ -1053,7 +1066,7 @@ void * getNIDfunc(const char * vsh_module, uint32_t fnid)
 void show_msg(char* msg)
 {
 	if(!vshtask_notify)
-		vshtask_notify = (void*)((int)getNIDfunc("vshtask", 0xA02D46E7));
+		vshtask_notify = (void*)((int)getNIDfunc("vshtask", 0xA02D46E7, 0));
 
 	if(strlen(msg)>180) msg[180]=0;
 
@@ -3118,6 +3131,7 @@ void string_to_lv2(char* path, u64 addr)
 }
 #endif
 
+#ifdef EXT_GDATA
 int set_gamedata_status(u8 status, bool do_mount)
 {
 	char msg[100];
@@ -3182,6 +3196,7 @@ int set_gamedata_status(u8 status, bool do_mount)
 	}
 	return 0;
 }
+#endif
 
 void detect_firmware()
 {
@@ -4461,12 +4476,14 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 			sprintf(fsize, "<a href=\"/mount.ps3%s\">%llu %s</a>", templn, sz, sf);
 	}
 #endif
+#ifdef COPY_PS3
 #ifdef SWAP_KERNEL
 	else if(!is_net && ( !extcmp(name, ".pkg", 4) || !extcmp(name, ".edat", 5) || !extcmp(name, ".p3t", 4) || !memcmp(name, "webftp_server", 13) || !memcmp(name, "boot_plugins_", 13) || !memcmp(name, "lv2_kernel", 10) ))
 #else
 	else if(!is_net && ( !extcmp(name, ".pkg", 4) || !extcmp(name, ".edat", 5) || !extcmp(name, ".p3t", 4) || !memcmp(name, "webftp_server", 13) || !memcmp(name, "boot_plugins_", 13) ))
 #endif
 		sprintf(fsize, "<a href=\"/copy.ps3%s\">%llu %s</a>", templn, sz, sf);
+#endif
 #ifdef LOAD_PRX
 	else if(!is_net && ( !extcmp(name, ".sprx", 5)))
 		sprintf(fsize, "<a href=\"/loadprx.ps3?slot=6&prx=%s\">%llu %s</a>", templn, sz, sf);
@@ -5825,7 +5842,10 @@ restart:
 							strstr(param, "syscall.ps3mapi")  ||
 							strstr(param, "syscall8.ps3mapi") ||
 #endif
-							strstr(param, "copy.ps3/")))
+#ifdef COPY_PS3
+							strstr(param, "copy.ps3/")
+#endif
+			))
 				is_binary=0;
 			else if(strstr(param, "cpursx.ps3")  ||
 					strstr(param, "index.ps3")   ||
@@ -5839,11 +5859,16 @@ restart:
 #ifdef VIDEO_REC
 					strstr(param, "videorec.ps3") ||
 #endif
-					strstr(param, "eject.ps3")   ||
+#ifdef EXT_GDATA
 					strstr(param, "extgd.ps3")   ||
+#endif
+#ifdef SYS_BGM
+					strstr(param, "sysbgm.ps3")  ||
+#endif
 #ifdef LOAD_PRX
 					strstr(param, "loadprx.ps3") ||
 #endif
+					strstr(param, "eject.ps3")   ||
 					strstr(param, "insert.ps3"))
 				is_binary=0;
 			else
@@ -6401,13 +6426,20 @@ html_response:
 					sprintf(templn, HTML_BUTTON_FMT
 									HTML_BUTTON_FMT
 									HTML_BUTTON_FMT
+#ifdef EXT_GDATA
 									HTML_BUTTON_FMT,
+#endif
 									HTML_BUTTON, STR_EJECT, HTML_ONCLICK, "/eject.ps3",
 									HTML_BUTTON, STR_INSERT, HTML_ONCLICK, "/insert.ps3",
-									HTML_BUTTON, STR_UNMOUNT, HTML_ONCLICK, "/mount.ps3/unmount",
-									HTML_BUTTON, "gameDATA", HTML_ONCLICK, "/extgd.ps3"); strcat(buffer, templn);
+									HTML_BUTTON, STR_UNMOUNT, HTML_ONCLICK, "/mount.ps3/unmount"
+#ifdef EXT_GDATA
+									, HTML_BUTTON, "gameDATA", HTML_ONCLICK, "/extgd.ps3"
+#endif
+                    ); strcat(buffer, templn);
+#ifdef COPY_PS3
 					if(((strstr(param, "/dev_") && strlen(param)>12) || strstr(param, "/dev_bdvd")) && !strstr(param,".ps3/") && !strstr(param,".ps3?"))
 					{sprintf(templn, "%s%s\" onclick='window.location.href=\"/copy.ps3%s\";'\">", HTML_BUTTON, STR_COPY, param); strcat(buffer, templn);}
+#endif
 					sprintf(templn,  "%s%s XML%s\" %s'%s';\"> "
 									 "%s%s HTML%s\" %s'%s';\">"
 									 HTML_BUTTON_FMT
@@ -6812,8 +6844,6 @@ just_leave:
 
 						if(cellFsStat(templn, &buf)==CELL_FS_SUCCEEDED)
 							{cobra_load_vsh_plugin(slot, templn, NULL, 0); if(strstr(templn, "/webftp_server")) goto quit;}
-
-						break;
 					}
 #endif
 #ifdef VIDEO_REC
@@ -6827,6 +6857,7 @@ just_leave:
 						strcat(buffer, "</a>");
 					}
 #endif
+#ifdef EXT_GDATA
 					else
 					if(strstr(param, "extgd.ps3"))
 					{
@@ -6841,6 +6872,41 @@ just_leave:
 						else
 							strcat(buffer, extgd?STR_ENABLED:STR_DISABLED);
 					}
+#endif
+#ifdef SYS_BGM
+					else
+					if(strstr(param, "sysbgm.ps3"))
+					{
+						static int system_bgm=0;
+
+						if(system_bgm==0)
+						{
+							system_bgm=-1;
+							BgmPlaybackEnable  = (void*)((int)getNIDfunc("vshmain",0xEDAB5E5E, 16*2));
+							BgmPlaybackDisable = (void*)((int)getNIDfunc("vshmain",0xEDAB5E5E, 17*2));
+						}
+
+						if(strstr(param, "?1") || strstr(param, "?e")) system_bgm=-1;
+						if(strstr(param, "?0") || strstr(param, "?d")) system_bgm=1;
+
+						if(strstr(param, "?s")) goto bgm_status;
+
+						int * arg2;
+						if(system_bgm<0)
+						{
+							BgmPlaybackEnable(0, &arg2); system_bgm=1;
+						}
+						else
+						{
+							BgmPlaybackDisable(0, &arg2); system_bgm=-1;
+						}
+
+bgm_status:
+						sprintf(templn, "System BGM: %s", (system_bgm>0)?STR_ENABLED:STR_DISABLED);
+						strcat(buffer, templn);
+						show_msg(templn);
+					}
+#endif
 #ifdef DEBUG_MEM
 					else
 					if(strstr(param, "dump.ps3"))
@@ -7275,7 +7341,7 @@ just_leave:
 						uint32_t *gcm_obj1 = VSH_GCM_OBJ + ((uint32_t) 1 << 4); // offset, pitch, width, height
 
 
-						_cellGcmIoOffsetToAddress = (void*)((int)getNIDfunc("sdk", 0x2a6fba9c));
+						_cellGcmIoOffsetToAddress = (void*)((int)getNIDfunc("sdk", 0x2a6fba9c, 0));
 
 						void *buf_adr[2];
 
@@ -7832,8 +7898,9 @@ just_leave:
 								param[strrchr(param, '?')-param]=0;
 
 							int plen=10;
+#ifdef COPY_PS3
 							if(strstr(param, "copy.ps3")) plen=IS_COPY;
-
+#endif
 							char target[MAX_PATH_LEN], enc_dir_name[1024];
 							bool mounted=false; max_mapped=0;
 							is_binary=1;
@@ -7886,6 +7953,7 @@ just_leave:
 
 								urlenc(enc_dir_name, tempstr);
 
+#ifdef COPY_PS3
 								if(plen==IS_COPY)
 								{
 									bool is_copying_from_hdd = (strstr(param+plen, "/dev_hdd0")!=NULL);
@@ -8033,7 +8101,9 @@ just_leave:
 
 									if(strstr(target, "/webftp_server")) {strcat(buffer, tempstr); sprintf(tempstr, "<HR>%s", STR_SETTINGSUPD);}
 								}
-								else if(!extcmp(param, ".BIN.ENC", 8))
+								else
+#endif
+								if(!extcmp(param, ".BIN.ENC", 8))
 									sprintf(tempstr, "%s: %s<hr><img src=\"%s\"><hr>%s", STR_GAMETOM, templn, enc_dir_name, mounted?STR_PS2LOADED:STR_ERROR);
 								else if(strstr(param, "/PSPISO") || strstr(param, "/ISO/"))
 									sprintf(tempstr, "%s: %s<hr><img src=\"%s\" height=%i><hr>%s", STR_GAMETOM, templn, enc_dir_name, strcasestr(enc_dir_name,".png")?200:300, mounted?STR_PSPLOADED:STR_ERROR);
@@ -8078,7 +8148,7 @@ just_leave:
 								}
 #endif
 							}
-
+#ifdef COPY_PS3
 							if(plen==IS_COPY && !copy_in_progress)
 							{
 								if(cellFsStat((char*)param+plen, &buf)!=CELL_FS_SUCCEEDED)
@@ -8111,6 +8181,7 @@ just_leave:
 										show_msg((char*)STR_CPYFINISH);
 								}
 							}
+#endif
 						}
 					}
 					else
@@ -8858,7 +8929,9 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 							ssend(conn_s_ftp, "214-CMDs:\r\n"
 #ifndef LITE_EDITION
 											  " SITE FLASH\r\n"
+#ifdef EXT_GDATA
 											  " SITE EXTGD <ON/OFF>\r\n"
+#endif
 											  " SITE MAPTO <path>\r\n"
 #ifdef FIX_GAME
 											  " SITE FIX <path>\r\n"
@@ -8910,6 +8983,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 								enable_dev_blind(NULL);
 						}
 #ifndef LITE_EDITION
+#ifdef EXT_GDATA
 						else
 						if(strcasecmp(cmd, "EXTGD") == 0)
 						{
@@ -8920,6 +8994,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 							if(strcasecmp(filename, "OFF") == 0)	set_gamedata_status(1, true);
 
 						}
+#endif
 						else
 						if(strcasecmp(cmd, "UMOUNT") == 0)
 						{
@@ -9964,9 +10039,12 @@ static void poll_thread(uint64_t poll)
 							{if(webman_config->netp1 && webman_config->neth1[0]) mount_with_mm((char*)"/net1", 1);}
 							else
 #endif
-								set_gamedata_status(extgd^1, true);
 
-							sys_timer_sleep(2); break;
+#ifdef EXT_GDATA
+							set_gamedata_status(extgd^1, true);
+							sys_timer_sleep(2);
+#endif
+							break;
 						}
 						else
 						if( !(webman_config->combo & FAIL_SAFE)
@@ -10373,7 +10451,7 @@ static void poll_thread(uint64_t poll)
 						else
 						if(!(webman_config->combo & SHOW_IDPS) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CIRCLE) ) // R2+O Show IDPS EID0+LV2
 						{
-							vshmain_is_ss_enabled = (void*)((int)getNIDfunc("vshmain", 0x981D7E9F)); //is screenshot enabled?
+							vshmain_is_ss_enabled = (void*)((int)getNIDfunc("vshmain", 0x981D7E9F, 0)); //is screenshot enabled?
 
 							if(vshmain_is_ss_enabled()==0)
 							{
@@ -11580,9 +11658,9 @@ static void wwwd_thread(uint64_t arg)
 	cobra_mode=0;
 #endif
 
-	View_Find = (void*)((int)getNIDfunc("paf",0xF21655F3));
-	plugin_GetInterface = (void*)((int)getNIDfunc("paf",0x23AFB290));
-	vsh_sprintf = (void*)((int)getNIDfunc("stdc",0x273B9711)); // sprintf
+	View_Find = (void*)((int)getNIDfunc("paf", 0xF21655F3, 0));
+	plugin_GetInterface = (void*)((int)getNIDfunc("paf", 0x23AFB290, 0));
+	vsh_sprintf = (void*)((int)getNIDfunc("stdc",0x273B9711, 0)); // sprintf
 
 	//pokeq(0x8000000000003560ULL, 0x386000014E800020ULL); // li r3, 0 / blr
 	//pokeq(0x8000000000003D90ULL, 0x386000014E800020ULL); // li r3, 0 / blr
@@ -12429,7 +12507,9 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	if(!strcmp(_path, "/dev_bdvd")) {do_umount(false); goto exit_mount;}
 
 #ifndef COBRA_ONLY
+#ifdef EXT_GDATA
 	if(do_eject==MOUNT_EXT_GDATA) goto patch;
+#endif
 #endif
 
 	// save lastgame.bin / process _next & _prev commands
@@ -12581,6 +12661,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 #ifdef COBRA_ONLY
 	//if(cobra_mode)
 	{
+#ifdef EXT_GDATA
 		{
 			// auto-enable external GD
 			if(do_eject!=1) ;
@@ -12602,6 +12683,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 				set_gamedata_status(1, false);
 			else if(extgd) set_gamedata_status(0, false);
 		}
+#endif
 
 		{
 			// show loaded path
@@ -13262,6 +13344,7 @@ patch:
 	// re-load last game
 	//------------------
 
+#ifdef EXT_GDATA
 	if(do_eject==MOUNT_EXT_GDATA) // extgd
 	{
 		sprintf(_path, WMTMP "/last_game.txt"); int fd=0;
@@ -13274,6 +13357,7 @@ patch:
 		else
 			_path[0]=0;
 	}
+#endif
 
 	if(_path[0] && strstr(_path, "/PS3_GAME/USRDIR/EBOOT.BIN")) _path[strlen(_path)-26]=0;
 
@@ -13365,7 +13449,7 @@ patch:
     //--------------------------------------------
 	// auto-map /dev_hdd0/game to dev_usbxxx/GAMEI
     //---------------------------------------------
-
+#ifdef EXT_GDATA
     if(do_eject!=1) ;
 	else if(strstr(_path, "/GAME"))
 	{
@@ -13381,7 +13465,7 @@ patch:
 		}
 		else if(extgd) set_gamedata_status(0, false);
 	}
-
+#endif
 
 	sprintf(app_sys, MM_ROOT_STD "/sys");
 	if(!isDir(app_sys))
