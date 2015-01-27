@@ -1068,7 +1068,7 @@ void show_msg(char* msg)
 	if(!vshtask_notify)
 		vshtask_notify = (void*)((int)getNIDfunc("vshtask", 0xA02D46E7, 0));
 
-	if(strlen(msg)>180) msg[180]=0;
+	if(strlen(msg)>200) msg[200]=0;
 
 	if(vshtask_notify)
 		vshtask_notify(0, msg);
