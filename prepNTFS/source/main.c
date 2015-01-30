@@ -22,7 +22,13 @@
 #define USB_MASS_STORAGE_2(n)	(0x10300000000001FULL+((n)-6)) /* For 6-127 */
 #define USB_MASS_STORAGE(n)	(((n) < 6) ? USB_MASS_STORAGE_1(n) : USB_MASS_STORAGE_2(n))
 
-#define MAX_SECTIONS	((0x10000-sizeof(rawseciso_args))/8)
+enum emu_modes
+{
+    PS3ISO = 0,
+    BDISO  = 1,
+    DVDISO = 2,
+    PSXISO = 3,
+};
 
 typedef struct
 {
@@ -32,6 +38,7 @@ typedef struct
 	uint32_t num_tracks;
 } __attribute__((packed)) rawseciso_args;
 
+#define MAX_SECTIONS	((0x10000-sizeof(rawseciso_args))/8)
 
 #define cue_buf  plugin_args
 #define _4KB_    4096
@@ -600,7 +607,8 @@ int main(int argc, const char* argv[])
 {
 	int i, parts;
 	unsigned int num_tracks;
-	u8 cue=0;
+	u8 cue=0; int ext_len = 4;
+
 	int emu_mode;
 	TrackDef tracks[100];
 	ScsiTrackDescriptor *scsi_tracks;
@@ -630,14 +638,14 @@ int main(int argc, const char* argv[])
 
 	sprintf(mmCM_cache, "%s", "/dev_hdd0/game/BLES80608/USRDIR/cache");
 	if(file_exists(mmCM_cache)) mmCM_found=true;
-    else
-    {sprintf(mmCM_cache, "%s", "/dev_hdd0/game/NPEA00374/USRDIR/cache");
+	else
+	{sprintf(mmCM_cache, "%s", "/dev_hdd0/game/NPEA00374/USRDIR/cache");
 	if(file_exists(mmCM_cache)) mmCM_found=true;
-    else
-    {sprintf(mmCM_cache, "%s", "/dev_hdd0/tmp/game_repo/main/cache");
+	else
+	{sprintf(mmCM_cache, "%s", "/dev_hdd0/tmp/game_repo/main/cache");
 	if(file_exists(mmCM_cache)) mmCM_found=true;
-    }
-    }
+	}
+	}
 
 
 //--- hold CROSS to keep previous cached files
@@ -705,10 +713,12 @@ int main(int argc, const char* argv[])
 							sprintf(filename, "%s", dir.d_name);
 							flen = strlen(filename)-1; if(flen<3) continue;
 
-							is_iso =	((strcasestr(filename + flen - 3, ".iso")) && (filename[flen]=='o' || filename[flen]=='O')) ||
-							  (m>0 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
-										((strcasestr(filename + flen - 3, ".img")) && (filename[flen]=='g' || filename[flen]=='G')) ||
-										((strcasestr(filename + flen - 3, ".mdf")) && (filename[flen]=='f' || filename[flen]=='F')) ));
+							is_iso =	( (strcasestr(filename + flen - 3, ".iso")) /*&& (filename[flen]=='o' || filename[flen]=='O')*/ ) ||
+							  (m>0 && ( ( (strcasestr(filename + flen - 3, ".bin")) /*&& (filename[flen]=='n' || filename[flen]=='N')*/ ) ||
+										( (strcasestr(filename + flen - 3, ".img")) /*&& (filename[flen]=='g' || filename[flen]=='G')*/ ) ||
+										( (strcasestr(filename + flen - 3, ".mdf")) /*&& (filename[flen]=='f' || filename[flen]=='F')*/ ) ));
+
+							if(!is_iso) {ext_len = 6; is_iso = (flen>5 && strcasestr(filename + flen - 5, ".iso.0"));} else ext_len = 4;
 
 ////////////////////////////////////////////////////////
 							if(!is_iso)
@@ -723,21 +733,23 @@ next_ntfs_entry:
 
 								sprintf(direntry, "%s/%s", subpath, dir.d_name);
 								sprintf(filename, "[%s] %s", subpath, dir.d_name);
-								flen = strlen(filename)-1;
+								flen = strlen(filename)-1; if(flen<3) goto next_ntfs_entry;
 
-								is_iso =	((strcasestr(filename + flen - 3, ".iso")) && (filename[flen]=='o' || filename[flen]=='O')) ||
-								  (m>0 && ( ((strcasestr(filename + flen - 3, ".bin")) && (filename[flen]=='n' || filename[flen]=='N')) ||
-											((strcasestr(filename + flen - 3, ".img")) && (filename[flen]=='g' || filename[flen]=='G')) ||
-											((strcasestr(filename + flen - 3, ".mdf")) && (filename[flen]=='f' || filename[flen]=='F')) ));
+								is_iso =	( (strcasestr(filename + flen - 3, ".iso")) /*&& (filename[flen]=='o' || filename[flen]=='O')*/ ) ||
+								  (m>0 && ( ( (strcasestr(filename + flen - 3, ".bin")) /*&& (filename[flen]=='n' || filename[flen]=='N')*/ ) ||
+											( (strcasestr(filename + flen - 3, ".img")) /*&& (filename[flen]=='g' || filename[flen]=='G')*/ ) ||
+											( (strcasestr(filename + flen - 3, ".mdf")) /*&& (filename[flen]=='f' || filename[flen]=='F')*/ ) ));
+
+								if(!is_iso) {ext_len = 6; is_iso = (flen>5 && strcasestr(filename + flen - 5, ".iso.0"));} else ext_len = 4;
 							}
 ////////////////////////////////////////////////////////
 
 							if( is_iso )
 							{
-								filename[strlen(filename)-4]=0;
+								filename[strlen(filename)-ext_len]=0;
 								snprintf(path, sizeof(path), "%s:/%s%s/%s", mounts[i].name, c_path[m], SUFIX(profile), direntry);
 
-								if (m==0)
+								if(m==PS3ISO)
 								{
 									titleID[0]=0;
 
@@ -792,6 +804,24 @@ next_ntfs_entry:
 
 								parts = ps3ntfs_file_to_sectors(path, sections, sections_size, MAX_SECTIONS, 1);
 
+								if(ext_len==6)
+								{
+									char iso_name[0x420], iso_path[0x420];
+									sprintf(iso_name, "%s", path);
+									iso_name[strlen(iso_name) - 1] = 0;
+
+									for (int o = 1; o < 64; o++)
+									{
+										if(parts >= MAX_SECTIONS) break;
+
+										sprintf(iso_path, "%s%i", iso_name, o);
+
+										if(file_exists(iso_path) == false) break;
+
+										parts += ps3ntfs_file_to_sectors(iso_path, sections + parts, sections_size + parts, MAX_SECTIONS - parts, 1);
+									}
+								}
+
 								if (parts == MAX_SECTIONS)
 								{
 									continue;
@@ -799,10 +829,10 @@ next_ntfs_entry:
 								else if (parts > 0)
 								{
 									num_tracks = 1;
-									if(m==0) emu_mode = EMU_PS3; else
-									if(m==1) emu_mode = EMU_BD;  else
-									if(m==2) emu_mode = EMU_DVD; else
-									if(m==3)
+									if(m==PS3ISO) emu_mode = EMU_PS3; else
+									if(m==BDISO ) emu_mode = EMU_BD;  else
+									if(m==DVDISO) emu_mode = EMU_DVD; else
+									if(m==PSXISO)
 									{
 										emu_mode = EMU_PSX;
 										cue=0;
