@@ -807,6 +807,7 @@ next_ntfs_entry:
 								if(ext_len==6)
 								{
 									char iso_name[0x420], iso_path[0x420];
+
 									sprintf(iso_name, "%s", path);
 									iso_name[strlen(iso_name) - 1] = 0;
 
@@ -815,7 +816,6 @@ next_ntfs_entry:
 										if(parts >= MAX_SECTIONS) break;
 
 										sprintf(iso_path, "%s%i", iso_name, o);
-
 										if(file_exists(iso_path) == false) break;
 
 										parts += ps3ntfs_file_to_sectors(iso_path, sections + parts, sections_size + parts, MAX_SECTIONS - parts, 1);

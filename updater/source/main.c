@@ -35,6 +35,8 @@ int CopyFile(char* path, char* path2)
 	sysFSStat stat;
 
 	ret= sysLv2FsStat(path, &stat);
+	lenght = stat.st_size;
+
 	if(ret) goto skip;
 
 	if(!memcmp(path, "/dev_hdd0/", 10) && !memcmp(path2, "/dev_hdd0/", 10))
@@ -44,8 +46,6 @@ int CopyFile(char* path, char* path2)
 		sysLv2FsUnlink(path2);
 		return sysLv2FsLink(path, path2);
 	}
-
-    lenght = stat.st_size;
 
 	ret = sysLv2FsOpen(path, 0, &fd, S_IRWXU | S_IRWXG | S_IRWXO, NULL, 0);
 	if(ret) goto skip;
@@ -75,7 +75,10 @@ skip:
 	if(mem) free(mem);
 	if(fd >=0) sysLv2FsClose(fd);
 	if(fd2>=0) sysLv2FsClose(fd2);
-	if(ret>0) ret = SUCCESS;
+	if(ret) return ret;
+
+	ret = sysLv2FsStat(path2, &stat);
+	if((ret == SUCCESS) && (stat.st_size == lenght)) ret = SUCCESS; else ret = FAILED;
 
 	return ret;
 }
@@ -393,10 +396,28 @@ int main()
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/LANG_XX.TXT","/dev_hdd0/tmp/wm_lang/LANG_XX.TXT");
 
 
+	// copy raw_iso.sprx to dev_flash
+	if(sysLv2FsStat("/dev_flash/vsh/module/raw_iso.sprx", &stat) != SUCCESS)
+	{
+		if(sysLv2FsStat("/dev_blind", &stat) != SUCCESS)
+			sys_fs_mount("CELL_FS_IOS:BUILTIN_FLSH1", "CELL_FS_FAT", "/dev_blind", 0);
+
+		if(sysLv2FsStat("/dev_blind", &stat) == SUCCESS)
+			CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/raw_iso.sprx","/dev_blind/vsh/module/raw_iso.sprx");
+	}
+
+	// copy raw_iso.sprx to dev_hdd (if failed to copy it to dev_flash)
+	if(sysLv2FsStat("/dev_flash/vsh/module/raw_iso.sprx", &stat) != SUCCESS)
+	{
+		if(sysLv2FsStat("/dev_hdd0/plugins", &stat) == SUCCESS)
+			CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/raw_iso.sprx","/dev_hdd0/plugins/raw_iso.sprx");
+		else
+			CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/raw_iso.sprx","/dev_hdd0/raw_iso.sprx");
+	}
+
+	// copy standalone video recorder plugin (video_rec.sprx) to /plugins folder
 	if((sysLv2FsStat("/dev_hdd0/plugins", &stat) == SUCCESS))
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/video_rec.sprx","/dev_hdd0/plugins/video_rec.sprx");
-	else
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/video_rec.sprx","/dev_hdd0/video_rec.sprx");
 
 	// update PRX+Mamba Loader
 	if((sysLv2FsStat("/dev_hdd0/game/IRISMAN01/USRDIR/webftp_server.sprx", &stat) == SUCCESS))
@@ -460,7 +481,7 @@ cont:
 	// update dev_flash (rebug)
 	if((sysLv2FsStat("/dev_flash/vsh/module/webftp_server.sprx", &stat) == SUCCESS) || (sysLv2FsStat("/dev_flash/vsh/module/webftp_server.sprx.bak", &stat) == SUCCESS))
 	{
-		if(!((sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx", &stat) == SUCCESS) || (sysLv2FsStat("/dev_blind/vsh/module/webftp_server.sprx.bak", &stat) == SUCCESS)))
+		if(sysLv2FsStat("/dev_blind", &stat) != SUCCESS)
 			sys_fs_mount("CELL_FS_IOS:BUILTIN_FLSH1", "CELL_FS_FAT", "/dev_blind", 0);
 
 		sysLv2FsChmod("/dev_blind/vsh/module/webftp_server.sprx", 0777);
