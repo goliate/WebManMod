@@ -51,7 +51,7 @@
 #define DEBUG_MEM		1	// /dump.ps3 / peek.lv1 / poke.lv1 / find.lv1 / peek.lv2 / poke.lv2 / find.lv2
 #define VIDEO_REC		1	// /videorec.ps3  start/stop video recording (in-game only)
 #define LOAD_PRX		1	// /loadprx.ps3?slot=n&prx=path/file.sprx  (load prx)
-#define FAKEISO			1	// support .ntfs[BDFILE] (fake ISO)
+#define FAKEISO 		1	// support .ntfs[BDFILE] (fake ISO)
 
 //// TEST FEATURES ////
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
@@ -72,8 +72,8 @@
 #include "vsh/system_plugin.h"
 #endif
 
-char _game_name[0x120];
-char search_url[50] = "http://google.com/search?q=";
+static char _game_name[0x120];
+static char search_url[50] = "http://google.com/search?q=";
 
 #ifdef COBRA_ONLY
  #include "cobra/cobra.h"
@@ -120,7 +120,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.17 MOD"						// webMAN version
+#define WM_VERSION			"1.41.18 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -159,6 +159,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define WEB_LINK_PAIR			XML_PAIR("module_name", "webbrowser_plugin")
 #define STR_NOITEM_PAIR			XML_PAIR("str_noitem", "msg_error_no_content") "</Table>"
 
+#define HTML_DIR				"&lt;dir&gt;"
 #define HTML_BUTTON_FMT			"%s%s\" %s'%s';\">"
 #define HTML_BUTTON				" <input type=\"button\" value=\""
 #define HTML_ONCLICK			"onclick=\"window.location.href="
@@ -332,6 +333,7 @@ static sys_ppu_thread_t thread_id		=-1;
 #define DEVICE_TYPE_BDMRE	0x43
 #define DEVICE_TYPE_DVD		0x10 /* DVD-ROM, DVD+-R, DVD+-RW etc, they are differenced by booktype field in some scsi command */
 #define DEVICE_TYPE_CD		0x08 /* CD-ROM, CD-DA, CD-R, CD-RW, etc, they are differenced somehow with scsi commands */
+#define DEVICE_TYPE_USB		0x00
 
 #define IS_COPY				9
 #define COPY_WHOLE_FILE		0
@@ -387,8 +389,10 @@ typedef struct
 } __attribute__((packed)) rawseciso_args;
 
 
+static sys_device_info_t disc_info;
 static uint32_t *sections, *sections_size;
 static uint32_t num_sections;
+uint64_t sector_size = 0x200;
 uint32_t handle = -1;
 static sys_event_queue_t command_queue_ntfs = -1;
 static u8 netiso_loaded=0;
@@ -494,7 +498,7 @@ typedef struct
 	uint8_t warn;
 	uint8_t fanc;
 	uint8_t temp1;
-	uint8_t fanm; // unused
+	uint8_t rxvid;
 	uint8_t bind;
 	uint8_t refr;
 	uint8_t manu;
@@ -579,21 +583,19 @@ typedef struct
 uint64_t get_fan_policy_offset=0;
 uint64_t set_fan_policy_offset=0;
 
-char *strcasestr(const char *s1, const char *s2);
-
-int set_gamedata_status(u8 status, bool do_mount);
-void set_buffer_sizes();
-void get_idps_psid();
-void enable_dev_blind(char *msg);
+static int set_gamedata_status(u8 status, bool do_mount);
+static void set_buffer_sizes();
+static void get_idps_psid();
+static void enable_dev_blind(char *msg);
 
 #ifdef NOSINGSTAR
-void no_singstar_icon();
+static void no_singstar_icon();
 #endif
 
-void refresh_xml(char *msg);
+static void refresh_xml(char *msg);
 
-void reset_settings(void);
-int save_settings(void);
+static void reset_settings(void);
+static int save_settings(void);
 static u64 backup[6];
 
 static u8 wmconfig[sizeof(WebmanCfg)];
@@ -668,6 +670,7 @@ int lang_pos, fh;
 #define STR_SCAN2		"Scan for content"
 #define STR_PSPL		"Show PSP Launcher"
 #define STR_PS2L		"Show PS2 Classic Launcher"
+#define STR_RXVID		"Show Video sub-folder"
 #define STR_VIDLG		"Video"
 #define STR_LPG			"Load last-played game on startup"
 #define STR_AUTOB		"Check for /dev_hdd0/PS3ISO/AUTOBOOT.ISO on startup"
@@ -799,168 +802,169 @@ int lang_pos, fh;
 #define STR_NOTFOUND	"Not found!"
 
 #else
-char lang_code[3]			= "";
+static char lang_code[3]			= "";
 
-char STR_TRADBY[150]		= "";
+static char STR_TRADBY[150]		= "";
 
-char STR_FILES[30]			= "Files";
-char STR_GAMES[30]			= "Games";
-char STR_SETUP[30]			= "Setup";
-char STR_HOME[30]			= "Home";
-char STR_EJECT[50]			= "Eject";
-char STR_INSERT[50]			= "Insert";
-char STR_UNMOUNT[50]		= "Unmount";
-char STR_COPY[50]			= "Copy Folder";
-char STR_REFRESH[50]		= "Refresh";
-char STR_SHUTDOWN[50]		= "Shutdown";
-char STR_RESTART[50]		= "Restart";
+static char STR_FILES[30]			= "Files";
+static char STR_GAMES[30]			= "Games";
+static char STR_SETUP[30]			= "Setup";
+static char STR_HOME[30]			= "Home";
+static char STR_EJECT[50]			= "Eject";
+static char STR_INSERT[50]			= "Insert";
+static char STR_UNMOUNT[50]		= "Unmount";
+static char STR_COPY[50]			= "Copy Folder";
+static char STR_REFRESH[50]		= "Refresh";
+static char STR_SHUTDOWN[50]		= "Shutdown";
+static char STR_RESTART[50]		= "Restart";
 
-char STR_BYTE[10]			= "b";
-char STR_KILOBYTE[10]		= "KB";
-char STR_MEGABYTE[10]		= "MB";
-char STR_GIGABYTE[10]		= "GB";
+static char STR_BYTE[10]			= "b";
+static char STR_KILOBYTE[10]		= "KB";
+static char STR_MEGABYTE[10]		= "MB";
+static char STR_GIGABYTE[10]		= "GB";
 
-char STR_COPYING[30]		= "Copying";
-char STR_CPYDEST[30]		= "Destination";
-char STR_CPYFINISH[30]		= "Copy Finished!";
-char STR_CPYABORT[50]		= "Copy aborted!";
-char STR_DELETE[50]			= "Delete";
+static char STR_COPYING[30]		= "Copying";
+static char STR_CPYDEST[30]		= "Destination";
+static char STR_CPYFINISH[30]		= "Copy Finished!";
+static char STR_CPYABORT[50]		= "Copy aborted!";
+static char STR_DELETE[50]			= "Delete";
 
-char STR_SCAN1[100]			= "Scan these devices";
-char STR_SCAN2[100]			= "Scan for content";
-char STR_PSPL[100]			= "Show PSP Launcher";
-char STR_PS2L[100]			= "Show PS2 Classic Launcher";
-char STR_VIDLG[30]			= "Video";
-char STR_LPG[100]			= "Load last-played game on startup";
-char STR_AUTOB[150]			= "Check for /dev_hdd0/PS3ISO/AUTOBOOT.ISO on startup";
-char STR_DELAYAB[200]		= "Delay loading of AUTOBOOT.ISO/last-game (Disc Auto-start)";
-char STR_DEVBL[150]			= "Enable /dev_blind (writable /dev_flash) on startup";
-char STR_CONTSCAN[150]		= "Disable content scan on startup";
-char STR_USBPOLL[100]		= "Disable USB polling";
-char STR_FTPSVC[100]		= "Disable FTP service";
-char STR_FIXGAME[100]		= "Disable auto-fix game";
-char STR_COMBOS[100]		= "Disable all PAD shortcuts";
-char STR_MMCOVERS[100]		= "Disable multiMAN covers";
-char STR_ACCESS[100]		= "Disable remote access to FTP/WWW services";
-char STR_NOSETUP[150]		= "Disable webMAN Setup entry in \"webMAN Games\"";
-char STR_NOSPOOF[100]		= "Disable firmware version spoofing";
-char STR_NOGRP[100]			= "Disable grouping of content in \"webMAN Games\"";
-char STR_NOWMDN[200]		= "Disable startup notification of WebMAN on the XMB";
+static char STR_SCAN1[100]			= "Scan these devices";
+static char STR_SCAN2[100]			= "Scan for content";
+static char STR_PSPL[100]			= "Show PSP Launcher";
+static char STR_PS2L[100]			= "Show PS2 Classic Launcher";
+static char STR_RXVID[100]			= "Show Video sub-folder";
+static char STR_VIDLG[30]			= "Video";
+static char STR_LPG[100]			= "Load last-played game on startup";
+static char STR_AUTOB[150]			= "Check for /dev_hdd0/PS3ISO/AUTOBOOT.ISO on startup";
+static char STR_DELAYAB[200]		= "Delay loading of AUTOBOOT.ISO/last-game (Disc Auto-start)";
+static char STR_DEVBL[150]			= "Enable /dev_blind (writable /dev_flash) on startup";
+static char STR_CONTSCAN[150]		= "Disable content scan on startup";
+static char STR_USBPOLL[100]		= "Disable USB polling";
+static char STR_FTPSVC[100]		= "Disable FTP service";
+static char STR_FIXGAME[100]		= "Disable auto-fix game";
+static char STR_COMBOS[100]		= "Disable all PAD shortcuts";
+static char STR_MMCOVERS[100]		= "Disable multiMAN covers";
+static char STR_ACCESS[100]		= "Disable remote access to FTP/WWW services";
+static char STR_NOSETUP[150]		= "Disable webMAN Setup entry in \"webMAN Games\"";
+static char STR_NOSPOOF[100]		= "Disable firmware version spoofing";
+static char STR_NOGRP[100]			= "Disable grouping of content in \"webMAN Games\"";
+static char STR_NOWMDN[200]		= "Disable startup notification of WebMAN on the XMB";
 #ifdef NOSINGSTAR
-char STR_NOSINGSTAR[100]	= "Remove SingStar icon";
+static char STR_NOSINGSTAR[100]	= "Remove SingStar icon";
 #endif
-char STR_RESET_USB[100]		= "Disable Reset USB Bus";
-char STR_TITLEID[200]		= "Include the ID as part of the title of the game";
-char STR_FANCTRL[120]		= "Enable dynamic fan control";
-char STR_NOWARN[120]		= "Disable temperature warnings";
-char STR_AUTOAT[100]		= "Auto at";
-char STR_LOWEST[30]			= "Lowest";
-char STR_FANSPEED[80]		= "fan speed";
-char STR_MANUAL[30]			= "Manual";
-char STR_PS2EMU[100]		= "PS2 Emulator";
-char STR_LANGAMES[100]		= "Scan for LAN games/videos";
-char STR_ANYUSB[100]		= "Wait for any USB device to be ready";
-char STR_ADDUSB[150]		= "Wait additionally for each selected USB device to be ready";
-char STR_SPOOFID[150]		= "Change idps and psid in lv2 memory at system startup";
-char STR_DELCFWSYS[200]		= "Disable lv1&lv2 peek&poke syscalls (6,7,9,10,11,36) and delete history files at system startup";
-char STR_MEMUSAGE[100]		= "Plugin memory usage";
-char STR_PLANG[100]			= "Plugin language";
-char STR_PROFILE[30]		= "Profile";
-char STR_DEFAULT[30]		= "Default";
-char STR_COMBOS2[100]		= "XMB/In-Game PAD SHORTCUTS";
-char STR_FAILSAFE[100]		= "FAIL SAFE";
-char STR_SHOWTEMP[100]		= "SHOW TEMP";
-char STR_SHOWIDPS[100]		= "SHOW IDPS";
-char STR_PREVGAME[100]		= "PREV GAME";
-char STR_NEXTGAME[100]		= "NEXT GAME";
-char STR_SHUTDOWN2[100]		= "SHUTDOWN ";
-char STR_RESTART2[100]		= "RESTART&nbsp; ";
-char STR_DELCFWSYS2[100] 	= "DEL CFW SYSCALLS";
-char STR_UNLOADWM[100]		= "UNLOAD WM";
-char STR_FANCTRL2[100]		= "CTRL FAN";
-char STR_FANCTRL4[100]		= "CTRL DYN FAN";
-char STR_FANCTRL5[100]		= "CTRL MIN FAN";
-char STR_UPDN[20]			= "&#8593;/&#8595;"; //↑/↓
-char STR_LFRG[20]			= "&#8592;/&#8594;"; //←/→
+static char STR_RESET_USB[100]		= "Disable Reset USB Bus";
+static char STR_TITLEID[200]		= "Include the ID as part of the title of the game";
+static char STR_FANCTRL[120]		= "Enable dynamic fan control";
+static char STR_NOWARN[120]		= "Disable temperature warnings";
+static char STR_AUTOAT[100]		= "Auto at";
+static char STR_LOWEST[30]			= "Lowest";
+static char STR_FANSPEED[80]		= "fan speed";
+static char STR_MANUAL[30]			= "Manual";
+static char STR_PS2EMU[100]		= "PS2 Emulator";
+static char STR_LANGAMES[100]		= "Scan for LAN games/videos";
+static char STR_ANYUSB[100]		= "Wait for any USB device to be ready";
+static char STR_ADDUSB[150]		= "Wait additionally for each selected USB device to be ready";
+static char STR_SPOOFID[150]		= "Change idps and psid in lv2 memory at system startup";
+static char STR_DELCFWSYS[200]		= "Disable lv1&lv2 peek&poke syscalls (6,7,9,10,11,36) and delete history files at system startup";
+static char STR_MEMUSAGE[100]		= "Plugin memory usage";
+static char STR_PLANG[100]			= "Plugin language";
+static char STR_PROFILE[30]		= "Profile";
+static char STR_DEFAULT[30]		= "Default";
+static char STR_COMBOS2[100]		= "XMB/In-Game PAD SHORTCUTS";
+static char STR_FAILSAFE[100]		= "FAIL SAFE";
+static char STR_SHOWTEMP[100]		= "SHOW TEMP";
+static char STR_SHOWIDPS[100]		= "SHOW IDPS";
+static char STR_PREVGAME[100]		= "PREV GAME";
+static char STR_NEXTGAME[100]		= "NEXT GAME";
+static char STR_SHUTDOWN2[100]		= "SHUTDOWN ";
+static char STR_RESTART2[100]		= "RESTART&nbsp; ";
+static char STR_DELCFWSYS2[100] 	= "DEL CFW SYSCALLS";
+static char STR_UNLOADWM[100]		= "UNLOAD WM";
+static char STR_FANCTRL2[100]		= "CTRL FAN";
+static char STR_FANCTRL4[100]		= "CTRL DYN FAN";
+static char STR_FANCTRL5[100]		= "CTRL MIN FAN";
+static char STR_UPDN[20]			= "&#8593;/&#8595;"; //↑/↓
+static char STR_LFRG[20]			= "&#8592;/&#8594;"; //←/→
 #ifdef COBRA_ONLY
-char STR_DISCOBRA[100]		= "COBRA TOGGLE";
+static char STR_DISCOBRA[100]		= "COBRA TOGGLE";
 #endif
 #ifdef REX_ONLY
-char STR_RBGMODE[100]		= "RBG MODE TOGGLE";
-char STR_RBGNORM[100]		= "NORM MODE TOGGLE";
-char STR_RBGMENU[100] 		= "MENU TOGGLE";
+static char STR_RBGMODE[100]		= "RBG MODE TOGGLE";
+static char STR_RBGNORM[100]		= "NORM MODE TOGGLE";
+static char STR_RBGMENU[100] 		= "MENU TOGGLE";
 #endif
-char STR_SAVE[30]			= "Save";
-char STR_SETTINGSUPD[250]	= "Settings updated.<br><br>Click <a href=\"/restart.ps3\">here</a> to restart your PLAYSTATION®3 system.";
-char STR_ERROR[30]			= "Error!";
+static char STR_SAVE[30]			= "Save";
+static char STR_SETTINGSUPD[250]	= "Settings updated.<br><br>Click <a href=\"/restart.ps3\">here</a> to restart your PLAYSTATION®3 system.";
+static char STR_ERROR[30]			= "Error!";
 
-char STR_MYGAMES[50]		= "webMAN Games";
-char STR_LOADGAMES[80]		= "Load games with webMAN";
-char STR_FIXING[50]			= "Fixing %s";
+static char STR_MYGAMES[50]		= "webMAN Games";
+static char STR_LOADGAMES[80]		= "Load games with webMAN";
+static char STR_FIXING[50]			= "Fixing %s";
 
-char STR_WMSETUP[50]		= "webMAN Setup";
-char STR_WMSETUP2[50]		= "Setup webMAN options";
+static char STR_WMSETUP[50]		= "webMAN Setup";
+static char STR_WMSETUP2[50]		= "Setup webMAN options";
 
-char STR_EJECTDISC[50]		= "Eject Disc";
-char STR_UNMOUNTGAME[100]	= "Unmount current game";
+static char STR_EJECTDISC[50]		= "Eject Disc";
+static char STR_UNMOUNTGAME[100]	= "Unmount current game";
 
-char STR_WMSTART[50]		= "webMAN loaded!";
-char STR_WMUNL[80]			= "webMAN unloaded!";
-char STR_CFWSYSALRD[130]	= "CFW Syscalls already disabled";
-char STR_CFWSYSRIP[130]		= "Removal History files & CFW Syscalls in progress...";
-char STR_RMVCFWSYS[130]		= "History files & CFW Syscalls deleted OK!";
-char STR_RMVCFWSYSF[130]	= "Failed to remove CFW Syscalls";
+static char STR_WMSTART[50]		= "webMAN loaded!";
+static char STR_WMUNL[80]			= "webMAN unloaded!";
+static char STR_CFWSYSALRD[130]	= "CFW Syscalls already disabled";
+static char STR_CFWSYSRIP[130]		= "Removal History files & CFW Syscalls in progress...";
+static char STR_RMVCFWSYS[130]		= "History files & CFW Syscalls deleted OK!";
+static char STR_RMVCFWSYSF[130]	= "Failed to remove CFW Syscalls";
 
-char STR_RMVWMCFG[130]		= "webMAN config reset in progress...";
-char STR_RMVWMCFGOK[130]	= "Done! Restart within 3 seconds";
+static char STR_RMVWMCFG[130]		= "webMAN config reset in progress...";
+static char STR_RMVWMCFGOK[130]	= "Done! Restart within 3 seconds";
 
-char STR_PS3FORMAT[50]		= "PS3 format games";
-char STR_PS2FORMAT[50]		= "PS2 format games";
-char STR_PS1FORMAT[50]		= "PSOne format games";
-char STR_PSPFORMAT[50]		= "PSP\xE2\x84\xA2 format games";
+static char STR_PS3FORMAT[50]		= "PS3 format games";
+static char STR_PS2FORMAT[50]		= "PS2 format games";
+static char STR_PS1FORMAT[50]		= "PSOne format games";
+static char STR_PSPFORMAT[50]		= "PSP\xE2\x84\xA2 format games";
 
-char STR_VIDFORMAT[50]		= "Blu-ray\xE2\x84\xA2 and DVD";
-char STR_VIDEO[50]			= "Video content";
+static char STR_VIDFORMAT[50]		= "Blu-ray\xE2\x84\xA2 and DVD";
+static char STR_VIDEO[50]			= "Video content";
 
-char STR_LAUNCHPSP[100]		= "Launch PSP ISO mounted through webMAN or mmCM";
-char STR_LAUNCHPS2[100]		= "Launch PS2 Classic";
+static char STR_LAUNCHPSP[100]		= "Launch PSP ISO mounted through webMAN or mmCM";
+static char STR_LAUNCHPS2[100]		= "Launch PS2 Classic";
 
-char STR_GAMEUM[50]			= "Game unmounted.";
+static char STR_GAMEUM[50]			= "Game unmounted.";
 
-char STR_EJECTED[50]		= "Disc ejected.";
-char STR_LOADED[50]			= "Disc inserted.";
+static char STR_EJECTED[50]		= "Disc ejected.";
+static char STR_LOADED[50]			= "Disc inserted.";
 
-char STR_GAMETOM[50]		= "Game to mount";
-char STR_GAMELOADED[250]	= "Game loaded successfully. Start the game from the disc icon<br>or from <b>/app_home</b>&nbsp;XMB entry.<hr>Click <a href=\"/mount.ps3/unmount\">here</a> to unmount the game.";
-char STR_PSPLOADED[230]		= "Game loaded successfully. Start the game using <b>PSP Launcher</b>.<hr>";
-char STR_PS2LOADED[230]		= "Game loaded successfully. Start the game using <b>PS2 Classic Launcher</b>.<hr>";
-char STR_LOADED2[50]		= "loaded   ";
+static char STR_GAMETOM[50]		= "Game to mount";
+static char STR_GAMELOADED[250]	= "Game loaded successfully. Start the game from the disc icon<br>or from <b>/app_home</b>&nbsp;XMB entry.<hr>Click <a href=\"/mount.ps3/unmount\">here</a> to unmount the game.";
+static char STR_PSPLOADED[230]		= "Game loaded successfully. Start the game using <b>PSP Launcher</b>.<hr>";
+static char STR_PS2LOADED[230]		= "Game loaded successfully. Start the game using <b>PS2 Classic Launcher</b>.<hr>";
+static char STR_LOADED2[50]		= "loaded   ";
 
-char STR_MOVIETOM[50]		= "Movie to mount";
-char STR_MOVIELOADED[250]	= "Movie loaded successfully. Start the movie from the disc icon<br>under the Video column.<hr>Click <a href=\"/mount.ps3/unmount\">here</a> to unmount the movie.";
+static char STR_MOVIETOM[50]		= "Movie to mount";
+static char STR_MOVIELOADED[250]	= "Movie loaded successfully. Start the movie from the disc icon<br>under the Video column.<hr>Click <a href=\"/mount.ps3/unmount\">here</a> to unmount the movie.";
 
-char STR_XMLRF[200]			= "Game list refreshed (<a href=\"" MY_GAMES_XML "\">mygames.xml</a>).<br>Click <a href=\"/restart.ps3\">here</a> to restart your PLAYSTATION®3 system now.";
+static char STR_XMLRF[200]			= "Game list refreshed (<a href=\"" MY_GAMES_XML "\">mygames.xml</a>).<br>Click <a href=\"/restart.ps3\">here</a> to restart your PLAYSTATION®3 system now.";
 
-char STR_STORAGE[50]		= "System storage";
-char STR_MEMORY[50]			= "Memory available";
-char STR_MBFREE[50]			= "MB free";
-char STR_KBFREE[50]			= "KB free";
+static char STR_STORAGE[50]		= "System storage";
+static char STR_MEMORY[50]			= "Memory available";
+static char STR_MBFREE[50]			= "MB free";
+static char STR_KBFREE[50]			= "KB free";
 
-char STR_FANCTRL3[50]		= "Fan control:";
-char STR_ENABLED[50]		= "Enabled";
-char STR_DISABLED[50]		= "Disabled";
+static char STR_FANCTRL3[50]		= "Fan control:";
+static char STR_ENABLED[50]		= "Enabled";
+static char STR_DISABLED[50]		= "Disabled";
 
-char STR_FANCH0[50]			= "Fan setting changed:";
-char STR_FANCH1[50]			= "MAX TEMP: ";
-char STR_FANCH2[50]			= "FAN SPEED: ";
-char STR_FANCH3[50]			= "MIN FAN SPEED: ";
+static char STR_FANCH0[50]			= "Fan setting changed:";
+static char STR_FANCH1[50]			= "MAX TEMP: ";
+static char STR_FANCH2[50]			= "FAN SPEED: ";
+static char STR_FANCH3[50]			= "MIN FAN SPEED: ";
 
-char STR_OVERHEAT[100]		= "System overheat warning!";
-char STR_OVERHEAT2[100]		= "  OVERHEAT DANGER!\r\nFAN SPEED INCREASED!";
+static char STR_OVERHEAT[100]		= "System overheat warning!";
+static char STR_OVERHEAT2[100]		= "  OVERHEAT DANGER!\r\nFAN SPEED INCREASED!";
 
-char STR_NOTFOUND[50]		= "Not found!";
+static char STR_NOTFOUND[50]		= "Not found!";
 
-char COVERS_PATH[100]		= "";
+static char COVERS_PATH[100]		= "";
 #endif
 
 int wwwd_start(uint64_t arg);
@@ -971,51 +975,70 @@ static int remote_stat(int s, char *path, int *is_directory, int64_t *file_size,
 #endif
 
 static void get_temperature(u32 _dev, u32 *_temp);
-void fan_control(u8 temp0, u8 maxtemp);
+static void fan_control(u8 temp0, u8 maxtemp);
 static void led(u64 color, u64 mode);
-void restore_fan(u8 settemp);
+static void restore_fan(u8 settemp);
 
-int savefile(char *file, char *mem, u64 size);
-int filecopy(char *file1, char *file2, uint64_t maxbytes);
-int folder_copy(char *path1, char *path2);
+static int savefile(char *file, char *mem, u64 size);
+static int filecopy(char *file1, char *file2, uint64_t maxbytes);
+static int folder_copy(char *path1, char *path2);
 
-void absPath(char* absPath_s, const char* path, const char* cwd);
-int isDir(const char* path);
-int ssplit(const char* str, char* left, int lmaxlen, char* right, int rmaxlen);
-int slisten(int port, int backlog);
-void sclose(int *socket_e);
+static void absPath(char* absPath_s, const char* path, const char* cwd);
+static int isDir(const char* path);
+static int ssplit(const char* str, char* left, int lmaxlen, char* right, int rmaxlen);
+static int slisten(int port, int backlog);
+static void sclose(int *socket_e);
 
-int del(char *path, bool recursive);
-int import_edats(char *path1, char *path2);
-void update_language();
-void detect_firmware();
-void remove_cfw_syscalls();
-void delete_history(bool delete_folders);
-bool language(const char *file_str, char *default_str);
-void block_online_servers();
+static int del(char *path, bool recursive);
+static void  import_edats(char *path1, char *path2);
+static void update_language();
+static void detect_firmware();
+static void remove_cfw_syscalls();
+static void delete_history(bool delete_folders);
+static bool language(const char *file_str, char *default_str);
+static void block_online_servers();
 
-char h2a(char hex);
-void urlenc(char *dst, char *src);
-int val(const char *c);
+static void add_query_html(char *buffer, char *param, char *label);
+static void add_xmb_entry(char *param, char *tempstr, char *templn, char *skey, u32 key, char *myxml_ps3, char *myxml_ps2, char *myxml_psx, char *myxml_psp, char *myxml_dvd, char *entry_name, u16 *item_count);
+static void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char *name, char *fsize, CellRtcDateTime rDate, u16 flen, unsigned long long sz, char *sf, u8 is_net);
+
+static void prepare_header(char *header, char *param, u8 is_binary);
+static void get_value(char *text, char *url, u16 size);
+static void handleclient(u64 conn_s_p);
+static void handleclient_ftp(u64 conn_s_ftp_p);
+
+static char h2a(char hex);
+static void urlenc(char *dst, char *src);
+static void utf8enc(char *dst, char *src);
+static void htmlenc(char *dst, char *src, u8 cpy2src);
+static int val(const char *c);
+
+#ifdef PS3MAPI
+static int Char2Int(char input);
+static void Hex2Bin(const char* src, char* target);
+#endif
 
 #ifdef PS2_DISC
 static void do_umount_ps2disc(bool mount);
 static bool mount_ps2disc(char *path);
 #endif
+
+static void mount_autoboot();
 static void do_umount(bool clean);
 static void do_umount_iso(void);
 static bool mount_with_mm(const char *_path, u8 do_eject);
-void eject_insert(u8 eject, u8 insert);
+static void eject_insert(u8 eject, u8 insert);
 
-bool from_reboot = false;
-bool copy_in_progress = false;
-bool copy_aborted = false;
-bool fix_in_progress = false;
-bool fix_aborted = false;
-bool is_busy = false;
-bool is_mounting = false;
+static bool from_reboot = false;
+static bool copy_in_progress = false;
+static bool copy_aborted = false;
+static bool fix_in_progress = false;
+static bool fix_aborted = false;
+static bool is_busy = false;
+static bool is_mounting = false;
 
-void show_msg(char* msg);
+static char* game_name();
+static void show_msg(char* msg);
 //void show_msg2(char* msg);
 
 //int (*_cellGcmIoOffsetToAddress)(uint32_t, void**) = NULL;
@@ -1070,7 +1093,7 @@ void * getNIDfunc(const char * vsh_module, uint32_t fnid, uint32_t offset)
 	return 0;
 }
 
-void show_msg(char* msg)
+static void show_msg(char* msg)
 {
 	if(!vshtask_notify)
 		vshtask_notify = (void*)((int)getNIDfunc("vshtask", 0xA02D46E7, 0));
@@ -1081,7 +1104,7 @@ void show_msg(char* msg)
 		vshtask_notify(0, msg);
 }
 
-char* game_name()
+static char* game_name()
 {
     int h = View_Find("game_plugin");
 
@@ -1096,7 +1119,7 @@ char* game_name()
 
 
 /*
-void show_msg2(char* msg) // usage: show_msg2(L"text");
+static void show_msg2(char* msg) // usage: show_msg2(L"text");
 {
 	if(View_Find("xmb_plugin") != 0)
 	{
@@ -1107,7 +1130,7 @@ void show_msg2(char* msg) // usage: show_msg2(L"text");
 */
 
 #ifdef EXTRA_FEAT
-void saveBMP()
+static void saveBMP()
 {
 	if(game_name()==0) //XMB
 	{
@@ -1147,28 +1170,29 @@ void log(const char *fmt, char *text)
 */
 
 #ifndef COBRA_ONLY
-void string_to_lv2(char* path, u64 addr);
-void add_to_map(char *path1, char *path2);
+static void string_to_lv2(char* path, u64 addr);
+static void add_to_map(char *path1, char *path2);
 #endif
 
-uint64_t peekq(uint64_t addr);
-void pokeq( uint64_t addr, uint64_t val);
-void poke_lv1( uint64_t addr, uint64_t val);
+static inline uint64_t peekq(uint64_t addr);
+static inline void pokeq( uint64_t addr, uint64_t val);
+static inline uint64_t peek_lv1(uint64_t addr);
+static inline void poke_lv1( uint64_t addr, uint64_t val);
 
-u32 lv2peek32(u64 addr);
-void lv2poke32(u64 addr, u32 value);
+static u32 lv2peek32(u64 addr);
+static void lv2poke32(u64 addr, u32 value);
 
 #ifdef DEBUG_MEM
-void dump_mem(char *file, uint64_t start, uint32_t size_mb);
+static void dump_mem(char *file, uint64_t start, uint32_t size_mb);
 #endif
 
-u32 lv2peek32(u64 addr)
+static u32 lv2peek32(u64 addr)
 {
     u32 ret = (u32) (peekq(addr) >> 32ULL);
     return ret;
 }
 
-void lv2poke32(u64 addr, u32 value)
+static void lv2poke32(u64 addr, u32 value)
 {
     pokeq(addr, (((u64) value) <<32) | (peekq(addr) & 0xffffffffULL));
 }
@@ -1221,7 +1245,7 @@ static inline sys_prx_id_t prx_get_module_id_by_address(void *addr)
 	return (int)p1;
 }
 
-static inline int sysLv2FsLink(const char *oldpath,const char *newpath)
+static int sysLv2FsLink(const char *oldpath,const char *newpath)
 {
 	system_call_2(SC_FS_LINK,(u64)oldpath,(u64)newpath);
 	return_to_user_prog(int);
@@ -1234,7 +1258,7 @@ static u32 in_cobra(u32 *mode)
 	return_to_user_prog(uint32_t);
 }
 */
-int isDir(const char* path)
+static int isDir(const char* path)
 {
 	struct CellFsStat s;
 	if(cellFsStat(path, &s)==CELL_FS_SUCCEEDED)
@@ -1243,7 +1267,7 @@ int isDir(const char* path)
 		return 0;
 }
 
-int savefile(char *file, char *mem, u64 size)
+static int savefile(char *file, char *mem, u64 size)
 {
 	u64 written; int fd=0;
 	cellFsChmod(file, MODE);
@@ -1258,7 +1282,7 @@ int savefile(char *file, char *mem, u64 size)
         return FAILED;
 }
 
-int filecopy(char *file1, char *file2, uint64_t maxbytes)
+static int filecopy(char *file1, char *file2, uint64_t maxbytes)
 {
     struct CellFsStat buf;
     int fd1, fd2;
@@ -1325,7 +1349,7 @@ int filecopy(char *file1, char *file2, uint64_t maxbytes)
 }
 
 #ifndef LITE_EDITION
-int del(char *path, bool recursive)
+static int del(char *path, bool recursive)
 {
 	if(!isDir(path)) {return cellFsUnlink(path);}
 	if(strlen(path)<11 || !memcmp(path, "/dev_bdvd", 9) || !memcmp(path, "/dev_flash", 10) || !memcmp(path, "/dev_blind", 10)) return FAILED;
@@ -1365,7 +1389,7 @@ int del(char *path, bool recursive)
 }
 #endif
 
-int folder_copy(char *path1, char *path2)
+static int folder_copy(char *path1, char *path2)
 {
 	int fd;
 	u64 read;
@@ -1402,7 +1426,7 @@ int folder_copy(char *path1, char *path2)
 	return CELL_FS_SUCCEEDED;
 }
 
-int import_edats(char *path1, char *path2)
+static void import_edats(char *path1, char *path2)
 {
 	int fd; bool from_usb;
 	u64 read;
@@ -1413,7 +1437,7 @@ int import_edats(char *path1, char *path2)
 	char target[MAX_PATH_LEN];
 
 	cellFsMkdir((char*)path2, MODE);
-	if(cellFsStat(path2, &buf)!=CELL_FS_SUCCEEDED) return FAILED;
+	if(cellFsStat(path2, &buf)!=CELL_FS_SUCCEEDED) return;
 
 	copy_aborted=false;
 	from_usb=(strstr(path1,"/dev_usb")!=NULL);
@@ -1437,12 +1461,12 @@ int import_edats(char *path1, char *path2)
 		cellFsClosedir(fd);
 	}
 	else
-		return FAILED;
+		return;
 
 	return CELL_FS_SUCCEEDED;
 }
 
-char h2a(char hex)
+static char h2a(char hex)
 {
 	char c = hex;
 	if(c>=0 && c<=9)
@@ -1452,7 +1476,7 @@ char h2a(char hex)
 	return c;
 }
 
-void urlenc(char *dst, char *src)
+static void urlenc(char *dst, char *src)
 {
 	size_t j=0;
     size_t n=strlen(src);
@@ -1470,7 +1494,7 @@ void urlenc(char *dst, char *src)
 	dst[j] = '\0';
 }
 
-void utf8enc(char *dst, char *src)
+static void utf8enc(char *dst, char *src)
 {
 	size_t j=0, n=strlen(src); u16 c;
 	for(size_t i=0; i<n; i++)
@@ -1496,7 +1520,7 @@ void utf8enc(char *dst, char *src)
 	strncpy(src, dst, MAX_LINE_LEN);
 }
 
-void htmlenc(char *dst, char *src, u8 cpy2src)
+static void htmlenc(char *dst, char *src, u8 cpy2src)
 {
 	size_t j=0;
     size_t n=strlen(src); char tmp[8]; memset(dst, 4*n, 0); u8 t, c;
@@ -1517,7 +1541,7 @@ void htmlenc(char *dst, char *src, u8 cpy2src)
 }
 
 /*
-void utf8dec(char *dst, char *src)
+static void utf8dec(char *dst, char *src)
 {
 	size_t j=0;
 	size_t n=strlen(src); u8 c;
@@ -1534,29 +1558,29 @@ void utf8dec(char *dst, char *src)
 	dst[j] = '\0';
 }
 */
-int val(const char *c)
+static int val(const char *c)
 {
     int previous_result=0, result=0;
     int multiplier=1;
 
-    if (c && *c == '-')
+    if(c && *c == '-')
     {
         multiplier = -1;
         c++;
     }
 
-    while (*c)
+    while(*c)
     {
-        if (*c < '0' || *c > '9') return result * multiplier;
+        if(*c < '0' || *c > '9') return result * multiplier;
 
         result *= 10;
-        if (result < previous_result)
+        if(result < previous_result)
             return(0);
         else
             previous_result *= 10;
 
         result += *c - '0';
-        if (result < previous_result)
+        if(result < previous_result)
             return(0);
         else
             previous_result += *c - '0';
@@ -1568,7 +1592,7 @@ int val(const char *c)
 
 #ifdef PS3MAPI
 
-int Char2Int(char input)
+static int Char2Int(char input)
 {
   if(input >= '0' && input <= '9')
     return input - '0';
@@ -1579,7 +1603,7 @@ int Char2Int(char input)
   return NULL;
 }
 
-void Hex2Bin(const char* src, char* target)
+static void Hex2Bin(const char* src, char* target)
 {
   while(*src && src[1])
   {
@@ -1596,15 +1620,16 @@ static int connect_to_server(char *server, uint16_t port)
 	unsigned int temp;
 	int s;
 
-	if ((temp = inet_addr(server)) != (unsigned int)-1)
+	if((temp = inet_addr(server)) != (unsigned int)-1)
 	{
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = temp;
 	}
-	else {
+	else
+	{
 		struct hostent *hp;
 
-		if ((hp = gethostbyname(server)) == NULL)
+		if((hp = gethostbyname(server)) == NULL)
 		{
 			return FAILED;
 		}
@@ -1615,7 +1640,7 @@ static int connect_to_server(char *server, uint16_t port)
 
 	sin.sin_port = htons(port);
 	s = socket(AF_INET, SOCK_STREAM, 0);
-	if (s < 0)
+	if(s < 0)
 	{
 		return FAILED;
 	}
@@ -1627,7 +1652,7 @@ static int connect_to_server(char *server, uint16_t port)
 	//setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 	setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+	if(connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 	{
 		return FAILED;
 	}
@@ -1648,36 +1673,35 @@ static int remote_stat(int s, char *path, int *is_directory, int64_t *file_size,
 	netiso_stat_result res;
 	int len;
 
-	*abort_connection = 0;
+	*abort_connection = 1;
 
 	len = strlen(path);
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode = (NETISO_CMD_STAT_FILE);
 	cmd.fp_len = (len);
 
-	if (send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (remote_stat) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (send(s, path, len, 0) != len)
+	if(send(s, path, len, 0) != len)
 	{
 		//DPRINTF("send failed (remote_stat) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
+	if(recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
 	{
 		//DPRINTF("recv failed (remote_stat) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
+	*abort_connection = 0;
+
 	*file_size = (res.file_size);
-	if (*file_size == -1)
+	if(*file_size == -1)
 		return FAILED;
 
 	*is_directory = res.is_directory;
@@ -1693,32 +1717,32 @@ static int read_remote_file(int s, void *buf, uint64_t offset, uint32_t size, in
 	netiso_read_file_cmd cmd;
 	netiso_read_file_result res;
 
-	*abort_connection = 0;
+	*abort_connection = 1;
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode = (NETISO_CMD_READ_FILE);
 	cmd.offset = (offset);
 	cmd.num_bytes = (size);
 
-	if (send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (read_remote_file) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
+	if(recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
 	{
 		//DPRINTF("recv failed (read_remote_file) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
+	*abort_connection = 0;
+
 	int bytes_read = (res.bytes_read);
-	if (bytes_read <= 0)
+	if(bytes_read <= 0)
 		return bytes_read;
 
-	if (recv(s, buf, bytes_read, MSG_WAITALL) != bytes_read)
+	if(recv(s, buf, bytes_read, MSG_WAITALL) != bytes_read)
 	{
 		//DPRINTF("recv failed (read_remote_file) (errno=%d)!\n", get_network_error());
 		*abort_connection = 1;
@@ -1734,33 +1758,32 @@ static int64_t open_remote_file_2(int s, char *path, int *abort_connection)
 	netiso_open_result res;
 	int len;
 
-	*abort_connection = 0;
+	*abort_connection = 1;
 
 	len = strlen(path);
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode = BE16(NETISO_CMD_OPEN_FILE);
 	cmd.fp_len = BE16(len);
 
-	if (send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (open_remote_file) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (send(s, path, len, 0) != len)
+	if(send(s, path, len, 0) != len)
 	{
 		//DPRINTF("send failed (open_remote_file) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
+	if(recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
 	{
 		//DPRINTF("recv failed (open_remote_file) (errno=%d)!\n", get_network_error());
-		*abort_connection = 1;
 		return FAILED;
 	}
+
+	*abort_connection = 0;
 
 	return (res.file_size);
 }
@@ -1777,25 +1800,25 @@ static int64_t open_remote_file(char *path)
 	cmd.opcode = NETISO_CMD_OPEN_FILE;
 	cmd.fp_len = len;
 
-	if (send(g_socket, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(g_socket, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (open_file) (errno=%d)!\n", sys_net_errno);
 		return FAILED;
 	}
 
-	if (send(g_socket, path, len, 0) != len)
+	if(send(g_socket, path, len, 0) != len)
 	{
 		//DPRINTF("send failed (open_file) (errno=%d)!\n", sys_net_errno);
 		return FAILED;
 	}
 
-	if (recv(g_socket, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
+	if(recv(g_socket, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
 	{
 		//DPRINTF("recv failed (open_file) (errno=%d)!\n", sys_net_errno);
 		return FAILED;
 	}
 
-	if (res.file_size == -1)
+	if(res.file_size == -1)
 	{
 		//DPRINTF("Remote file %s doesn't exist!\n", path);
 		return FAILED;
@@ -1815,13 +1838,13 @@ static int read_remote_file_critical(uint64_t offset, void *buf, uint32_t size)
 	cmd.num_bytes = size;
 	cmd.offset = offset;
 
-	if (send(g_socket, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(g_socket, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (read file) (errno=%d)!\n", sys_net_errno);
 		return FAILED;
 	}
 
-	if (recv(g_socket, buf, size, MSG_WAITALL) != (int)size)
+	if(recv(g_socket, buf, size, MSG_WAITALL) != (int)size)
 	{
 		//DPRINTF("recv failed (recv file)  (errno=%d)!\n", sys_net_errno);
 		return FAILED;
@@ -1839,13 +1862,13 @@ static int process_read_cd_2048_cmd(uint8_t *buf, uint32_t start_sector, uint32_
 	cmd.start_sector = start_sector;
 	cmd.sector_count = sector_count;
 
-	if (send(g_socket, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(g_socket, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (read 2048) (errno=%d)!\n", sys_net_errno);
 		return FAILED;
 	}
 
-	if (recv(g_socket, buf, sector_count*2048, MSG_WAITALL) != (int)(sector_count*2048))
+	if(recv(g_socket, buf, sector_count*2048, MSG_WAITALL) != (int)(sector_count*2048))
 	{
 		//DPRINTF("recv failed (read 2048)  (errno=%d)!\n", sys_net_errno);
 		return FAILED;
@@ -1862,11 +1885,11 @@ static int process_read_iso_cmd(uint8_t *buf, uint64_t offset, uint32_t size)
 	//DPRINTF("read iso: %p %lx %x\n", buf, offset, size);
 	read_end = offset + size;
 
-	if (read_end >= discsize)
+	if(read_end >= discsize)
 	{
 		//DPRINTF("Read beyond limits: %llx %x (discsize=%llx)!\n", offset, size, discsize);
 
-		if (offset >= discsize)
+		if(offset >= discsize)
 		{
 			memset(buf, 0, size);
 			return 0;
@@ -1883,19 +1906,19 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 {
 	int cache = 0;
 
-	if (remaining <= CD_CACHE_SIZE)
+	if(remaining <= CD_CACHE_SIZE)
 	{
 		int dif = (int)cached_cd_sector-sector;
 
-		if (ABS(dif) < CD_CACHE_SIZE)
+		if(ABS(dif) < CD_CACHE_SIZE)
 		{
 			uint8_t *copy_ptr = NULL;
 			uint32_t copy_offset = 0;
 			uint32_t copy_size = 0;
 
-			if (dif > 0)
+			if(dif > 0)
 			{
-				if (dif < (int)remaining)
+				if(dif < (int)remaining)
 				{
 					copy_ptr = cd_cache;
 					copy_offset = dif;
@@ -1909,18 +1932,18 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 				copy_size = MIN((int)remaining, CD_CACHE_SIZE+dif);
 			}
 
-			if (copy_ptr)
+			if(copy_ptr)
 			{
 				memcpy(buf+(copy_offset*2352), copy_ptr, copy_size*2352);
 
-				if (remaining == copy_size)
+				if(remaining == copy_size)
 				{
 					return 0;
 				}
 
 				remaining -= copy_size;
 
-				if (dif <= 0)
+				if(dif <= 0)
 				{
 					uint32_t newsector = cached_cd_sector + CD_CACHE_SIZE;
 					buf += ((newsector-sector)*2352);
@@ -1932,17 +1955,17 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 		cache = 1;
 	}
 
-	if (!cache)
+	if(!cache)
 	{
 		return process_read_iso_cmd(buf, sector*2352, remaining*2352);
 	}
 
-	if (!cd_cache)
+	if(!cd_cache)
 	{
 		sys_addr_t addr;
 
 		int ret = sys_memory_allocate(_192KB_, SYS_MEMORY_PAGE_SIZE_64K, &addr);
-		if (ret != 0)
+		if(ret != 0)
 		{
 			//DPRINTF("sys_memory_allocate failed: %x\n", ret);
 			return ret;
@@ -1951,7 +1974,7 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 		cd_cache = (uint8_t *)addr;
 	}
 
-	if (process_read_iso_cmd(cd_cache, sector*2352, CD_CACHE_SIZE*2352) != 0)
+	if(process_read_iso_cmd(cd_cache, sector*2352, CD_CACHE_SIZE*2352) != 0)
 		return FAILED;
 
 	memcpy(buf, cd_cache, remaining*2352);
@@ -1966,17 +1989,17 @@ static int sys_storage_ext_mount_discfile_proxy(sys_event_port_t result_port, sy
 	return (int)p1;
 }
 
-static int fake_insert_event(uint64_t disctype)
+static int fake_insert_event(uint64_t devicetype, uint64_t disctype)
 {
 	uint64_t param = (uint64_t)(disctype) << 32ULL;
-	sys_storage_ext_fake_storage_event(7, 0, BDVD_DRIVE);
-	return sys_storage_ext_fake_storage_event(3, param, BDVD_DRIVE);
+	sys_storage_ext_fake_storage_event(7, 0, devicetype);
+	return sys_storage_ext_fake_storage_event(3, param, devicetype);
 }
 
-static int fake_eject_event(void)
+static int fake_eject_event(uint64_t devicetype)
 {
-	sys_storage_ext_fake_storage_event(4, 0, BDVD_DRIVE);
-	return sys_storage_ext_fake_storage_event(8, 0, BDVD_DRIVE);
+	sys_storage_ext_fake_storage_event(4, 0, devicetype);
+	return sys_storage_ext_fake_storage_event(8, 0, devicetype);
 }
 
 
@@ -1994,17 +2017,19 @@ static void netiso_thread(uint64_t arg)
 
 	args = (netiso_args *)(uint32_t)arg;
 
+	sector_size = 0x200;
+
 	//DPRINTF("Hello VSH\n");
 
 	g_socket = connect_to_server(args->server, args->port);
-	if (g_socket < 0)
+	if(g_socket < 0)
 	{
 		sys_memory_free((sys_addr_t)args);
 		sys_ppu_thread_exit(0);
 	}
 
 	ret64 = open_remote_file(args->path);
-	if (ret64 < 0)
+	if(ret64 < 0)
 	{
 		sys_memory_free((sys_addr_t)args);
 		sys_ppu_thread_exit(0);
@@ -2013,7 +2038,7 @@ static void netiso_thread(uint64_t arg)
 	discsize = (uint64_t)ret64;
 
 	ret = sys_event_port_create(&result_port, 1, SYS_EVENT_PORT_NO_NAME);
-	if (ret != 0)
+	if(ret != 0)
 	{
 		//DPRINTF("sys_event_port_create failed: %x\n", ret);
 		sys_memory_free((sys_addr_t)args);
@@ -2022,7 +2047,7 @@ static void netiso_thread(uint64_t arg)
 
 	sys_event_queue_attribute_initialize(queue_attr);
 	ret = sys_event_queue_create(&command_queue, &queue_attr, 0, 1);
-	if (ret != 0)
+	if(ret != 0)
 	{
 		//DPRINTF("sys_event_queue_create failed: %x\n", ret);
 		sys_memory_free((sys_addr_t)args);
@@ -2032,13 +2057,13 @@ static void netiso_thread(uint64_t arg)
 
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
 
-	if (real_disctype != 0)
+	if(real_disctype != 0)
 	{
-		fake_eject_event();
+		fake_eject_event(BDVD_DRIVE);
 	}
 
-	emu_mode = args->emu_mode;
-	if (emu_mode == EMU_PSX)
+	emu_mode = args->emu_mode & 0xF;
+	if(emu_mode == EMU_PSX)
 	{
 		numtracks = args->numtracks;
 		tracks = &args->tracks[0];
@@ -2055,21 +2080,21 @@ static void netiso_thread(uint64_t arg)
 	//DPRINTF("mount = %x\n", ret);
 
 	sys_memory_free((sys_addr_t)args);
-	fake_insert_event(real_disctype);
+	fake_insert_event(BDVD_DRIVE, real_disctype);
 
-	if (ret != 0)
+	if(ret != 0)
 	{
 		sys_event_port_destroy(result_port);
 		sys_ppu_thread_exit(0);
 	}
 
 	netiso_loaded=1;
-	while (netiso_loaded)
+	while(netiso_loaded)
 	{
 		sys_event_t event;
 
 		ret = sys_event_queue_receive(command_queue, &event, 0);
-		if (ret != 0)
+		if(ret != 0)
 		{
 			//DPRINTF("sys_event_queue_receive failed: %x\n", ret);
 			break;
@@ -2083,7 +2108,7 @@ static void netiso_thread(uint64_t arg)
 		{
 			case CMD_READ_ISO:
 			{
-				if (is_cd2352)
+				if(is_cd2352)
 				{
 					ret = process_read_cd_2048_cmd(buf, offset/2048, size/2048);
 				}
@@ -2102,7 +2127,7 @@ static void netiso_thread(uint64_t arg)
 		}
 
 		ret = sys_event_port_send(result_port, ret, 0, 0);
-		if (ret != 0)
+		if(ret != 0)
 		{
 			//DPRINTF("sys_event_port_send failed: %x\n", ret);
 			break;
@@ -2110,20 +2135,20 @@ static void netiso_thread(uint64_t arg)
 	}
 
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
-	fake_eject_event();
+	fake_eject_event(BDVD_DRIVE);
 	sys_storage_ext_umount_discfile();
 
-	if (real_disctype != 0)
+	if(real_disctype != 0)
 	{
-		fake_insert_event(real_disctype);
+		fake_insert_event(BDVD_DRIVE, real_disctype);
 	}
 
-	if (cd_cache)
+	if(cd_cache)
 	{
 		sys_memory_free((sys_addr_t)cd_cache);
 	}
 
-	if (g_socket >= 0)
+	if(g_socket >= 0)
 	{
 		shutdown(g_socket, SHUT_RDWR);
 		socketclose(g_socket);
@@ -2131,7 +2156,7 @@ static void netiso_thread(uint64_t arg)
 	}
 
 	sys_event_port_disconnect(result_port);
-	if (sys_event_port_destroy(result_port) != 0)
+	if(sys_event_port_destroy(result_port) != 0)
 	{
 		//DPRINTF("Error destroyng result_port\n");
 	}
@@ -2145,22 +2170,22 @@ static void netiso_stop_thread(uint64_t arg)
 {
 	uint64_t exit_code;
 
-	if (g_socket >= 0)
+	if(g_socket >= 0)
 	{
 		shutdown(g_socket, SHUT_RDWR);
 		socketclose(g_socket);
 		g_socket = -1;
 	}
 
-	if (command_queue != (sys_event_queue_t)-1)
+	if(command_queue != (sys_event_queue_t)-1)
 	{
-		if (sys_event_queue_destroy(command_queue, SYS_EVENT_QUEUE_DESTROY_FORCE) != 0)
+		if(sys_event_queue_destroy(command_queue, SYS_EVENT_QUEUE_DESTROY_FORCE) != 0)
 		{
 			//DPRINTF("Failed in destroying command_queue\n");
 		}
 	}
 
-	if (thread_id_net != (sys_ppu_thread_t)-1)
+	if(thread_id_net != (sys_ppu_thread_t)-1)
 	{
 		sys_ppu_thread_join(thread_id_net, &exit_code);
 	}
@@ -2178,15 +2203,15 @@ static inline void get_next_read(uint64_t discoffset, uint64_t bufsize, uint64_t
 	*readsize = bufsize;
 	*offset = 0;
 
-	for (uint32_t i = 0; i < num_sections; i++)
+	for(uint32_t i = 0; i < num_sections; i++)
 	{
-		uint64_t last = base + ((uint64_t)sections_size[i] * 512);
+		uint64_t last = base + ((uint64_t)sections_size[i] * sector_size);
 
-		if (discoffset >= base && discoffset < last)
+		if(discoffset >= base && discoffset < last)
 		{
 			uint64_t maxfileread = last-discoffset;
 
-			if (bufsize > maxfileread)
+			if(bufsize > maxfileread)
 				*readsize = maxfileread;
 			else
 				*readsize = bufsize;
@@ -2196,7 +2221,7 @@ static inline void get_next_read(uint64_t discoffset, uint64_t bufsize, uint64_t
 			return;
 		}
 
-		base += ((uint64_t)sections_size[i] * 512);
+		base += ((uint64_t)sections_size[i] * sector_size);
 	}
 
 	// We can be here on video blu-ray
@@ -2210,18 +2235,18 @@ static int process_read_iso_cmd_iso(uint8_t *buf, uint64_t offset, uint64_t size
 	//DPRINTF("read iso: %p %lx %lx\n", buf, offset, size);
 	remaining = size;
 
-	while (remaining > 0)
+	while(remaining > 0)
 	{
 		uint64_t pos, readsize;
 		int idx;
 		int ret;
-		uint8_t tmp[512];
+		uint8_t tmp[sector_size];
 		uint32_t sector;
 		uint32_t r;
 
 		get_next_read(offset, remaining, &pos, &readsize, &idx);
 
-		if (idx == -1 || sections[idx] == 0xFFFFFFFF)
+		if(idx == -1 || sections[idx] == 0xFFFFFFFF)
 		{
 			memset(buf, 0, readsize);
 			buf += readsize;
@@ -2230,24 +2255,24 @@ static int process_read_iso_cmd_iso(uint8_t *buf, uint64_t offset, uint64_t size
 			continue;
 		}
 
-		if (pos & 511)
+		if(pos & (sector_size-1))
 		{
 			uint64_t csize;
 
-			sector = sections[idx] + pos/512;
+			sector = sections[idx] + pos/sector_size;
 			ret = sys_storage_read(handle, 0, sector, 1, tmp, &r, 0);
-			if (ret != 0 || r != 1)
+			if(ret != 0 || r != 1)
 			{
 				//DPRINTF("sys_storage_read failed: %x 1 -> %x\n", sector, ret);
 				return FAILED;
 			}
 
-			csize = 512-(pos&511);
+			csize = sector_size-(pos&(sector_size-1));
 
-			if (csize > readsize)
+			if(csize > readsize)
 				csize = readsize;
 
-			memcpy(buf, tmp+(pos&511), csize);
+			memcpy(buf, tmp+(pos&(sector_size-1)), csize);
 			buf += csize;
 			offset += csize;
 			pos += csize;
@@ -2255,23 +2280,23 @@ static int process_read_iso_cmd_iso(uint8_t *buf, uint64_t offset, uint64_t size
 			readsize -= csize;
 		}
 
-		if (readsize > 0)
+		if(readsize > 0)
 		{
-			uint32_t n = readsize / 512;
+			uint32_t n = readsize / sector_size;
 
-			if (n > 0)
+			if(n > 0)
 			{
 				uint64_t s;
 
-				sector = sections[idx] + pos/512;
+				sector = sections[idx] + pos/sector_size;
 				ret = sys_storage_read(handle, 0, sector, n, buf, &r, 0);
-				if (ret != 0 || r != n)
+				if(ret != 0 || r != n)
 				{
 					//DPRINTF("sys_storage_read failed: %x %x -> %x\n", sector, n, ret);
 					return FAILED;
 				}
 
-				s = n * 512;
+				s = n * sector_size;
 				buf += s;
 				offset += s;
 				pos += s;
@@ -2279,11 +2304,11 @@ static int process_read_iso_cmd_iso(uint8_t *buf, uint64_t offset, uint64_t size
 				readsize -= s;
 			}
 
-			if (readsize > 0)
+			if(readsize > 0)
 			{
-				sector = sections[idx] + pos/512;
+				sector = sections[idx] + pos/sector_size;
 				ret = sys_storage_read(handle, 0, sector, 1, tmp, &r, 0);
-				if (ret != 0 || r != 1)
+				if(ret != 0 || r != 1)
 				{
 					//DPRINTF("sys_storage_read failed: %x 1 -> %x\n", sector, ret);
 					return FAILED;
@@ -2300,9 +2325,9 @@ static int process_read_iso_cmd_iso(uint8_t *buf, uint64_t offset, uint64_t size
 	return 0;
 }
 
-static inline void my_memcpy(uint8_t *dst, uint8_t *src, int size)
+static inline void my_memcpy(uint8_t *dst, uint8_t *src, uint16_t size)
 {
-	for (int i = 0; i < size; i++)
+	for(uint16_t i = 0; i < size; i++)
 		dst[i] = src[i];
 }
 
@@ -2315,11 +2340,11 @@ static int process_read_cd_2048_cmd_iso(uint8_t *buf, uint32_t start_sector, uin
 	uint8_t *in = buf;
 	uint8_t *out = buf;
 
-	if (fit > 0)
+	if(fit > 0)
 	{
 		process_read_iso_cmd_iso(buf, start_sector*2352, fit*2352);
 
-		for (i = 0; i < fit; i++)
+		for(i = 0; i < fit; i++)
 		{
 			my_memcpy(out, in+24, 2048);
 			in += 2352;
@@ -2328,7 +2353,7 @@ static int process_read_cd_2048_cmd_iso(uint8_t *buf, uint32_t start_sector, uin
 		}
 	}
 
-	for (i = 0; i < rem; i++)
+	for(i = 0; i < rem; i++)
 	{
 		process_read_iso_cmd_iso(out, (start_sector*2352)+24, 2048);
 		out += 2048;
@@ -2342,19 +2367,19 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 {
 	int cache = 0;
 
-	if (remaining <= CD_CACHE_SIZE)
+	if(remaining <= CD_CACHE_SIZE)
 	{
 		int dif = (int)cached_cd_sector-sector;
 
-		if (ABS(dif) < CD_CACHE_SIZE)
+		if(ABS(dif) < CD_CACHE_SIZE)
 		{
 			uint8_t *copy_ptr = NULL;
 			uint32_t copy_offset = 0;
 			uint32_t copy_size = 0;
 
-			if (dif > 0)
+			if(dif > 0)
 			{
-				if (dif < (int)remaining)
+				if(dif < (int)remaining)
 				{
 					copy_ptr = cd_cache;
 					copy_offset = dif;
@@ -2368,18 +2393,18 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 				copy_size = MIN((int)remaining, CD_CACHE_SIZE+dif);
 			}
 
-			if (copy_ptr)
+			if(copy_ptr)
 			{
 				memcpy(buf+(copy_offset*2352), copy_ptr, copy_size*2352);
 
-				if (remaining == copy_size)
+				if(remaining == copy_size)
 				{
 					return 0;
 				}
 
 				remaining -= copy_size;
 
-				if (dif <= 0)
+				if(dif <= 0)
 				{
 					uint32_t newsector = cached_cd_sector + CD_CACHE_SIZE;
 					buf += ((newsector-sector)*2352);
@@ -2391,17 +2416,17 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 		cache = 1;
 	}
 
-	if (!cache)
+	if(!cache)
 	{
 		return process_read_iso_cmd_iso(buf, sector*2352, remaining*2352);
 	}
 
-	if (!cd_cache)
+	if(!cd_cache)
 	{
 		sys_addr_t addr;
 
 		int ret = sys_memory_allocate(_192KB_, SYS_MEMORY_PAGE_SIZE_64K, &addr);
-		if (ret != 0)
+		if(ret != 0)
 		{
 			//DPRINTF("sys_memory_allocate failed: %x\n", ret);
 			return ret;
@@ -2410,7 +2435,7 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 		cd_cache = (uint8_t *)addr;
 	}
 
-	if (process_read_iso_cmd_iso(cd_cache, sector*2352, CD_CACHE_SIZE*2352) != 0)
+	if(process_read_iso_cmd_iso(cd_cache, sector*2352, CD_CACHE_SIZE*2352) != 0)
 		return FAILED;
 
 	memcpy(buf, cd_cache, remaining*2352);
@@ -2423,15 +2448,15 @@ static void rawseciso_stop_thread(uint64_t arg)
 	uint64_t exit_code;
 	rawseciso_loaded = 1;
 
-	if (command_queue_ntfs != (sys_event_queue_t)-1)
+	if(command_queue_ntfs != (sys_event_queue_t)-1)
 	{
-		if (sys_event_queue_destroy(command_queue_ntfs, SYS_EVENT_QUEUE_DESTROY_FORCE) != 0)
+		if(sys_event_queue_destroy(command_queue_ntfs, SYS_EVENT_QUEUE_DESTROY_FORCE) != 0)
 		{
 			//DPRINTF("Failed in destroying command_queue\n");
 		}
 	}
 
-	if (thread_id_ntfs != (sys_ppu_thread_t)-1)
+	if(thread_id_ntfs != (sys_ppu_thread_t)-1)
 	{
 		sys_ppu_thread_join(thread_id_ntfs, &exit_code);
 	}
@@ -2456,17 +2481,27 @@ static void rawseciso_thread(uint64_t arg)
 	sections = (uint32_t *)(args+1);
 	sections_size = sections + num_sections;
 
+	sector_size = 0x200;
+	if(args->device!=0)
+	{
+		for(u8 retry = 0; retry < 16; retry++)
+		{
+			if(sys_storage_get_device_info(args->device, &disc_info) == 0) {sector_size = (uint32_t) disc_info.sector_size; break;}
+			sys_timer_usleep(500000);
+		}
+	}
+
 	discsize = 0;
 
-	for (uint32_t i = 0; i < num_sections; i++)
+	for(uint32_t i = 0; i < num_sections; i++)
 	{
 		discsize += sections_size[i];
 	}
 
-	discsize = discsize * 512;
+	discsize = discsize * sector_size;
 
-	emu_mode = args->emu_mode;
-	if (emu_mode == EMU_PSX)
+	emu_mode = args->emu_mode & 0xF;
+	if(emu_mode == EMU_PSX)
 	{
 		num_tracks = args->num_tracks;
 		tracks = (ScsiTrackDescriptor *)(sections_size + num_sections);
@@ -2479,9 +2514,9 @@ static void rawseciso_thread(uint64_t arg)
 		is_cd2352 = 0;
 	}
 
-	if (is_cd2352)
+	if(is_cd2352)
 	{
-		if (discsize % 2352)
+		if(discsize % 2352)
 		{
 			discsize = discsize - (discsize % 2352);
 		}
@@ -2490,7 +2525,7 @@ static void rawseciso_thread(uint64_t arg)
 	//DPRINTF("discsize = %lx%08lx\n", discsize>>32, discsize);
 
 	ret = sys_storage_open(args->device, 0, &handle, 0);
-	if (ret != 0)
+	if(ret != 0)
 	{
 		//DPRINTF("sys_storage_open failed: %x\n", ret);
 		sys_memory_free((sys_addr_t)args);
@@ -2498,7 +2533,7 @@ static void rawseciso_thread(uint64_t arg)
 	}
 
 	ret = sys_event_port_create(&result_port, 1, SYS_EVENT_PORT_NO_NAME);
-	if (ret != 0)
+	if(ret != 0)
 	{
 		//DPRINTF("sys_event_port_create failed: %x\n", ret);
 		sys_storage_close(handle);
@@ -2508,7 +2543,7 @@ static void rawseciso_thread(uint64_t arg)
 
 	sys_event_queue_attribute_initialize(queue_attr);
 	ret = sys_event_queue_create(&command_queue_ntfs, &queue_attr, 0, 1);
-	if (ret != 0)
+	if(ret != 0)
 	{
 		//DPRINTF("sys_event_queue_create failed: %x\n", ret);
 		sys_event_port_destroy(result_port);
@@ -2519,17 +2554,17 @@ static void rawseciso_thread(uint64_t arg)
 
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
 
-	if (real_disctype != 0)
+	if(real_disctype != 0)
 	{
-		fake_eject_event();
+		fake_eject_event(BDVD_DRIVE);
 	}
 
 	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue_ntfs, emu_mode, discsize, _256KB_, num_tracks, tracks);
 	//DPRINTF("mount = %x\n", ret);
 
-	fake_insert_event(real_disctype);
+	fake_insert_event(BDVD_DRIVE, real_disctype);
 
-	if (ret != 0)
+	if(ret != 0)
 	{
 		sys_event_port_disconnect(result_port);
 		// Queue destroyed in stop thread sys_event_queue_destroy(command_queue_ntfs);
@@ -2540,12 +2575,12 @@ static void rawseciso_thread(uint64_t arg)
 	}
 
 	rawseciso_loaded=1;
-	while (rawseciso_loaded)
+	while(rawseciso_loaded)
 	{
 		sys_event_t event;
 
 		ret = sys_event_queue_receive(command_queue_ntfs, &event, 0);
-		if (ret != 0)
+		if(ret != 0)
 		{
 			//DPRINTF("sys_event_queue_receive failed: %x\n", ret);
 			break;
@@ -2559,7 +2594,7 @@ static void rawseciso_thread(uint64_t arg)
 		{
 			case CMD_READ_ISO:
 			{
-				if (is_cd2352)
+				if(is_cd2352)
 				{
 					ret = process_read_cd_2048_cmd_iso(buf, offset/2048, size/2048);
 				}
@@ -2578,7 +2613,7 @@ static void rawseciso_thread(uint64_t arg)
 		}
 
 		ret = sys_event_port_send(result_port, ret, 0, 0);
-		if (ret != 0)
+		if(ret != 0)
 		{
 			//DPRINTF("sys_event_port_send failed: %x\n", ret);
 			break;
@@ -2588,15 +2623,15 @@ static void rawseciso_thread(uint64_t arg)
 	sys_memory_free((sys_addr_t)args);
 
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
-	fake_eject_event();
+	fake_eject_event(BDVD_DRIVE);
 	sys_storage_ext_umount_discfile();
 
-	if (real_disctype != 0)
+	if(real_disctype != 0)
 	{
-		fake_insert_event(real_disctype);
+		fake_insert_event(BDVD_DRIVE, real_disctype);
 	}
 
-	if (cd_cache)
+	if(cd_cache)
 	{
 		sys_memory_free((sys_addr_t)cd_cache);
 	}
@@ -2604,7 +2639,7 @@ static void rawseciso_thread(uint64_t arg)
 	sys_storage_close(handle);
 
 	sys_event_port_disconnect(result_port);
-	if (sys_event_port_destroy(result_port) != 0)
+	if(sys_event_port_destroy(result_port) != 0)
 	{
 		//DPRINTF("Error destroyng result_port\n");
 	}
@@ -2617,7 +2652,7 @@ static void rawseciso_thread(uint64_t arg)
 }
 #endif
 
-void absPath(char* absPath_s, const char* path, const char* cwd)
+static void absPath(char* absPath_s, const char* path, const char* cwd)
 {
 	if(path[0] == '/') strcpy(absPath_s, path);
 	else
@@ -2628,28 +2663,30 @@ void absPath(char* absPath_s, const char* path, const char* cwd)
 
 		strcat(absPath_s, path);
 	}
+
+	if(strstr(absPath_s, "/dev_blind") && !isDir("/dev_blind")) enable_dev_blind(NULL);
 }
 
-void pokeq( uint64_t addr, uint64_t val) //lv2
-{
-	system_call_2(SC_POKE_LV2, addr, val);
-}
-
-uint64_t peekq(uint64_t addr) //lv2
+static inline uint64_t peekq(uint64_t addr) //lv2
 {
 	system_call_1(SC_PEEK_LV2, addr);
 	return_to_user_prog(uint64_t);
 }
 
-void poke_lv1( uint64_t addr, uint64_t val)
+static inline void pokeq( uint64_t addr, uint64_t val) //lv2
 {
-	system_call_2(SC_POKE_LV1, addr, val);
+	system_call_2(SC_POKE_LV2, addr, val);
 }
 
-uint64_t peek_lv1(uint64_t addr)
+static inline uint64_t peek_lv1(uint64_t addr)
 {
 	system_call_1(SC_PEEK_LV1, (uint64_t) addr);
 	return (uint64_t) p1;
+}
+
+static inline void poke_lv1( uint64_t addr, uint64_t val)
+{
+	system_call_2(SC_POKE_LV1, addr, val);
 }
 
 
@@ -2745,11 +2782,11 @@ void toggle_video_rec()
 		if(recording == false)
 		{
 		  // not recording yet
-			show_msg("Recording started");
+			show_msg((char*)"Recording started");
 
 			if(rec_start() == false)
 			{
-				show_msg("Recording Error!");
+				show_msg((char*)"Recording Error!");
 			}
 			else
 			{
@@ -2761,7 +2798,7 @@ void toggle_video_rec()
 			// we are already recording
 			rec_interface->stop();
 			rec_interface->close(0);
-			show_msg("Recording finished");
+			show_msg((char*)"Recording finished");
 			recording = false;
 		}
 	}
@@ -2771,7 +2808,7 @@ void toggle_video_rec()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef ENGLISH_ONLY
-bool language(const char *file_str, char *default_str)
+static bool language(const char *file_str, char *default_str)
 {
 	uint64_t siz = 0;
 	uint8_t i;
@@ -2804,40 +2841,44 @@ retry:
 	do {
 		cellFsRead(f, (void *)&temp, 0x01, &siz);
 		lang_pos++;
-		for(i=0; i < strlen(file_str) ; i++) {
-			if(temp[0] != file_str[i]) {
-				break;
-			} else {
-				if (i==strlen(file_str)-1 ) {
-					while(temp[0] != '[') {
-						cellFsRead(f, (void *)&temp, 0x01, &siz);
-						lang_pos++;
-					}
-					int str_len = 0;
-					while(true) {
-						cellFsRead(f, (void *)&temp, 0x01, &siz);
-						lang_pos++;
-						if(temp[0] == ']') {
-							default_str[str_len] = NULL;
-							return true;
-						}
-						default_str[str_len] = temp[0];
-						str_len++;
-					}
-				} else {
+		for(i=0; i < strlen(file_str); i++)
+		{
+			if(temp[0] != file_str[i]) break;
+			else if(i==strlen(file_str)-1)
+			{
+				while(temp[0] != '[')
+				{
 					cellFsRead(f, (void *)&temp, 0x01, &siz);
 					lang_pos++;
 				}
+				int str_len = 0;
+				while(true)
+				{
+					cellFsRead(f, (void *)&temp, 0x01, &siz);
+					lang_pos++;
+					if(temp[0] == ']')
+					{
+						default_str[str_len] = NULL;
+						return true;
+					}
+					default_str[str_len] = temp[0];
+					str_len++;
+				}
+			}
+			else
+			{
+				cellFsRead(f, (void *)&temp, 0x01, &siz);
+				lang_pos++;
 			}
 		}
-	} while(siz != 0) ;
+	} while(siz != 0);
 
 	if(do_retry) {do_retry=false; lang_pos=0; goto retry;}
 
 	return true;
 }
 
-void update_language()
+static void update_language()
 {
 	lang_pos=fh=0;
 
@@ -2870,6 +2911,7 @@ void update_language()
 		language("STR_SCAN2", STR_SCAN2);
 		language("STR_PSPL", STR_PSPL);
 		language("STR_PS2L", STR_PS2L);
+		language("STR_RXVID", STR_RXVID);
 		language("STR_VIDLG", STR_VIDLG	);
 		language("STR_LPG", STR_LPG);
 		language("STR_AUTOB", STR_AUTOB);
@@ -3015,7 +3057,8 @@ uint64_t convertH(char *val)
 	uint64_t ret=0;
 	int i, n=0;
 
-	for(i = 0; i < 16+n; i++) {
+	for(i = 0; i < 16+n; i++)
+	{
 		if(val[i]==' ') {n++; continue;}
 
 		if(val[i]>='0' && val[i]<='9') buff=(   val[i]-'0')*0x10; else
@@ -3067,7 +3110,7 @@ uint64_t find_syscall_table()
 }
 */
 
-void get_idps_psid()
+static void get_idps_psid()
 {
 	if(c_firmware<=4.53f)
 	{
@@ -3100,7 +3143,7 @@ void get_idps_psid()
 }
 
 #ifndef COBRA_ONLY
-void add_to_map(char *path1, char *path2)
+static void add_to_map(char *path1, char *path2)
 {
 	if(max_mapped==0) pokeq(MAP_BASE + 0x00, 0x0000000000000000ULL);
 
@@ -3118,7 +3161,7 @@ leave:
 	return;
 }
 
-void string_to_lv2(char* path, u64 addr)
+static void string_to_lv2(char* path, u64 addr)
 {
 	u16 len=(strlen(path)+8)&0x7f8;
 	len=RANGE(len, 8, 384);
@@ -3139,7 +3182,7 @@ void string_to_lv2(char* path, u64 addr)
 #endif
 
 #ifdef EXT_GDATA
-int set_gamedata_status(u8 status, bool do_mount)
+static int set_gamedata_status(u8 status, bool do_mount)
 {
 	char msg[100];
 	char gamei_path[MAX_PATH_LEN]; u8 n;
@@ -3205,7 +3248,7 @@ int set_gamedata_status(u8 status, bool do_mount)
 }
 #endif
 
-void detect_firmware()
+static void detect_firmware()
 {
 	if(c_firmware>3.40f) return;
 
@@ -3320,7 +3363,7 @@ void detect_firmware()
 	}
 }
 
-void block_online_servers()
+static void block_online_servers()
 {
 	u64 mem=0;
 	for(u64 addr=0x860000; addr<0xFFFFF8ULL; addr+=4)//16MB
@@ -3357,7 +3400,7 @@ void block_online_servers()
 	}
 }
 
-void remove_cfw_syscalls()
+static void remove_cfw_syscalls()
 {
 	detect_firmware();
 
@@ -3408,7 +3451,7 @@ void remove_cfw_syscalls()
 	#endif
 }
 
-void delete_history(bool delete_folders)
+static void delete_history(bool delete_folders)
 {
 	int fd;
 
@@ -3450,7 +3493,7 @@ void delete_history(bool delete_folders)
 	cellFsRmdir("/dev_hdd0/PKG");
 }
 
-int ssplit(const char* str, char* left, int lmaxlen, char* right, int rmaxlen)
+static int ssplit(const char* str, char* left, int lmaxlen, char* right, int rmaxlen)
 {
 	int ios = strcspn(str, " ");
 	int ret = (ios < (int)strlen(str) - 1);
@@ -3472,7 +3515,7 @@ int ssplit(const char* str, char* left, int lmaxlen, char* right, int rmaxlen)
 	return ret;
 }
 
-int slisten(int port, int backlog)
+static int slisten(int port, int backlog)
 {
 	int list_s = socket(AF_INET, SOCK_STREAM, 0);
 	if(list_s<0) return list_s;
@@ -3494,7 +3537,7 @@ int slisten(int port, int backlog)
 	return list_s;
 }
 
-void sclose(int *socket_e)
+static void sclose(int *socket_e)
 {
 	if(*socket_e != -1)
 	{
@@ -3521,7 +3564,7 @@ static int connect_to_server2(char *server, uint16_t port)
 	unsigned int temp;
 	int s;
 
-	if ((temp = inet_addr(server)) != (unsigned int)-1)
+	if((temp = inet_addr(server)) != (unsigned int)-1)
 	{
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = temp;
@@ -3529,7 +3572,7 @@ static int connect_to_server2(char *server, uint16_t port)
 	else {
 		struct hostent *hp;
 
-		if ((hp = gethostbyname(server)) == NULL)
+		if((hp = gethostbyname(server)) == NULL)
 		{
 			return FAILED;
 		}
@@ -3583,21 +3626,21 @@ static int open_remote_dir(int s, char *path, int *abort_connection)
 	cmd.opcode = (NETISO_CMD_OPEN_DIR);
 	cmd.dp_len = (len);
 
-	if (send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 		//DPRINTF("send failed (open_remote_dir) (errno=%d)!\n", get_network_error());
 		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (send(s, path, len, 0) != len)
+	if(send(s, path, len, 0) != len)
 	{
 		//DPRINTF("send failed (open_remote_dir) (errno=%d)!\n", get_network_error());
 		*abort_connection = 1;
 		return FAILED;
 	}
 
-	if (recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
+	if(recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
 	{
 		//DPRINTF("recv failed (open_remote_dir) (errno=%d)!\n", get_network_error());
 		*abort_connection = 1;
@@ -3613,26 +3656,26 @@ static int read_remote_dir(int s, sys_addr_t *data /*netiso_read_dir_result_data
 	netiso_read_dir_result res;
 	int len;
 
-	*abort_connection = 0;
+	*abort_connection = 1;
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode = (NETISO_CMD_READ_DIR);
+
 //MM_LOG("Sending request...(%i) ", s);
-	if (send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
+	if(send(s, &cmd, sizeof(cmd), 0) != sizeof(cmd))
 	{
 //MM_LOG("FAILED!\n");
-		*abort_connection = 1;
 		return FAILED;
 	}
 //MM_LOG("Receiving response...");
-	if (recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
+	if(recv(s, &res, sizeof(res), MSG_WAITALL) != sizeof(res))
 	{
 //MM_LOG("FAILED!\n");
-		*abort_connection = 1;
 		return FAILED;
 	}
+
 //MM_LOG("OK (%i entries)\n", res.dir_size );
-	if (res.dir_size > 0)
+	if(res.dir_size > 0)
 	{
 		if(res.dir_size>866) res.dir_size=866;
 		len = (sizeof(netiso_read_dir_result_data)*res.dir_size);
@@ -3644,9 +3687,8 @@ static int read_remote_dir(int s, sys_addr_t *data /*netiso_read_dir_result_data
 			u8 *data2=(u8*)data1;
 			//MM_LOG("dir_size=%i (%i bytes) (%i)\n", res.dir_size, len, s);
 
-			if (recv(s, data2, len, MSG_WAITALL) != len)
+			if(recv(s, data2, len, MSG_WAITALL) != len)
 			{
-				*abort_connection = 1;
 				sys_memory_free(data1);
 				*data=NULL;
 				return FAILED;
@@ -3659,6 +3701,8 @@ static int read_remote_dir(int s, sys_addr_t *data /*netiso_read_dir_result_data
 	}
 	else
 		*data=NULL;
+
+	*abort_connection = 0;
 
 	return (res.dir_size);
 }
@@ -3698,23 +3742,34 @@ static void add_option_item(const char *value, const char *label, bool selected,
 	strcat(buffer, templn);
 }
 
+#define READ_SFO_HEADER() \
+	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return false; \
+	u16 pos, str, dat, indx=0; \
+	str=(mem[0x8]+(mem[0x9]<<8)); \
+	dat=pos=(mem[0xc]+(mem[0xd]<<8));
+
+#define FOR_EACH_SFO_FIELD() \
+	while(str<4090) \
+	{ \
+		if((mem[str]==0) || (str>=dat)) break;
+
+#define READ_NEXT_SFO_FIELD() \
+		while(mem[str]) str++;str++; \
+		pos+=(mem[0x1c+indx]+(mem[0x1d+indx]<<8)); \
+		indx+=0x10; \
+	}
+
 static void parse_param_sfo(unsigned char *mem, char *titleID, char *title)
 {
-	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return; //is sfo header?
+	READ_SFO_HEADER()
 
-	u8 fcount=0;
-
-	u16 pos, str, dat, indx=0;
-
-	str=(mem[0x8]+(mem[0x9]<<8));
-	dat=pos=(mem[0xc]+(mem[0xd]<<8));
 	memset(titleID, 0, 10);
 	memset(title, 0, 64);
 
-	while(str<4090)
-	{
-		if((mem[str]==0) || (str>=dat)) break;
+	u8 fcount=0;
 
+	FOR_EACH_SFO_FIELD()
+	{
 		if(!memcmp((char *) &mem[str], "TITLE_ID", 8))
 		{
 			strncpy(titleID, (char *) &mem[pos], 9);
@@ -3727,9 +3782,7 @@ static void parse_param_sfo(unsigned char *mem, char *titleID, char *title)
 			fcount++; if(fcount>=2) break;
 		}
 
-		while(mem[str]) str++;str++;
-		pos+=(mem[0x1c+indx]+(mem[0x1d+indx]<<8));
-		indx+=0x10;
+		READ_NEXT_SFO_FIELD()
 	}
 
 	if(webman_config->tid && strlen(titleID)==9 && (titleID[0]=='B' || titleID[0]=='N'))
@@ -3740,21 +3793,18 @@ static void parse_param_sfo(unsigned char *mem, char *titleID, char *title)
 
 static bool fix_param_sfo(unsigned char *mem, char *titleID, u8 msg)
 {
-	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return false; //is sfo header?
+	READ_SFO_HEADER()
+
+	memset(titleID, 0, 10);
 
 #ifdef FIX_GAME
 	u8 fcount=0;
 #endif
-	u16 pos, str, dat, indx=0; bool ret=false;
 
-	str=(mem[0x8]+(mem[0x9]<<8));
-	dat=pos=(mem[0xc]+(mem[0xd]<<8));
-	memset(titleID, 0, 10);
+	bool ret=false;
 
-	while(str<4090)
+	FOR_EACH_SFO_FIELD()
 	{
-		if((mem[str]==0) || (str>=dat)) break;
-
 		if(!memcmp((char *) &mem[str], "TITLE_ID", 8))
 		{
 			strncpy(titleID, (char *) &mem[pos], 9);
@@ -3781,39 +3831,34 @@ static bool fix_param_sfo(unsigned char *mem, char *titleID, u8 msg)
 		}
 #endif
 
-		while(mem[str]) str++;str++;
-		pos+=(mem[0x1c+indx]+(mem[0x1d+indx]<<8));
-		indx+=0x10;
+		READ_NEXT_SFO_FIELD()
 	}
+
 	return ret;
 }
 
 #ifdef FIX_GAME
 static bool fix_ps3_extra(unsigned char *mem)
 {
-	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return false; //is sfo header?
+	READ_SFO_HEADER()
 
-	u16 pos, str, dat, indx=0;
-
-	str=(mem[0x8]+(mem[0x9]<<8));
-	dat=pos=(mem[0xc]+(mem[0xd]<<8));
-
-	while(str<4090)
+	FOR_EACH_SFO_FIELD()
 	{
-		if((mem[str]==0) || (str>=dat)) break;
-
 		if(!memcmp((char *) &mem[str], "ATTRIBUTE", 9))
 		{
 			if(!(mem[pos+2] & 2)) {mem[pos+2]|=0x2; return true;}
 			break;
 		}
 
-		while(mem[str]) str++;str++;
-		pos+=(mem[0x1c+indx]+(mem[0x1d+indx]<<8));
-		indx+=0x10;
+		READ_NEXT_SFO_FIELD()
 	}
+
 	return false;
 }
+
+#undef READ_SFO_HEADER()
+#undef FOR_EACH_SFO_FIELD()
+#undef READ_NEXT_SFO_FIELD()
 
 static void fix_game(char *path)
 {
@@ -4399,7 +4444,6 @@ int connect_to_remote_server(u8 server_id)
 #endif
 #endif
 
-
 static void mount_autoboot()
 {
 	struct CellFsStat s;
@@ -4450,7 +4494,7 @@ static void mount_autoboot()
 	}
 }
 
-void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char *name, char *fsize, CellRtcDateTime rDate, u16 flen, unsigned long long sz, char *sf, u8 is_net)
+static void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char *name, char *fsize, CellRtcDateTime rDate, u16 flen, unsigned long long sz, char *sf, u8 is_net)
 {
 	if(sz<10240) sprintf(sf, "%s", STR_BYTE);
 	else if(sz<2097152) {sprintf(sf, "%s", STR_KILOBYTE); sz>>=10;}
@@ -4465,12 +4509,14 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 	if(is_dir)
 	{
 		if(name[0]=='.')
-			sprintf(fsize, "<a href=\"%s\">&lt;dir&gt;</a>", templn);
+			sprintf(fsize, "<a href=\"%s\">%s</a>", templn, HTML_DIR);
+		else if(flen == 9 && !strcmp(name, "dev_blind"))
+			sprintf(fsize, "<a href=\"%s?0\">%s</a>", templn, HTML_DIR);
 		else
 #ifdef PS2_DISC
-			sprintf(fsize, "<a href=\"/mount%s%s\">&lt;dir&gt;</a>", strstr(name, "[PS2")?".ps2":".ps3", templn);
+			sprintf(fsize, "<a href=\"/mount%s%s\">%s</a>", strstr(name, "[PS2")?".ps2":".ps3", templn, HTML_DIR);
 #else
-			sprintf(fsize, "<a href=\"/mount.ps3%s\">&lt;dir&gt;</a>", templn);
+			sprintf(fsize, "<a href=\"/mount.ps3%s\">%s</a>", templn, HTML_DIR);
 #endif
 	}
 #ifdef COBRA_ONLY
@@ -4500,27 +4546,27 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 	snprintf(ename, 6, "%s    ", name); urlenc(templn, tempstr);
 
 	sprintf(tempstr, "%c%c%c%c%c%c<tr>"
-                      "<td><a %shref=\"%s\">%s</a></td>",
+                     "<td><a %shref=\"%s\">%s</a></td>",
 	is_dir ? '0' : '1', ename[0], ename[1], ename[2], ename[3], ename[4],
 	is_dir ? "class=\"f\" " : "", templn, name);
 
 	flen=strlen(tempstr);
 	if(flen>=LINELEN)
 	{
-		if(is_dir) sprintf(fsize, "&lt;dir&gt;"); else sprintf(fsize, "%llu %s", sz, sf);
+		if(is_dir) sprintf(fsize, HTML_DIR); else sprintf(fsize, "%llu %s", sz, sf);
 
 		sprintf(tempstr, "%c%c%c%c%c%c<tr>"
-                          "<td><a %shref=\"%s\">%s</a></td>",
+                         "<td><a %shref=\"%s\">%s</a></td>",
 		is_dir ? '0' : '1', ename[0], ename[1], ename[2], ename[3], ename[4],
 		is_dir ? "class=\"f\" " : "", templn, name);
 
 		flen=strlen(tempstr);
 		if(flen>=LINELEN)
 		{
-			if(is_dir) sprintf(fsize, "&lt;dir&gt;"); else sprintf(fsize, "%llu %s", sz, sf);
+			if(is_dir) sprintf(fsize, HTML_DIR); else sprintf(fsize, "%llu %s", sz, sf);
 
 			sprintf(tempstr, "%c%c%c%c%c%c<tr>"
-                              "<td>%s</td>",
+                             "<td>%s</td>",
 			is_dir ? '0' : '1', ename[0], ename[1], ename[2], ename[3], ename[4],
 			name);
 		}
@@ -4536,13 +4582,13 @@ void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char 
 	if(flen>=LINELEN) {flen=0; tempstr[0]=0;} //ignore file if it is still too long
 }
 
-void add_query_html(char *buffer, char *param, char *label)
+static void add_query_html(char *buffer, char *param, char *label)
 {
     char templn[64];
     sprintf(templn, "[<a href=\"/index.ps3?%s\">%s</a>] ", param, label); strcat(buffer, templn);
 }
 
-void add_xmb_entry(char *param, char *tempstr, char *templn, char *skey, u32 key, char *myxml_ps3, char *myxml_ps2, char *myxml_psx, char *myxml_psp, char *myxml_dvd, char *entry_name, u16 *item_count)
+static void add_xmb_entry(char *param, char *tempstr, char *templn, char *skey, u32 key, char *myxml_ps3, char *myxml_ps2, char *myxml_psx, char *myxml_psp, char *myxml_dvd, char *entry_name, u16 *item_count)
 {
 	if(strlen(templn)<5) strcat(templn, "     ");
 	sprintf(skey, "3%c%c%c%c%04i", templn[0], templn[1], templn[2], templn[3], key);
@@ -4992,6 +5038,13 @@ static void handleclient(u64 conn_s_p)
 				}
 			}
 			if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)) strcpy(myxml_dvd, "<View id=\"seg_wm_dvd_items\"><Attributes>");
+
+			if(webman_config->rxvid && (!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)))
+					sprintf(templn, "<Table key=\"rx_video\">"
+									XML_PAIR("icon","%s")
+									XML_PAIR("title","%s")
+									XML_PAIR("child","segment") "%s",
+									wm_icons[4], STR_VIDLG, STR_NOITEM_PAIR); strcat(myxml_dvd, templn);
 #endif
 		}
 
@@ -5301,7 +5354,7 @@ next_xml_entry:
 									if(f0<NTFS && tempID[0]==0 && strstr(param, "/PS3ISO"))
 									{   // get title ID from ISO
 										sprintf(icon, "%s/%s", param, entry.d_name);
-										if (cellFsOpen(icon, CELL_FS_O_RDONLY, &fs, NULL, 0) == CELL_FS_SUCCEEDED)
+										if(cellFsOpen(icon, CELL_FS_O_RDONLY, &fs, NULL, 0) == CELL_FS_SUCCEEDED)
 										{
 											if(cellFsLseek(fs, 0x810, CELL_FS_SEEK_SET, &msiz) == CELL_FS_SUCCEEDED)
 											{
@@ -5404,7 +5457,7 @@ continue_reading_folder_xml:
 #ifdef COBRA_ONLY
 			if(!(webman_config->cmask & PS1)) {strcat(myxml_psx, "</Attributes><Items>");}
 			if(!(webman_config->cmask & PSP)) {strcat(myxml_psp, "</Attributes><Items>"); if(webman_config->pspl && cellFsStat((char*)"/dev_hdd0/game/PSPC66820", &buf)==CELL_FS_SUCCEEDED) strcat(myxml_psp, QUERY_XMB("cobra_psp_launcher", "xcb://127.0.0.1/query?limit=1&cond=Ae+Game:Game.titleId PSPC66820"));}
-			if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)) strcat(myxml_dvd, "</Attributes><Items>");
+			if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)) {strcat(myxml_dvd, "</Attributes><Items>"); if(webman_config->rxvid) strcat(myxml_dvd, QUERY_XMB("rx_video", "#seg_wm_bdvd"));}
 #endif
 		}
 		else
@@ -5500,7 +5553,7 @@ continue_reading_folder_xml:
 
 			}
 			else
-				if(strlen(myxml_dvd)<(BUFFER_SIZE-1000))
+				if(strlen(myxml_dvd)<(BUFFER_SIZE-2000))
 					strcat(myxml_items, templn);
 		}
 
@@ -5513,7 +5566,19 @@ continue_reading_folder_xml:
 #ifdef COBRA_ONLY
 			if(!(webman_config->cmask & PS1)) strcat(myxml_psx, "</Items></View>");
 			if(!(webman_config->cmask & PSP)) strcat(myxml_psp, "</Items></View>");
-			if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)) strcat(myxml_dvd, "</Items></View>");
+			if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU))
+			{
+				strcat(myxml_dvd, "</Items></View>");
+				if(webman_config->rxvid)
+				{
+					strcat(myxml_dvd,	"<View id=\"seg_wm_bdvd\">"
+										"<Items>"
+										QUERY_XMB("rx_video1", "xcb://localhost/query?table=MMS_MEDIA_TYPE_SYSTEM&genre=Video&sort=+StorageMedia:StorageMedia.sortOrder+StorageMedia:StorageMedia.timeInserted&cond=Ae+StorageMedia:StorageMedia.stat.mediaStatus %xCB_MEDIA_INSERTED+Ae+StorageMedia:StorageMedia.mediaFormat %xCB_MEDIA_FORMAT_DATA+AGL+StorageMedia:StorageMedia.type %xCB_MEDIA_TYPE_BDROM %xCB_MEDIA_TYPE_WM")
+										QUERY_XMB("rx_video2", "xcb://localhost/query?sort=+Game:Common.titleForSort&cond=AGL+Game:Game.titleId RXMOV0000 RXMOVZZZZ+An+Game:Game.category 2D+An+Game:Game.category BV+An+Game:Game.category HG")
+										"</Items>"
+										"</View>");
+				}
+			}
 #endif
 		}
 
@@ -5786,6 +5851,11 @@ again3:
 				is_popup=1; is_binary=0;
 				goto html_response;
 			}
+			if(strstr(param, "/dev_blind"))
+			{
+				is_binary=2;
+				goto html_response;
+			}
 #endif
 			if(strstr(param, "quit.ps3"))
 			{
@@ -5926,7 +5996,7 @@ html_response:
 					if(is_index_ps3) {sprintf(url, "_%i", i); if(strstr(param, url)) {profile=i; break;}}
 				}
 
-				if (uprofile!=profile) {webman_config->profile=profile; save_settings();}
+				if(uprofile!=profile) {webman_config->profile=profile; save_settings();}
 				if((uprofile!=profile) || is_index_ps3) cellFsUnlink((char*)WMTMP "/games.html");
 			}
 			//--
@@ -6039,6 +6109,7 @@ html_response:
 
 					if(strstr(param, "psl=1")) webman_config->pspl=1;
 					if(strstr(param, "p2l=1")) webman_config->ps2l=1;
+					if(strstr(param, "rxv=1")) webman_config->rxvid=1;
 
 					webman_config->combo=webman_config->combo2=0;
 					if(!strstr(param, "pfs=1")) webman_config->combo|=FAIL_SAFE;
@@ -6289,7 +6360,7 @@ html_response:
 								".ic{position:absolute;top:5px;right:5px;left:5px;bottom:40px;}"
 								".propfont{font-family:\"Courier New\",Courier,monospace;}");
 
-				if(!strstr(param, "/setup.ps3")) strcat(buffer, "td+td{text-align:right;}");
+				if(!strstr(param, "/setup.ps3")) strcat(buffer, "td+td{text-align:right;white-space:nowrap}");
 
 				if(is_ps3_http)
 					strcat(buffer, ".gi{height:210px;width:267px;");
@@ -6442,7 +6513,7 @@ html_response:
 #endif
                     ); strcat(buffer, templn);
 #ifdef COPY_PS3
-					if(((strstr(param, "/dev_") && strlen(param)>12) || strstr(param, "/dev_bdvd")) && !strstr(param,".ps3/") && !strstr(param,".ps3?"))
+					if(((strstr(param, "/dev_") && strlen(param)>12 && !strstr(param,"?")) || strstr(param, "/dev_bdvd")) && !strstr(param,".ps3/") && !strstr(param,".ps3?"))
 					{sprintf(templn, "%s%s\" onclick='window.location.href=\"/copy.ps3%s\";'\">", HTML_BUTTON, STR_COPY, param); strcat(buffer, templn);}
 #endif
 					sprintf(templn,  "%s%s XML%s\" %s'%s';\"> "
@@ -6540,9 +6611,19 @@ html_response:
 #endif
 				if(is_binary==2) // folder listing
 				{
+						if(strstr(param, "/dev_blind?"))
+						{
+							if(strstr(param, "?1")) enable_dev_blind(NULL);
+							if(strstr(param, "?0")) {system_call_3(SC_FS_UMOUNT, (u64)(char*)"/dev_blind", 0, 1);}
+
+							sprintf(templn, "/dev_blind: %s", isDir("/dev_blind")?STR_ENABLED:STR_DISABLED); strcat(buffer, templn); goto send_response;
+						}
+
+						absPath(templn, param, "/"); // auto mount /dev_blind
+
 						u8 is_net = (param[1]=='n');
 
-						if(is_net || cellFsOpendir( param, &fd) == CELL_FS_SUCCEEDED)
+						if(is_net || cellFsOpendir(param, &fd) == CELL_FS_SUCCEEDED)
 						{
 							CellFsDirent entry;
 							u64 read_e;
@@ -6612,7 +6693,7 @@ html_response:
 									{
 										strcpy(templn, param); if(templn[strlen(templn)-1]=='/') templn[strlen(templn)-1]=0;
 										if(strrchr(templn, '/')) templn[strrchr(templn, '/')-templn]=0; if(strlen(templn)<6 && strlen(param)<8) {templn[0]='/'; templn[1]=0;}
-										sprintf(tempstr, "!00000<tr><td><a class=\"f\" href=\"%s\">..</a></td><td> <a href=\"%s\">&lt;dir&gt;</a> &nbsp; </td><td>11-Nov-2006 11:11</td></tr>", templn, templn);
+										sprintf(tempstr, "!00000<tr><td><a class=\"f\" href=\"%s\">..</a></td><td> <a href=\"%s\">%s</a> &nbsp; </td><td>11-Nov-2006 11:11</td></tr>", templn, templn, HTML_DIR);
 
 										if(strlen(tempstr)>MAX_LINE_LEN) continue; //ignore lines too long
 										strncpy(line_entry[idx].path, tempstr, LINELEN); idx++; dirs++;
@@ -6741,9 +6822,9 @@ just_leave:
 								{
 									sprintf(tempstr, "0net%i <tr>"
 															"<td><a class=\"f\" href=\"/net%i\">net%i (%s:%i)</a></td>"
-															"<td> <a href=\"/mount.ps3/net%i\">&lt;dir&gt;</a> &nbsp; </td><td>11-Nov-2006 11:11</td>"
+															"<td> <a href=\"/mount.ps3/net%i\">%s</a> &nbsp; </td><td>11-Nov-2006 11:11</td>"
 															"</tr>", n, n, n, n==1 ? webman_config->neth1 : n==2 ? webman_config->neth2 : webman_config->neth0,
-																			  n==1 ? webman_config->netp1 : n==2 ? webman_config->netp2 : webman_config->netp0, n);
+																			  n==1 ? webman_config->netp1 : n==2 ? webman_config->netp2 : webman_config->netp0, n, HTML_DIR);
 									strncpy(line_entry[idx].path, tempstr, LINELEN); idx++;
 									tlen+=strlen(tempstr);
 								}
@@ -7121,7 +7202,9 @@ bgm_status:
 						add_check_box("ps1", "1", "PLAYSTATION\xC2\xAE"        , NULL     , !(webman_config->cmask & PS1), buffer);
                         add_check_box("psp", "1", "PLAYSTATION\xC2\xAEPORTABLE", " ("     , !(webman_config->cmask & PSP), buffer);
                         add_check_box("psl", "1", STR_PSPL                     , ")<br>"  ,  (webman_config->pspl)       , buffer);
-						add_check_box("blu", "1", "Blu-ray\xE2\x84\xA2"        , NULL     , !(webman_config->cmask & BLU), buffer);
+						add_check_box("blu", "1", "Blu-ray\xE2\x84\xA2"        , " ("     , !(webman_config->cmask & BLU), buffer);
+						add_check_box("rxv", "1", STR_RXVID                    , ")<br>"  ,  (webman_config->rxvid)      , buffer);
+
 						add_check_box("dvd", "1", "DVD "                       , STR_VIDLG, !(webman_config->cmask & DVD), buffer);
 #endif
 
@@ -7492,15 +7575,15 @@ bgm_status:
 										"<u>%s:</u><br><br>"
 										"%s: <select name=\"proc\">", "Get process memory", "Process");
 						strcat(buffer, templn);
-						for (int i = 0; i < 16; i++)
+						for(int i = 0; i < 16; i++)
 						{
-							if (1 < pid_list[i])
+							if(1 < pid_list[i])
 							{
 								memset(templn, 0, sizeof(templn));
 								memset(pid_str, 0, sizeof(pid_str));
 								{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)templn); }
 								sprintf(pid_str, "%i", pid_list[i]);
-								if (1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
+								if(1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
 							}
 						}
 						sprintf(templn, "</select>"
@@ -7516,15 +7599,15 @@ bgm_status:
 										"<u>%s:</u><br><br>"
 										"%s: <select name=\"proc\">", "Set process memory" , "Process");
 						strcat(buffer, templn);
-						for (int i = 0; i < 16; i++)
+						for(int i = 0; i < 16; i++)
 						{
-							if (1 < pid_list[i])
+							if(1 < pid_list[i])
 							{
 								memset(templn, 0, sizeof(templn));
 								memset(pid_str, 0, sizeof(pid_str));
 								{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)templn); }
 								sprintf(pid_str, "%i", pid_list[i]);
-								if (1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
+								if(1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
 							}
 						}
 						int version = 0;
@@ -7638,27 +7721,27 @@ bgm_status:
 						strcat(buffer, templn);
 						int ret_val = -1;
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 6); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc6", "1\" disabled=\"disabled", "[6]LV2 Peek", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc6", "1\" disabled=\"disabled", "[6]LV2 Peek", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc6", "1", "[6]LV2 Peek", NULL, false, buffer);}
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 7); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc7", "1\" disabled=\"disabled", "[7]LV2 Poke", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc7", "1\" disabled=\"disabled", "[7]LV2 Poke", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc7", "1", "[7]LV2 Poke", NULL, false, buffer);}
 						strcat(buffer, "</td><td  width=\"260\"  valign=\"top\" style=\"text-align: left; float: left;\">");
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 9); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc9", "1\" disabled=\"disabled", "[9]LV1 Poke", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc9", "1\" disabled=\"disabled", "[9]LV1 Poke", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc9", "1", "[9]LV1 Poke", NULL, false, buffer);}
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 10); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc10", "1\" disabled=\"disabled", "[10]LV1 Call", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc10", "1\" disabled=\"disabled", "[10]LV1 Call", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc10", "1", "[10]LV1 Call", NULL, false, buffer);}
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 11); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc11", "1\" disabled=\"disabled", "[11]LV1 Peek", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc11", "1\" disabled=\"disabled", "[11]LV1 Peek", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc11", "1", "[11]LV1 Peek", NULL, false, buffer);}
 						strcat(buffer, "</td><td  width=\"260\"  valign=\"top\" style=\"text-align: left; float: left;\">");
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 35); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc35", "1\" disabled=\"disabled", "[35]Map Path", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc35", "1\" disabled=\"disabled", "[35]Map Path", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc35", "1", "[35]Map Path", NULL, false, buffer);}
 						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 36); ret_val = (int)p1;}
-						if ( ret_val != 0) add_check_box("sc36", "1\" disabled=\"disabled", "[36]Map Game", NULL, true, buffer);
+						if( ret_val != 0) add_check_box("sc36", "1\" disabled=\"disabled", "[36]Map Game", NULL, true, buffer);
 						else {ret_val = -1; add_check_box("sc36", "1", "[36]Map Game", NULL, false, buffer);}
 						sprintf(templn, "</td></tr><tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form></table><br><hr color=\"#FF0000\"/>", "Disable");
 						strcat(buffer, templn);
@@ -7682,7 +7765,7 @@ bgm_status:
 						strcat(buffer, templn);
 						int ret_val = -1;
 						{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_PCHECK_SYSCALL8); ret_val = (int)p1;}
-						if (ret_val < 0)
+						if(ret_val < 0)
 						{
 							add_radio_button("mode", "0\" disabled=\"disabled", "sc8_0", "Fully enabled", NULL, false, buffer);
 							add_radio_button("mode", "1\" disabled=\"disabled", "sc8_1", "Partially disabled : Keep only COBRA/MAMBA/PS3MAPI features", NULL, false, buffer);
@@ -7746,15 +7829,15 @@ bgm_status:
 							char pid_str[32];
 							u32 pid_list[16];
 							{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
-							for (int i = 0; i < 16; i++)
+							for(int i = 0; i < 16; i++)
 							{
-								if (1 < pid_list[i])
+								if(1 < pid_list[i])
 								{
 									memset(templn, 0, sizeof(templn));
 									memset(pid_str, 0, sizeof(pid_str));
 									{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)templn); }
 									sprintf(pid_str, "%i", pid_list[i]);
-									if (1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
+									if(1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
 								}
 							}
 							strcat(buffer, "</select>   ");
@@ -7780,9 +7863,9 @@ bgm_status:
 							memset(buffer_tmp, 0, sizeof(buffer_tmp));
 							int retval = -1;
 							{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)pid, (u64)address, (u64)buffer_tmp, (u64)length); retval = (int)p1;}
-							if (0 <= retval)
+							if(0 <= retval)
 							{
-								for (int i = 0; i < length; i++)
+								for(int i = 0; i < length; i++)
 								{
 									sprintf(templn, "%02X", (uint8_t)buffer_tmp[i]);
 									strcat(buffer, templn);
@@ -7842,15 +7925,15 @@ bgm_status:
 							char pid_str[32];
 							u32 pid_list[16];
 							{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
-							for (int i = 0; i < 16; i++)
+							for(int i = 0; i < 16; i++)
 							{
-								if (1 < pid_list[i])
+								if(1 < pid_list[i])
 								{
 									memset(templn, 0, sizeof(templn));
 									memset(pid_str, 0, sizeof(pid_str));
 									{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)templn); }
 									sprintf(pid_str, "%i", pid_list[i]);
-									if (1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
+									if(1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
 								}
 							}
 							strcat(buffer, "</select>   ");
@@ -7863,7 +7946,7 @@ bgm_status:
 							sprintf(templn, "<input name=\"proc\" type=\"hidden\" value=\"%u\"><br><br>", pid);
 							strcat(buffer, templn);
 						}
-						if (strlen(val_tmp) < 1) sprintf(val_tmp, "%02X", 0);
+						if(strlen(val_tmp) < 1) sprintf(val_tmp, "%02X", 0);
 						sprintf(templn, "<b><u>%s:</u></b> "  HTML_INPUT("addr", "%X", "16", "18")
 										"<br><br><b><u>%s:</u></b><br><br>"
 										"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
@@ -7876,7 +7959,7 @@ bgm_status:
 						{
 							int retval = -1;
 							{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PROC_MEM, (u64)pid, (u64)address, (u64)value, (u64)length); retval = (int)p1;}
-							if (0 <= retval) sprintf(templn, "<br><b><u>%s!</u></b>", "Done");
+							if(0 <= retval) sprintf(templn, "<br><b><u>%s!</u></b>", "Done");
 							else sprintf(templn, "<br><b><u>%s: %i</u></b>", "Error", retval);
 							strcat(buffer, templn);
 						}
@@ -8025,6 +8108,7 @@ bgm_status:
 											sprintf(target, "/dev_usb000/PS3/THEME");
 										else
 											sprintf(target, "/dev_hdd0/theme");
+
 										strcat(target, strrchr(param, '/'));
 									}
 									else if(!extcmp(param+plen, ".pkg", 4))
@@ -8033,6 +8117,7 @@ bgm_status:
 											sprintf(target, "/dev_usb000/Packages");
 										else
 											sprintf(target, "/dev_hdd0/packages");
+
 										strcat(target, strrchr(param, '/'));
 									}
 									else if(!extcmp(param+plen, ".edat", 5))
@@ -8041,6 +8126,7 @@ bgm_status:
 											sprintf(target, "/dev_usb000/exdata");
 										else
 											sprintf(target, "%s/%s/exdata", "/dev_hdd0/home", webman_config->uaccount);
+
 										strcat(target, strrchr(param, '/'));
 									}
 									else if(strstr(param+plen, "/exdata"))
@@ -8058,6 +8144,7 @@ bgm_status:
 											sprintf(target, "/dev_usb000/PS3/SAVEDATA");
 										else
 											sprintf(target, "%s/%s/savedata", "/dev_hdd0/home", webman_config->uaccount);
+
 										strcat(target, strrchr(param, '/'));
 									}
 									else if(strcasestr(param+plen, "/trophy/"))
@@ -8066,6 +8153,7 @@ bgm_status:
 											sprintf(target, "/dev_usb000/PS3/TROPHY");
 										else
 											sprintf(target, "%s/%s/trophy", "/dev_hdd0/home", webman_config->uaccount);
+
 										strcat(target, strrchr(param, '/'));
 									}
 									else if(strstr(param+plen, "/webftp_server"))
@@ -8147,7 +8235,7 @@ bgm_status:
 										{
 											if((entry.d_name[0]=='.')) continue;
 
-											if (is_iso || strstr(entry.d_name, "[PS2")!=NULL)
+											if(is_iso || strstr(entry.d_name, "[PS2")!=NULL)
 											{
 												if(pcount==0) strcat(buffer, "<br><HR>");
 												urlenc(enc_dir_name, entry.d_name);
@@ -8568,7 +8656,7 @@ next_html_entry:
 															if( f0<NTFS ) //get title id from ISO
 															{
 																sprintf(icon, "%s/%s", param, entry.d_name);
-																if (cellFsOpen(icon, CELL_FS_O_RDONLY, &fs, NULL, 0) == CELL_FS_SUCCEEDED)
+																if(cellFsOpen(icon, CELL_FS_O_RDONLY, &fs, NULL, 0) == CELL_FS_SUCCEEDED)
 																{
 																	if(cellFsLseek(fs, 0x810, CELL_FS_SEEK_SET, &msiz) == CELL_FS_SUCCEEDED)
 																	{
@@ -8648,7 +8736,7 @@ next_html_entry:
 													flen-=4; if(flen<32) break;
 													templn[flen]=0;
 												}
-												while (strlen(templn)>MAX_LINE_LEN);
+												while(strlen(templn)>MAX_LINE_LEN);
 
 												if(strlen(tempstr)>MAX_LINE_LEN) continue; //ignore lines too long
 												strncpy(line_entry[idx].path, tempstr, MAX_LINE_LEN); idx++;
@@ -9754,7 +9842,7 @@ static void peek_chunk(uint64_t start, uint64_t size, uint8_t* buf) // read from
 	}
 }
 
-void dump_mem(char *file, uint64_t start, uint32_t size_mb)
+static void dump_mem(char *file, uint64_t start, uint32_t size_mb)
 {
 	int fp;
 	uint64_t sw;
@@ -9782,7 +9870,7 @@ void dump_mem(char *file, uint64_t start, uint32_t size_mb)
 #endif
 
 #ifdef NOSINGSTAR
-void no_singstar_icon()
+static void no_singstar_icon()
 {
 	int fd;
 
@@ -9805,7 +9893,7 @@ void no_singstar_icon()
 }
 #endif
 
-void refresh_xml(char *msg)
+static void refresh_xml(char *msg)
 {
 	webman_config->profile=profile; save_settings();
 
@@ -9819,7 +9907,7 @@ void refresh_xml(char *msg)
 	show_msg((char*)msg);
 }
 
-void enable_dev_blind(char *msg)
+static void enable_dev_blind(char *msg)
 {
 	if(!isDir("/dev_blind"))
 		{system_call_8(SC_FS_MOUNT, (u64)(char*)"CELL_FS_IOS:BUILTIN_FLSH1", (u64)(char*)"CELL_FS_FAT", (u64)(char*)"/dev_blind", 0, 0, 0, 0, 0);}
@@ -10031,12 +10119,13 @@ static void poll_thread(uint64_t poll)
 			if(!webman_config->nopad)
 			{
 				data.len=0;
-				if (cellPadGetData(0, &data) != CELL_PAD_OK)
-					if (cellPadGetData(1, &data) != CELL_PAD_OK)
-						if (cellPadGetData(2, &data) != CELL_PAD_OK) {sys_timer_usleep(300000); continue;}
-				if (data.len > 0)
+				if(cellPadGetData(0, &data) != CELL_PAD_OK)
+					if(cellPadGetData(1, &data) != CELL_PAD_OK)
+						if(cellPadGetData(2, &data) != CELL_PAD_OK) {sys_timer_usleep(300000); continue;}
+
+				if(data.len > 0)
 				{
-					if ((data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_SELECT))
+					if((data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_SELECT))
 					{
 						if( !(webman_config->combo2 & (EXTGAMDAT | MOUNTNET0 | MOUNTNET1))         // Toggle External Game Data
                             && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_SQUARE)) // SELECT+SQUARE
@@ -10366,7 +10455,7 @@ static void poll_thread(uint64_t poll)
 						}
 					}
 					else
-					if ((data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_L3) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2))
+					if((data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_L3) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2))
 					{
 						if(!(webman_config->combo & SHUT_DOWN) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CROSS) ) // L3+R2+X (shutdown)
 						{
@@ -10741,7 +10830,7 @@ reboot:
 	sys_ppu_thread_exit(0);
 }
 
-void restore_fan(u8 settemp)
+static void restore_fan(u8 settemp)
 {
 	if(backup[0]==1 && (get_fan_policy_offset>0))
 	{
@@ -10760,7 +10849,7 @@ void restore_fan(u8 settemp)
 	}
 }
 
-void fan_control(u8 temp0, u8 initial)
+static void fan_control(u8 temp0, u8 initial)
 {
 	if(get_fan_policy_offset)
 	{
@@ -10804,7 +10893,7 @@ void fan_control(u8 temp0, u8 initial)
 	}
 }
 
-int save_settings()
+static int save_settings()
 {
 	u64 written; int fdwm=0;
 	if(cellFsOpen(WMCONFIG, CELL_FS_O_CREAT|CELL_FS_O_WRONLY, &fdwm, NULL, 0) == CELL_FS_SUCCEEDED)
@@ -10817,7 +10906,7 @@ int save_settings()
 		return FAILED;
 }
 
-void reset_settings()
+static void reset_settings()
 {
 	memset(webman_config, 0, sizeof(WebmanCfg));
 
@@ -10924,7 +11013,7 @@ void reset_settings()
 	profile=webman_config->profile;
 }
 
-void set_buffer_sizes()
+static void set_buffer_sizes()
 {
 	if(webman_config->foot==1) //MIN
 	{
@@ -11046,37 +11135,37 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 	ssend(conn_s_ps3mapi, PS3MAPI_OK_220);
 
 	sprintf(ip_address, "%s", inet_ntoa(conn_info.local_adr));
-	for (u8 n = 0; n<strlen(ip_address); n++) if (ip_address[n] == '.') ip_address[n] = ',';
+	for(u8 n = 0; n<strlen(ip_address); n++) if(ip_address[n] == '.') ip_address[n] = ',';
 
 	ssend(conn_s_ps3mapi, PS3MAPI_OK_230);
 
 	sprintf(buffer, PS3MAPI_CONNECT_NOTIF, inet_ntoa(conn_info.remote_adr)); show_msg(buffer);
 
-	while (connactive == 1 && working)
+	while(connactive == 1 && working)
 	{
 
-		if (recv(conn_s_ps3mapi, buffer, PS3MAPI_RECV_SIZE, 0) > 0)
+		if(recv(conn_s_ps3mapi, buffer, PS3MAPI_RECV_SIZE, 0) > 0)
 		{
 			buffer[strcspn(buffer, "\n")] = '\0';
 			buffer[strcspn(buffer, "\r")] = '\0';
 
 			int split = ssplit(buffer, cmd, 19, param1, 383);
-			if (strcasecmp(cmd, "DISCONNECT") == 0)
+			if(strcasecmp(cmd, "DISCONNECT") == 0)
 			{
 				ssend(conn_s_ps3mapi, PS3MAPI_OK_221);
 				connactive = 0;
 			}
-			else if (strcasecmp(cmd, "SERVER") == 0)
+			else if(strcasecmp(cmd, "SERVER") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					split = ssplit(param1, cmd, 19, param2, 383);
-					if (strcasecmp(cmd, "GETVERSION") == 0)
+					if(strcasecmp(cmd, "GETVERSION") == 0)
 					{
 						sprintf(buffer, "200 %i\r\n", PS3MAPI_SERVER_VERSION);
 						ssend(conn_s_ps3mapi, buffer);
 					}
-					else if (strcasecmp(cmd, "GETMINVERSION") == 0)
+					else if(strcasecmp(cmd, "GETMINVERSION") == 0)
 					{
 						sprintf(buffer, "200 %i\r\n", PS3MAPI_SERVER_MINVERSION);
 						ssend(conn_s_ps3mapi, buffer);
@@ -11088,19 +11177,19 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 				}
 			}
-			else if (strcasecmp(cmd, "CORE") == 0)
+			else if(strcasecmp(cmd, "CORE") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					split = ssplit(param1, cmd, 19, param2, 383);
-					if (strcasecmp(cmd, "GETVERSION") == 0)
+					if(strcasecmp(cmd, "GETVERSION") == 0)
 					{
 						int version = 0;
 						{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
 						sprintf(buffer, "200 %i\r\n", version);
 						ssend(conn_s_ps3mapi, buffer);
 					}
-					else if (strcasecmp(cmd, "GETMINVERSION") == 0)
+					else if(strcasecmp(cmd, "GETMINVERSION") == 0)
 					{
 						int version = 0;
 						{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_MINVERSION); version = (int)(p1); }
@@ -11114,12 +11203,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 				}
 			}
-			else if (strcasecmp(cmd, "PS3") == 0)
+			else if(strcasecmp(cmd, "PS3") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					split = ssplit(param1, cmd, 19, param2, 383);
-					if (strcasecmp(cmd, "SHUTDOWN") == 0)
+					if(strcasecmp(cmd, "SHUTDOWN") == 0)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
@@ -11127,7 +11216,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						{system_call_4(SC_SYS_POWER, SYS_SHUTDOWN, 0, 0, 0); }
 						sys_ppu_thread_exit(0);
 					}
-					else if (strcasecmp(cmd, "REBOOT") == 0)
+					else if(strcasecmp(cmd, "REBOOT") == 0)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
@@ -11135,7 +11224,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0); }
 						sys_ppu_thread_exit(0);
 					}
-					else if (strcasecmp(cmd, "SOFTREBOOT") == 0)
+					else if(strcasecmp(cmd, "SOFTREBOOT") == 0)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
@@ -11143,7 +11232,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						{system_call_3(SC_SYS_POWER, SYS_SOFT_REBOOT, NULL, 0); }
 						sys_ppu_thread_exit(0);
 					}
-					else if (strcasecmp(cmd, "HARDREBOOT") == 0)
+					else if(strcasecmp(cmd, "HARDREBOOT") == 0)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
@@ -11151,50 +11240,50 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						{system_call_3(SC_SYS_POWER, SYS_HARD_REBOOT, NULL, 0); }
 						sys_ppu_thread_exit(0);
 					}
-					else if (strcasecmp(cmd, "GETFWVERSION") == 0)
+					else if(strcasecmp(cmd, "GETFWVERSION") == 0)
 					{
 						int version = 0;
 						{system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_VERSION); version = (int)(p1); }
 						sprintf(buffer, "200 %i\r\n", version);
 						ssend(conn_s_ps3mapi, buffer);
 					}
-					else if (strcasecmp(cmd, "GETFWTYPE") == 0)
+					else if(strcasecmp(cmd, "GETFWTYPE") == 0)
 					{
 						memset(param2, 0, sizeof(param2));
 						{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)param2); }
 						sprintf(buffer, "200 %s\r\n", param2);
 						ssend(conn_s_ps3mapi, buffer);
 					}
-					else if (strcasecmp(cmd, "NOTIFY") == 0)
+					else if(strcasecmp(cmd, "NOTIFY") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							show_msg(param2);
 							ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "BUZZER1") == 0)
+					else if(strcasecmp(cmd, "BUZZER1") == 0)
 					{
 						{ system_call_3(SC_RING_BUZZER, 0x1004, 0x4, 0x6); }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
-					else if (strcasecmp(cmd, "BUZZER2") == 0)
+					else if(strcasecmp(cmd, "BUZZER2") == 0)
 					{
 						{ system_call_3(SC_RING_BUZZER, 0x1004, 0x7, 0x36); }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
-					else if (strcasecmp(cmd, "BUZZER3") == 0)
+					else if(strcasecmp(cmd, "BUZZER3") == 0)
 					{
 						{ system_call_3(SC_RING_BUZZER, 0x1004, 0xa, 0x1b6); }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
-					else if (strcasecmp(cmd, "LED") == 0)
+					else if(strcasecmp(cmd, "LED") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							split = ssplit(param2, param1, 383, param2, 383);
-							if (split == 1)
+							if(split == 1)
 							{
 								u64 color = val(param1);
 								u64 mode = val(param2);
@@ -11205,7 +11294,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "GETTEMP") == 0)
+					else if(strcasecmp(cmd, "GETTEMP") == 0)
 					{
 						u32 cpu_temp = 0;
 						u32 rsx_temp = 0;
@@ -11216,9 +11305,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						sprintf(buffer, "200 %i|%i\r\n", cpu_temp, rsx_temp);
 						ssend(conn_s_ps3mapi, buffer);
 					}
-					else if (strcasecmp(cmd, "DISABLESYSCALL") == 0)
+					else if(strcasecmp(cmd, "DISABLESYSCALL") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							int num = val(param2);
 							{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_DISABLE_SYSCALL, (u64)num); }
@@ -11226,9 +11315,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "CHECKSYSCALL") == 0)
+					else if(strcasecmp(cmd, "CHECKSYSCALL") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							int num = val(param2);
 							int check = 0;
@@ -11238,9 +11327,9 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "PDISABLESYSCALL8") == 0)
+					else if(strcasecmp(cmd, "PDISABLESYSCALL8") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							int mode = val(param2);
 							{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_PDISABLE_SYSCALL8, (u64)mode); }
@@ -11248,24 +11337,24 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "PCHECKSYSCALL8") == 0)
+					else if(strcasecmp(cmd, "PCHECKSYSCALL8") == 0)
 					{
 						int check = 0;
 						{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_PCHECK_SYSCALL8); check = (int)(p1); }
 						sprintf(buffer, "200 %i\r\n", check);
 						ssend(conn_s_ps3mapi, buffer);
 					}
-					else if (strcasecmp(cmd, "DELHISTORY+F") == 0)
+					else if(strcasecmp(cmd, "DELHISTORY+F") == 0)
 					{
 						delete_history(true);
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
-					else if (strcasecmp(cmd, "DELHISTORY") == 0)
+					else if(strcasecmp(cmd, "DELHISTORY") == 0)
 					{
 						delete_history(false);
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
-					else if (strcasecmp(cmd, "REMOVEHOOK") == 0)
+					else if(strcasecmp(cmd, "REMOVEHOOK") == 0)
 					{
 						{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_REMOVE_HOOK); }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
@@ -11277,14 +11366,14 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 				}
 			}
-			else if (strcasecmp(cmd, "PROCESS") == 0)
+			else if(strcasecmp(cmd, "PROCESS") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					split = ssplit(param1, cmd, 19, param2, 383);
-					if (strcasecmp(cmd, "GETNAME") == 0)
+					if(strcasecmp(cmd, "GETNAME") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							u32 pid = val(param2);
 							memset(param2, 0, sizeof(param2));
@@ -11294,13 +11383,13 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "GETALLPID") == 0)
+					else if(strcasecmp(cmd, "GETALLPID") == 0)
 					{
 						u32 pid_list[16];
 						memset(buffer, 0, sizeof(buffer));
 						sprintf(buffer, "200 ");
 						{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
-						for (int i = 0; i < 16; i++)
+						for(int i = 0; i < 16; i++)
 						{
 							sprintf(buffer + strlen(buffer), "%i|", pid_list[i]);
 						}
@@ -11314,62 +11403,62 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 				}
 			}
-			else if (strcasecmp(cmd, "MEMORY") == 0)
+			else if(strcasecmp(cmd, "MEMORY") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					split = ssplit(param1, cmd, 19, param2, 383);
-					if (strcasecmp(cmd, "GET") == 0)
+					if(strcasecmp(cmd, "GET") == 0)
 					{
-						if (data_s > 0)
+						if(data_s > 0)
 						{
-							if (split == 1)
+							if(split == 1)
 							{
 								split = ssplit(param2, param1, 383, param2, 383);
-								if (split == 1)
+								if(split == 1)
 								{
 									u32 attached_pid = val(param1);
 									split = ssplit(param2, param1, 383, param2, 383);
-									if (split == 1)
+									if(split == 1)
 									{
 										u64 offset = val(param1);
 										int size = val(param2);
 										int rr = -4;
 										sys_addr_t sysmem = 0;
-										if (sys_memory_allocate(BUFFER_SIZE_PS3MAPI, SYS_MEMORY_PAGE_SIZE_64K, &sysmem) == 0)
+										if(sys_memory_allocate(BUFFER_SIZE_PS3MAPI, SYS_MEMORY_PAGE_SIZE_64K, &sysmem) == 0)
 										{
 											char *buffer2 = (char*)sysmem;
 											ssend(conn_s_ps3mapi, PS3MAPI_OK_150);
 											rr = 0;
-											while (working)
+											while(working)
 											{
-												if (size > BUFFER_SIZE_PS3MAPI)
+												if(size > BUFFER_SIZE_PS3MAPI)
 												{
 													int sizetoread = BUFFER_SIZE_PS3MAPI;
 													int leftsize = size;
-													if (size < BUFFER_SIZE_PS3MAPI) sizetoread = size;
-													while (0 < leftsize)
+													if(size < BUFFER_SIZE_PS3MAPI) sizetoread = size;
+													while(0 < leftsize)
 													{
 														system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)attached_pid, offset, (u64)buffer2, (u64)sizetoread);
-														if (send(data_s, buffer2, sizetoread, 0)<0) { rr = -3; break; }
+														if(send(data_s, buffer2, sizetoread, 0)<0) { rr = -3; break; }
 														offset += sizetoread;
 														leftsize -= sizetoread;
-														if (leftsize < BUFFER_SIZE_PS3MAPI) sizetoread = leftsize;
-														if (sizetoread == 0) break;
+														if(leftsize < BUFFER_SIZE_PS3MAPI) sizetoread = leftsize;
+														if(sizetoread == 0) break;
 													}
 													break;
 												}
 												else
 												{
 													system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)attached_pid, (u64)offset, (u64)buffer2, (u64)size);
-													if (send(data_s, buffer2, size, 0)<0) { rr = -3; break; }
+													if(send(data_s, buffer2, size, 0)<0) { rr = -3; break; }
 													break;
 												}
 											}
 											sys_memory_free(sysmem);
 										}
-										if (rr == 0) ssend(conn_s_ps3mapi, PS3MAPI_OK_226);
-										else if (rr == -4) ssend(conn_s_ps3mapi, PS3MAPI_ERROR_550);
+										if(rr == 0) ssend(conn_s_ps3mapi, PS3MAPI_OK_226);
+										else if(rr == -4) ssend(conn_s_ps3mapi, PS3MAPI_ERROR_550);
 										else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_451);
 									}
 									else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
@@ -11380,28 +11469,28 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_425);
 					}
-					else if (strcasecmp(cmd, "SET") == 0)
+					else if(strcasecmp(cmd, "SET") == 0)
 					{
-						if (data_s > 0)
+						if(data_s > 0)
 						{
-							if (split == 1)
+							if(split == 1)
 							{
 								split = ssplit(param2, param1, 383, param2, 383);
-								if (split == 1)
+								if(split == 1)
 								{
 									u32 attached_pid = val(param1);
 									u64 offset = val(param2);
 									int rr = -1;
 									sys_addr_t sysmem = 0;
-									if (sys_memory_allocate(BUFFER_SIZE_PS3MAPI, SYS_MEMORY_PAGE_SIZE_64K, &sysmem) == 0)
+									if(sys_memory_allocate(BUFFER_SIZE_PS3MAPI, SYS_MEMORY_PAGE_SIZE_64K, &sysmem) == 0)
 									{
 										char *buffer2 = (char*)sysmem;
 										u64 read_e = 0;
 										ssend(conn_s_ps3mapi, PS3MAPI_OK_150);
 										rr = 0;
-										while (working)
+										while(working)
 										{
-											if ((read_e = (u64)recv(data_s, buffer2, BUFFER_SIZE_PS3MAPI, MSG_WAITALL)) > 0)
+											if((read_e = (u64)recv(data_s, buffer2, BUFFER_SIZE_PS3MAPI, MSG_WAITALL)) > 0)
 											{
 												system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PROC_MEM, (u64)attached_pid, offset, (u64)buffer2, (u64)read_e);
 												offset += read_e;
@@ -11413,7 +11502,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 										}
 										sys_memory_free(sysmem);
 									}
-									if (rr == 0) ssend(conn_s_ps3mapi, PS3MAPI_OK_226);
+									if(rr == 0) ssend(conn_s_ps3mapi, PS3MAPI_OK_226);
 									else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_451);
 								}
 								else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
@@ -11429,17 +11518,17 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 				}
 			}
-			else if (strcasecmp(cmd, "MODULE") == 0)
+			else if(strcasecmp(cmd, "MODULE") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					split = ssplit(param1, cmd, 19, param2, 383);
-					if (strcasecmp(cmd, "GETNAME") == 0)
+					if(strcasecmp(cmd, "GETNAME") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							split = ssplit(param2, param1, 383, param2, 383);
-							if (split == 1)
+							if(split == 1)
 							{
 								u32 pid = val(param1);
 								s32 prxid = val(param2);
@@ -11452,12 +11541,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "GETFILENAME") == 0)
+					else if(strcasecmp(cmd, "GETFILENAME") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							split = ssplit(param2, param1, 383, param2, 383);
-							if (split == 1)
+							if(split == 1)
 							{
 								u32 pid = val(param1);
 								s32 prxid = val(param2);
@@ -11470,16 +11559,16 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "GETALLPRXID") == 0)
+					else if(strcasecmp(cmd, "GETALLPRXID") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							s32 prxid_list[128];
 							u32 pid = val(param2);
 							memset(buffer, 0, sizeof(buffer));
 							sprintf(buffer, "200 ");
 							{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_MODULE_PID, (u64)pid, (u64)prxid_list); }
-							for (int i = 0; i < 128; i++)
+							for(int i = 0; i < 128; i++)
 							{
 								sprintf(buffer + strlen(buffer), "%i|", prxid_list[i]);
 							}
@@ -11488,12 +11577,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "LOAD") == 0)
+					else if(strcasecmp(cmd, "LOAD") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							split = ssplit(param2, param1, 383, param2, 383);
-							if (split == 1)
+							if(split == 1)
 							{
 								u32 pid = val(param1);
 								{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_LOAD_PROC_MODULE, (u64)pid, (u64)param2, NULL, 0); }
@@ -11503,12 +11592,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if (strcasecmp(cmd, "UNLOAD") == 0)
+					else if(strcasecmp(cmd, "UNLOAD") == 0)
 					{
-						if (split == 1)
+						if(split == 1)
 						{
 							split = ssplit(param2, param1, 383, param2, 383);
-							if (split == 1)
+							if(split == 1)
 							{
 								u32 pid = val(param1);
 								s32 prx_id = val(param2);
@@ -11526,13 +11615,13 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 				}
 			}
-			else if (strcasecmp(cmd, "TYPE") == 0)
+			else if(strcasecmp(cmd, "TYPE") == 0)
 			{
-				if (split == 1)
+				if(split == 1)
 				{
 					ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
-					if (strcmp(param1, "A") == 0) dataactive = 1;
-					else if (strcmp(param1, "I") == 0)  dataactive = 0;
+					if(strcmp(param1, "A") == 0) dataactive = 1;
+					else if(strcmp(param1, "I") == 0)  dataactive = 0;
 					else  dataactive = 1;
 				}
 				else
@@ -11540,11 +11629,11 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					dataactive = 1;
 				}
 			}
-			else if (strcasecmp(cmd, "PASV") == 0)
+			else if(strcasecmp(cmd, "PASV") == 0)
 			{
 				u8 pasv_retry = 0;
 			pasv_again:
-				if (!p1x)
+				if(!p1x)
 				{
 					cellRtcGetCurrentTick(&pTick);
 					p1x = (((pTick.tick & 0xfe0000) >> 16) & 0xff) | 0x80; // use ports 32768 -> 65279 (0x8000 -> 0xFEFF)
@@ -11552,12 +11641,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 				}
 				data_ls = slisten(getPort(p1x, p2x), 1);
 
-				if (data_ls >= 0)
+				if(data_ls >= 0)
 				{
 					sprintf(pasv_output, "227 Entering Passive Mode (%s,%i,%i)\r\n", ip_address, p1x, p2x);
 					ssend(conn_s_ps3mapi, pasv_output);
 
-					if ((data_s = accept(data_ls, NULL, NULL)) > 0)
+					if((data_s = accept(data_ls, NULL, NULL)) > 0)
 					{
 						dataactive = 1;
 					}
@@ -11570,7 +11659,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 				else
 				{
 					p1x = 0;
-					if (pasv_retry<10)
+					if(pasv_retry<10)
 					{
 						pasv_retry++;
 						goto pasv_again;
@@ -11580,11 +11669,11 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 			}
 			else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_502);
 
-			if (dataactive == 1) dataactive = 0;
+			if(dataactive == 1) dataactive = 0;
 			else
 			{
 				sclose(&data_s);
-				if (data_ls>0) { sclose(&data_ls); data_ls = FAILED; }
+				if(data_ls>0) { sclose(&data_ls); data_ls = FAILED; }
 			}
 		}
 		else
@@ -11606,31 +11695,31 @@ static void ps3mapi_thread(u64 arg)
 {
 	int core_minversion = 0;
 	{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_MINVERSION); core_minversion = (int)(p1); }
-	if ((core_minversion !=0) &&(PS3MAPI_CORE_MINVERSION == core_minversion)) //Check if ps3mapi core has a compatible min_version.
+	if((core_minversion !=0) &&(PS3MAPI_CORE_MINVERSION == core_minversion)) //Check if ps3mapi core has a compatible min_version.
 	{
 		int list_s = FAILED;
 	relisten:
 		list_s = slisten(PS3MAPIPORT, 4);
 
-		if (list_s<0)
+		if(list_s<0)
 		{
 			sys_timer_sleep(3);
 			goto relisten;
 		}
 
-		if (list_s >= 0)
+		if(list_s >= 0)
 		{
-			while (working)
+			while(working)
 			{
 				sys_timer_usleep(1668);
 				int conn_s_ps3mapi;
-				if ((conn_s_ps3mapi = accept(list_s, NULL, NULL)) > 0)
+				if((conn_s_ps3mapi = accept(list_s, NULL, NULL)) > 0)
 				{
 					sys_ppu_thread_t id;
 					sys_ppu_thread_create(&id, handleclient_ps3mapi, (u64)conn_s_ps3mapi, -0x1d8, 0x10000, 0, THREAD02_NAME_PS3MAPI);
 				}
 				else
-				if (sys_net_errno == SYS_NET_EBADF || sys_net_errno == SYS_NET_ENETDOWN)
+				if(sys_net_errno == SYS_NET_EBADF || sys_net_errno == SYS_NET_ENETDOWN)
 				{
 					sclose(&list_s);
 					list_s = FAILED;
@@ -11684,6 +11773,8 @@ static void wwwd_thread(uint64_t arg)
 	{struct CellFsStat buf; from_reboot = (cellFsStat((char*)WMNOSCAN, &buf)==CELL_FS_SUCCEEDED); is_rebug=isDir("/dev_flash/rebug");}
 
 	if(webman_config->blind) enable_dev_blind(NULL);
+
+	{sys_map_path((char*)"/app_home", NULL);}
 
 	set_buffer_sizes();
 
@@ -11803,20 +11894,20 @@ static void wwwd_stop_thread(uint64_t arg)
 	uint64_t exit_code;
 	working = 0;
 
-	//if (thread_id != (sys_ppu_thread_t)-1)
+	//if(thread_id != (sys_ppu_thread_t)-1)
 		sys_ppu_thread_join(thread_id, &exit_code);
 
-	if (thread_id_ftp != (sys_ppu_thread_t)-1)
+	if(thread_id_ftp != (sys_ppu_thread_t)-1)
 		sys_ppu_thread_join(thread_id_ftp, &exit_code);
 
 #ifdef PS3MAPI
 	///////////// PS3MAPI BEGIN //////////////
-	if (thread_id_ps3mapi != (sys_ppu_thread_t)-1)
+	if(thread_id_ps3mapi != (sys_ppu_thread_t)-1)
 		sys_ppu_thread_join(thread_id_ps3mapi, &exit_code);
 	///////////// PS3MAPI END //////////////
 #endif
 
-	//if (thread_id_poll != (sys_ppu_thread_t)-1)
+	//if(thread_id_poll != (sys_ppu_thread_t)-1)
 		sys_ppu_thread_join(thread_id_poll, &exit_code);
 
 	sys_ppu_thread_exit(0);
@@ -11848,7 +11939,7 @@ int wwwd_stop(void)
 	return SYS_PRX_STOP_OK;
 }
 
-void eject_insert(u8 eject, u8 insert)
+static void eject_insert(u8 eject, u8 insert)
 {
 	u8 atapi_cmnd2[56];
 	u8* atapi_cmnd = atapi_cmnd2;
@@ -11893,16 +11984,16 @@ static void do_umount_iso(void)
 	cobra_get_disc_type(&real_disctype, &effective_disctype, &iso_disctype);
 
 	// If there is an effective disc in the system, it must be ejected
-	if (effective_disctype != DISC_TYPE_NONE)
+	if(effective_disctype != DISC_TYPE_NONE)
 	{
 		cobra_send_fake_disc_eject_event();
 		sys_timer_usleep(4000);
 	}
 
-	if (iso_disctype != DISC_TYPE_NONE) cobra_umount_disc_image();
+	if(iso_disctype != DISC_TYPE_NONE) cobra_umount_disc_image();
 
 	// If there is a real disc in the system, issue an insert event
-	if (real_disctype != DISC_TYPE_NONE)
+	if(real_disctype != DISC_TYPE_NONE)
 	{
 		cobra_send_fake_disc_insert_event();
 		for(u8 m=0; m<22; m++)
@@ -11930,8 +12021,9 @@ static void do_umount(bool clean)
 		sys_timer_usleep(20000);
 
 		cobra_unset_psp_umd();
+
 		{sys_map_path((char*)"/dev_bdvd", NULL);}
-		{sys_map_path((char*)"/app_home", (is_rebug || !isDir("/dev_hdd0/packages"))?NULL:(char*)"/dev_hdd0/packages");}
+		{sys_map_path((char*)"/app_home", !isDir("/dev_hdd0/packages")?NULL:(char*)"/dev_hdd0/packages");}
 
 		{sys_map_path((char*)"//dev_bdvd", NULL);}
 		//{sys_map_path((char*)"//app_home", NULL);}
@@ -12493,10 +12585,10 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 		}
 	}
 
-	char paramsfo[_4KB_], titleID[10];
-	unsigned char *mem = (u8*)paramsfo; int fs;
+	struct CellFsStat s; int fs;
+	char titleID[10];
 
-	char _path[MAX_PATH_LEN];
+	char _path[strlen(_path0)+2];
 
 	strcpy(_path, _path0);
 
@@ -12612,13 +12704,16 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	{
 		if(strstr(_path, ".ntfs[BDFILE]") || (strstr(_path, ".ntfs[") && strstr(_path, "[raw]")))
 		{
-			struct CellFsStat s; bool found=false;
-			sprintf(paramsfo, "/dev_flash/vsh/module/raw_iso.sprx");
-			found=(!found && cellFsStat((char*)paramsfo, &s)==CELL_FS_SUCCEEDED); if(!found) sprintf(paramsfo, "/dev_hdd0/raw_iso.sprx");
-			found=(!found && cellFsStat((char*)paramsfo, &s)==CELL_FS_SUCCEEDED); if(!found) sprintf(paramsfo, "/dev_hdd0/plugins/raw_iso.sprx");
-			found=(!found && cellFsStat((char*)paramsfo, &s)==CELL_FS_SUCCEEDED); if(!found) sprintf(paramsfo, "/dev_hdd0/game/IRISMAN00/sprx_iso");
+			bool found=false; u8 n;
+			const char raw_iso_sprx[4][40] = {  "/dev_flash/vsh/module/raw_iso.sprx",
+												"/dev_hdd0/raw_iso.sprx",
+												"/dev_hdd0/plugins/raw_iso.sprx",
+												"/dev_hdd0/game/IRISMAN00/sprx_iso" };
 
-			if(cellFsStat((char*)paramsfo, &s)==CELL_FS_SUCCEEDED)
+			for(n = 0; n < 4 && !found; n++)
+				found = (cellFsStat((char*)raw_iso_sprx[n], &s)==CELL_FS_SUCCEEDED);
+
+			if(found)
 			{
 				cellFsChmod(_path, MODE);
 
@@ -12633,7 +12728,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 					cobra_unload_vsh_plugin(0);
 
 					do_umount(false);
-					cobra_load_vsh_plugin(0, paramsfo, sprx_data, msiz);
+					cobra_load_vsh_plugin(0, (char*)raw_iso_sprx[n], sprx_data, msiz);
 
 					_path[strlen(_path)-13]=0;
 					sprintf(sprx_data, "\"%s\" %s", _path+20, STR_LOADED2);
@@ -12649,7 +12744,6 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	// Launch PS2 Classic
 	if(!extcmp(_path, ".BIN.ENC", 8))
 	{
-		struct CellFsStat s;
 		char temp[MAX_PATH_LEN];
 
 		if(cellFsStat(PS2_CLASSIC_PLACEHOLDER, &s)==CELL_FS_SUCCEEDED)
@@ -12779,10 +12873,6 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			else
 				sys_timer_usleep(50000);
 
-			struct CellFsStat s;
-
-			//{sys_map_path((char*)"/dev_bdvd", NULL);}
-			//{sys_map_path((char*)"/app_home", is_rebug?NULL:(char*)"/dev_hdd0/packages");}
 			do_umount(false);
 
 			u8 iso_num=1;
@@ -13020,7 +13110,6 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 				{
 					if(!extcasecmp(_path, ".cue", 4))
 					{
-						struct CellFsStat s;
 						int flen=strlen(cobra_iso_list[0]);
 
 						char extensions[8][8]={".BIN", ".bin", ".iso", ".ISO", ".img", ".IMG", ".mdf", ".MDF"};
@@ -13055,7 +13144,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 									u8 use_pregap=0;
 									u32 lp=0;
 
-									while (lp<msiz)// get_line ( templn, 512, buf1 ) != NULL )
+									while(lp<msiz)// get_line ( templn, 512, buf1 ) != NULL )
 									{
 										u8 line_found=0;
 										templn[0]=0;
@@ -13129,16 +13218,21 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			int special_mode=0;
 
 #ifdef EXTRA_FEAT
-			CellPadData data;
-            for(u8 n=0; n<10; n++)
-			{
-				data.len=0;
-				if(cellPadGetData(0, &data) != CELL_PAD_OK)
-					if(cellPadGetData(1, &data) != CELL_PAD_OK) cellPadGetData(2, &data);
+			CellPadData pad_data;
+			pad_data.len=0;
 
-				if(data.len > 0 && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_SELECT)) {special_mode=true; break;} //mount also app_home / eject disc
-				sys_timer_usleep(10000);
+			for(u8 n=0;n<10;n++)
+			{
+				if(cellPadGetData(0, &pad_data) != CELL_PAD_OK)
+					if(cellPadGetData(1, &pad_data) != CELL_PAD_OK)
+							cellPadGetData(2, &pad_data);
+
+				if(pad_data.len > 0) break;
+				sys_timer_usleep(100000);
 			}
+
+			if(pad_data.len > 0 && (pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_SELECT)) {special_mode=true; break;} //mount also app_home / eject disc
+			sys_timer_usleep(10000);
 
 			if(special_mode) eject_insert(1, 0);
 #endif
@@ -13151,7 +13245,9 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			sprintf(filename, "%s/PS3_GAME/PARAM.SFO", _path);
 			if(cellFsOpen(filename, CELL_FS_O_RDONLY, &fs, NULL, 0)==CELL_FS_SUCCEEDED)
 			{
+				char paramsfo[_4KB_]; unsigned char *mem = (u8*)paramsfo;
 				uint64_t msiz = 0;
+
 				cellFsLseek(fs, 0, CELL_FS_SEEK_SET, &msiz);
 				cellFsRead(fs, (void *)&paramsfo, _4KB_, &msiz);
 				cellFsClose(fs);
@@ -13194,29 +13290,23 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			{
 				if(strstr(_path, "/dev_usb") && isDir(_path))
 				{
-					for(u8 f0=0; f0<8; f0++) sys_storage_ext_fake_storage_event(4, 0, ((f0<6)?USB_MASS_STORAGE_1(f0):USB_MASS_STORAGE_2(f0)));
-					for(u8 f0=0; f0<8; f0++) sys_storage_ext_fake_storage_event(8, 0, ((f0<6)?USB_MASS_STORAGE_1(f0):USB_MASS_STORAGE_2(f0)));
+					// send fake eject event
+					for(u8 f0=0; f0<8; f0++) fake_eject_event((f0<6)?USB_MASS_STORAGE_1(f0):USB_MASS_STORAGE_2(f0));
 
 					sys_timer_sleep(1); u8 indx=0;
 
 					if(strstr(_path, "/dev_usb00")) indx=_path[10]-'0';
 
-					sys_storage_ext_fake_storage_event(7, 0, ((indx<6)?USB_MASS_STORAGE_1(indx):USB_MASS_STORAGE_2(indx)));
-					sys_storage_ext_fake_storage_event(3, 0, ((indx<6)?USB_MASS_STORAGE_1(indx):USB_MASS_STORAGE_2(indx)));
+					// send fake insert event for the current usb device
+					fake_insert_event((indx<6)?USB_MASS_STORAGE_1(indx):USB_MASS_STORAGE_2(indx), DEVICE_TYPE_USB);
 
 					sys_timer_sleep(3);
 
+					// send fake insert event for the other usb devices
 					for(u8 f0=0; f0<8; f0++)
 					{
-						if(f0!=indx)
-						{
-							sys_storage_ext_fake_storage_event(7, 0, ((f0<6)?USB_MASS_STORAGE_1(f0):USB_MASS_STORAGE_2(f0)));
-							sys_storage_ext_fake_storage_event(3, 0, ((f0<6)?USB_MASS_STORAGE_1(f0):USB_MASS_STORAGE_2(f0)));
-						}
+						if(f0!=indx) fake_insert_event((f0<6)?USB_MASS_STORAGE_1(f0):USB_MASS_STORAGE_2(f0), DEVICE_TYPE_USB);
 					}
-
-					//sprintf(tempstr, "Setting primary USB HDD:\r\n     /dev_usb00%i", indx);
-					//show_msg(tempstr);
 				}
 			}
 
@@ -13429,7 +13519,9 @@ patch:
 	sprintf(filename, "%s/PS3_GAME/PARAM.SFO", _path);
 	if(cellFsOpen(filename, CELL_FS_O_RDONLY, &fs, NULL, 0)==CELL_FS_SUCCEEDED)
 	{
+		char paramsfo[_4KB_]; unsigned char *mem = (u8*)paramsfo;
 		uint64_t msiz = 0;
+
 		cellFsLseek(fs, 0, CELL_FS_SEEK_SET, &msiz);
 		cellFsRead(fs, (void *)&paramsfo, _4KB_, &msiz);
 		cellFsClose(fs);
@@ -13604,6 +13696,8 @@ patch:
 	u64 map_data  = (MAP_BASE);
 	u64 map_paths = (MAP_BASE) + (max_mapped+1) * 0x20;
 
+	for(u16 n=0; n<0x400; n+=8) pokeq(map_data + n, 0);
+/*
 	for(u8 n=0; n<0x20; n++)
 	{
 		pokeq(map_data + (n * 0x20) + 0x00, 0);
@@ -13611,7 +13705,7 @@ patch:
 		pokeq(map_data + (n * 0x20) + 0x10, 0);
 		pokeq(map_data + (n * 0x20) + 0x18, 0);
 	}
-
+*/
 	if(!max_mapped) {ret=false; goto exit_mount;}
 
 	for(u8 n=0; n<max_mapped; n++)
@@ -13644,6 +13738,7 @@ exit_mount:
 #ifdef FIX_GAME
 	if(ret && (c_firmware<4.66f) && cellFsOpen("/dev_bdvd/PS3_GAME/PARAM.SFO", CELL_FS_O_RDONLY, &fs, NULL, 0)==CELL_FS_SUCCEEDED)
 	{
+		char paramsfo[_4KB_]; unsigned char *mem = (u8*)paramsfo;
 		uint64_t msiz = 0;
 
 		cellFsLseek(fs, 0, CELL_FS_SEEK_SET, &msiz);
@@ -13651,6 +13746,16 @@ exit_mount:
 		cellFsClose(fs);
 
 		fix_param_sfo(mem, titleID, 1); // show warning (if fix is needed)
+	}
+#endif
+
+	delete_history(false);
+	if(!ret) {char msg[MAX_PATH_LEN]; sprintf(msg, "%s %s", STR_ERROR, _path); show_msg(msg);}
+
+#ifdef COBRA_ONLY
+	{
+		if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
+			sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd");
 	}
 #endif
 
