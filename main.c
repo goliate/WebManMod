@@ -5541,7 +5541,7 @@ continue_reading_folder_xml:
 				if(skey[(a)][0]==PS1 && strlen(myxml_psx)<(BUFFER_SIZE_PSX-128))
 					strcat(myxml_psx, templn);
 				else
-				if(skey[(a)][0]==BLU && strlen(myxml_dvd)<(BUFFER_SIZE_DVD-128))
+				if(skey[(a)][0]==BLU && strlen(myxml_dvd)<(BUFFER_SIZE_DVD-1200))
 					strcat(myxml_dvd, templn);
 				else
 #endif
@@ -5553,7 +5553,7 @@ continue_reading_folder_xml:
 
 			}
 			else
-				if(strlen(myxml_dvd)<(BUFFER_SIZE-2000))
+				if(strlen(myxml_dvd)<(BUFFER_SIZE-1000))
 					strcat(myxml_items, templn);
 		}
 
