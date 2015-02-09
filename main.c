@@ -373,7 +373,7 @@ typedef struct
 	char server[0x40];
 	char path[0x420];
 	uint32_t emu_mode;
-	uint32_t numtracks;
+	uint32_t num_tracks;
 	uint16_t port;
 	uint8_t pad[6];
 	ScsiTrackDescriptor tracks[1];
@@ -420,6 +420,9 @@ static u8 init_running=0;
 static int g_socket = -1;
 static sys_event_queue_t command_queue = -1;
 #endif
+
+#define CD_SECTOR_SIZE_2048   2048
+#define CD_SECTOR_SIZE_2352   2352
 
 static uint64_t discsize=0;
 static int is_cd2352=0;
@@ -635,8 +638,8 @@ uint64_t convertH(char *val);
 
 #define SYSCALLS_UNAVAILABLE    0xFFFFFFFF80010003ULL
 
-uint64_t IDPS[2] = {0,0};
-uint64_t PSID[2] = {0,0};
+uint64_t IDPS[2] = {0, 0};
+uint64_t PSID[2] = {0, 0};
 int lang_pos, fh;
 
 #ifdef ENGLISH_ONLY
@@ -1052,7 +1055,7 @@ uint32_t (*BgmPlaybackEnable)(int, void *) = NULL;
 int (*vshmain_is_ss_enabled)() = NULL;
 int (*set_SSHT_)(int) = NULL;
 
-int opd[2] = {0,0};
+int opd[2] = {0, 0};
 
 void * getNIDfunc(const char * vsh_module, uint32_t fnid, uint32_t offset);
 
@@ -1309,7 +1312,7 @@ static int filecopy(char *file1, char *file2, uint64_t maxbytes)
 		if(sys_memory_allocate(chunk_size, SYS_MEMORY_PAGE_SIZE_64K, &buf1)==0)
 		{	// copy_file
 
-			if(cellFsOpen(file2, CELL_FS_O_CREAT | CELL_FS_O_TRUNC | CELL_FS_O_WRONLY, &fd2, 0,0)==CELL_FS_SUCCEEDED)
+			if(cellFsOpen(file2, CELL_FS_O_CREAT | CELL_FS_O_TRUNC | CELL_FS_O_WRONLY, &fd2, 0, 0)==CELL_FS_SUCCEEDED)
 			{
 				char *chunk=(char*)buf1;
 				uint64_t msiz1 = 0, msiz2 = 0, pos=0;
@@ -1868,7 +1871,7 @@ static int process_read_cd_2048_cmd(uint8_t *buf, uint32_t start_sector, uint32_
 		return FAILED;
 	}
 
-	if(recv(g_socket, buf, sector_count*2048, MSG_WAITALL) != (int)(sector_count*2048))
+	if(recv(g_socket, buf, sector_count * CD_SECTOR_SIZE_2048, MSG_WAITALL) != (int)(sector_count * CD_SECTOR_SIZE_2048))
 	{
 		//DPRINTF("recv failed (read 2048)  (errno=%d)!\n", sys_net_errno);
 		return FAILED;
@@ -1928,13 +1931,13 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 			else
 			{
 
-				copy_ptr = cd_cache+((-dif)*2352);
+				copy_ptr = cd_cache+((-dif) * CD_SECTOR_SIZE_2352);
 				copy_size = MIN((int)remaining, CD_CACHE_SIZE+dif);
 			}
 
 			if(copy_ptr)
 			{
-				memcpy(buf+(copy_offset*2352), copy_ptr, copy_size*2352);
+				memcpy(buf+(copy_offset * CD_SECTOR_SIZE_2352), copy_ptr, copy_size * CD_SECTOR_SIZE_2352);
 
 				if(remaining == copy_size)
 				{
@@ -1946,7 +1949,7 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 				if(dif <= 0)
 				{
 					uint32_t newsector = cached_cd_sector + CD_CACHE_SIZE;
-					buf += ((newsector-sector)*2352);
+					buf += ((newsector-sector) * CD_SECTOR_SIZE_2352);
 					sector = newsector;
 				}
 			}
@@ -1957,7 +1960,7 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 
 	if(!cache)
 	{
-		return process_read_iso_cmd(buf, sector*2352, remaining*2352);
+		return process_read_iso_cmd(buf, sector * CD_SECTOR_SIZE_2352, remaining * CD_SECTOR_SIZE_2352);
 	}
 
 	if(!cd_cache)
@@ -1974,10 +1977,10 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 		cd_cache = (uint8_t *)addr;
 	}
 
-	if(process_read_iso_cmd(cd_cache, sector*2352, CD_CACHE_SIZE*2352) != 0)
+	if(process_read_iso_cmd(cd_cache, sector * CD_SECTOR_SIZE_2352, CD_CACHE_SIZE * CD_SECTOR_SIZE_2352) != 0)
 		return FAILED;
 
-	memcpy(buf, cd_cache, remaining*2352);
+	memcpy(buf, cd_cache, remaining * CD_SECTOR_SIZE_2352);
 	cached_cd_sector = sector;
 	return 0;
 }
@@ -2013,7 +2016,7 @@ static void netiso_thread(uint64_t arg)
 	int64_t ret64;
 	int ret;
 	ScsiTrackDescriptor *tracks;
-	int emu_mode, numtracks;
+	int emu_mode, num_tracks;
 
 	args = (netiso_args *)(uint32_t)arg;
 
@@ -2054,7 +2057,6 @@ static void netiso_thread(uint64_t arg)
 		sys_ppu_thread_exit(ret);
 	}
 
-
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
 
 	if(real_disctype != 0)
@@ -2065,18 +2067,18 @@ static void netiso_thread(uint64_t arg)
 	emu_mode = args->emu_mode & 0xF;
 	if(emu_mode == EMU_PSX)
 	{
-		numtracks = args->numtracks;
+		num_tracks = args->num_tracks;
 		tracks = &args->tracks[0];
 		is_cd2352 = 1;
 	}
 	else
 	{
-		numtracks = 0;
+		num_tracks = 0;
 		tracks = NULL;
 		is_cd2352 = 0;
 	}
 
-	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, numtracks, tracks);
+	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, num_tracks, tracks);
 	//DPRINTF("mount = %x\n", ret);
 
 	sys_memory_free((sys_addr_t)args);
@@ -2104,13 +2106,13 @@ static void netiso_thread(uint64_t arg)
 		uint64_t offset = event.data2;
 		uint32_t size = event.data3&0xFFFFFFFF;
 
-		switch (event.data1)
+		switch(event.data1)
 		{
 			case CMD_READ_ISO:
 			{
 				if(is_cd2352)
 				{
-					ret = process_read_cd_2048_cmd(buf, offset/2048, size/2048);
+					ret = process_read_cd_2048_cmd(buf, offset / CD_SECTOR_SIZE_2048, size / CD_SECTOR_SIZE_2048);
 				}
 				else
 				{
@@ -2121,7 +2123,7 @@ static void netiso_thread(uint64_t arg)
 
 			case CMD_READ_CD_ISO_2352:
 			{
-				ret = process_read_cd_2352_cmd(buf, offset/2352, size/2352);
+				ret = process_read_cd_2352_cmd(buf, offset / CD_SECTOR_SIZE_2352, size / CD_SECTOR_SIZE_2352);
 			}
 			break;
 		}
@@ -2162,13 +2164,14 @@ static void netiso_thread(uint64_t arg)
 	}
 
 	//DPRINTF("Exiting main thread!\n");
-	netiso_loaded=0;
+	netiso_loaded = 0;
 	sys_ppu_thread_exit(0);
 }
 
 static void netiso_stop_thread(uint64_t arg)
 {
 	uint64_t exit_code;
+	netiso_loaded = 1;
 
 	if(g_socket >= 0)
 	{
@@ -2190,8 +2193,7 @@ static void netiso_stop_thread(uint64_t arg)
 		sys_ppu_thread_join(thread_id_net, &exit_code);
 	}
 
-	netiso_loaded=0;
-
+	netiso_loaded = 0;
 	sys_ppu_thread_exit(0);
 }
 #endif
@@ -2333,8 +2335,8 @@ static inline void my_memcpy(uint8_t *dst, uint8_t *src, uint16_t size)
 
 static int process_read_cd_2048_cmd_iso(uint8_t *buf, uint32_t start_sector, uint32_t sector_count)
 {
-	uint32_t capacity = sector_count*2048;
-	uint32_t fit = capacity/2352;
+	uint32_t capacity = sector_count * CD_SECTOR_SIZE_2048;
+	uint32_t fit = capacity / CD_SECTOR_SIZE_2352;
 	uint32_t rem = (sector_count-fit);
 	uint32_t i;
 	uint8_t *in = buf;
@@ -2342,21 +2344,21 @@ static int process_read_cd_2048_cmd_iso(uint8_t *buf, uint32_t start_sector, uin
 
 	if(fit > 0)
 	{
-		process_read_iso_cmd_iso(buf, start_sector*2352, fit*2352);
+		process_read_iso_cmd_iso(buf, start_sector * CD_SECTOR_SIZE_2352, fit * CD_SECTOR_SIZE_2352);
 
 		for(i = 0; i < fit; i++)
 		{
-			my_memcpy(out, in+24, 2048);
-			in += 2352;
-			out += 2048;
+			my_memcpy(out, in+24, CD_SECTOR_SIZE_2048);
+			in  += CD_SECTOR_SIZE_2352;
+			out += CD_SECTOR_SIZE_2048;
 			start_sector++;
 		}
 	}
 
 	for(i = 0; i < rem; i++)
 	{
-		process_read_iso_cmd_iso(out, (start_sector*2352)+24, 2048);
-		out += 2048;
+		process_read_iso_cmd_iso(out, (start_sector * CD_SECTOR_SIZE_2352) + 24, CD_SECTOR_SIZE_2048);
+		out += CD_SECTOR_SIZE_2048;
 		start_sector++;
 	}
 
@@ -2389,13 +2391,13 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 			else
 			{
 
-				copy_ptr = cd_cache+((-dif)*2352);
+				copy_ptr = cd_cache+((-dif) * CD_SECTOR_SIZE_2352);
 				copy_size = MIN((int)remaining, CD_CACHE_SIZE+dif);
 			}
 
 			if(copy_ptr)
 			{
-				memcpy(buf+(copy_offset*2352), copy_ptr, copy_size*2352);
+				memcpy(buf+(copy_offset * CD_SECTOR_SIZE_2352), copy_ptr, copy_size * CD_SECTOR_SIZE_2352);
 
 				if(remaining == copy_size)
 				{
@@ -2407,7 +2409,7 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 				if(dif <= 0)
 				{
 					uint32_t newsector = cached_cd_sector + CD_CACHE_SIZE;
-					buf += ((newsector-sector)*2352);
+					buf += ((newsector-sector) * CD_SECTOR_SIZE_2352);
 					sector = newsector;
 				}
 			}
@@ -2418,7 +2420,7 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 
 	if(!cache)
 	{
-		return process_read_iso_cmd_iso(buf, sector*2352, remaining*2352);
+		return process_read_iso_cmd_iso(buf, sector * CD_SECTOR_SIZE_2352, remaining * CD_SECTOR_SIZE_2352);
 	}
 
 	if(!cd_cache)
@@ -2435,10 +2437,10 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 		cd_cache = (uint8_t *)addr;
 	}
 
-	if(process_read_iso_cmd_iso(cd_cache, sector*2352, CD_CACHE_SIZE*2352) != 0)
+	if(process_read_iso_cmd_iso(cd_cache, sector * CD_SECTOR_SIZE_2352, CD_CACHE_SIZE * CD_SECTOR_SIZE_2352) != 0)
 		return FAILED;
 
-	memcpy(buf, cd_cache, remaining*2352);
+	memcpy(buf, cd_cache, remaining * CD_SECTOR_SIZE_2352);
 	cached_cd_sector = sector;
 	return 0;
 }
@@ -2461,7 +2463,7 @@ static void rawseciso_stop_thread(uint64_t arg)
 		sys_ppu_thread_join(thread_id_ntfs, &exit_code);
 	}
 
-	rawseciso_loaded=0;
+	rawseciso_loaded = 0;
 	sys_ppu_thread_exit(0);
 }
 
@@ -2516,9 +2518,9 @@ static void rawseciso_thread(uint64_t arg)
 
 	if(is_cd2352)
 	{
-		if(discsize % 2352)
+		if(discsize % CD_SECTOR_SIZE_2352)
 		{
-			discsize = discsize - (discsize % 2352);
+			discsize = discsize - (discsize % CD_SECTOR_SIZE_2352);
 		}
 	}
 
@@ -2590,13 +2592,13 @@ static void rawseciso_thread(uint64_t arg)
 		uint64_t offset = event.data2;
 		uint32_t size = event.data3&0xFFFFFFFF;
 
-		switch (event.data1)
+		switch(event.data1)
 		{
 			case CMD_READ_ISO:
 			{
 				if(is_cd2352)
 				{
-					ret = process_read_cd_2048_cmd_iso(buf, offset/2048, size/2048);
+					ret = process_read_cd_2048_cmd_iso(buf, offset / CD_SECTOR_SIZE_2048, size / CD_SECTOR_SIZE_2048);
 				}
 				else
 				{
@@ -2607,7 +2609,7 @@ static void rawseciso_thread(uint64_t arg)
 
 			case CMD_READ_CD_ISO_2352:
 			{
-				ret = process_read_cd_2352_cmd_iso(buf, offset/2352, size/2352);
+				ret = process_read_cd_2352_cmd_iso(buf, offset / CD_SECTOR_SIZE_2352, size / CD_SECTOR_SIZE_2352);
 			}
 			break;
 		}
@@ -2647,7 +2649,7 @@ static void rawseciso_thread(uint64_t arg)
 	// queue destroyed in stop thread
 
 	//DPRINTF("Exiting main thread!\n");
-	rawseciso_loaded=0;
+	rawseciso_loaded = 0;
 	sys_ppu_thread_exit(0);
 }
 #endif
@@ -4241,7 +4243,7 @@ static void get_iso_icon(char *icon, char *param, char *file, int isdir, int ns,
 				}
 				cellFsClose(fdw);
 				if(boff<1 || abort_connection) cellFsUnlink(icon);
-				open_remote_file_2(ns, (char*)"/CLOSEFILE",	&bytes_read);
+				open_remote_file_2(ns, (char*)"/CLOSEFILE", &bytes_read);
 				return;
 			}
 		}
@@ -4493,6 +4495,97 @@ static void mount_autoboot()
 		mount_with_mm(path, 1); // mount path
 	}
 }
+
+#ifdef COBRA_ONLY
+#ifndef LITE_EDITION
+static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry, char *neth, char *param, char *templn, char *tempstr, char *enc_dir_name, char *icon, char *tempID, u8 f1)
+{
+	int abort_connection=0, is_directory=0, fdw = 0; int64_t file_size; u64 mtime, ctime, atime;
+
+	if(!data[v3_entry].is_directory)
+	{
+        int flen = strlen(data[v3_entry].name)-4;
+		if(flen<0 || data[v3_entry].name[flen]!='.') return FAILED;
+		if(!strcasestr(".iso.bin.mdf.img", data[v3_entry].name + flen)) return FAILED;
+	}
+	else
+	{
+		if(data[v3_entry].name[0]=='.') return FAILED;
+		//if(!strstr(param, "/GAME")) return FAILED;
+	}
+
+	icon[0]=tempID[0]=0;
+
+	if(IS_PS3_FOLDER) //PS3 games only
+	{
+		if(data[v3_entry].is_directory)
+			sprintf(templn, WMTMP "/%s.SFO", data[v3_entry].name);
+		else
+			{get_name(templn, data[v3_entry].name, 1); strcat(templn, ".SFO\0");}
+
+		struct CellFsStat buf;
+
+		if(data[v3_entry].is_directory && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
+		{
+			sprintf(tempstr, "%s/%s/PS3_GAME/PARAM.SFO", param, data[v3_entry].name);
+
+			if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; return FAILED;}
+
+			if(cellFsOpen(templn, CELL_FS_O_CREAT|CELL_FS_O_RDWR|CELL_FS_O_TRUNC, &fdw, NULL, 0)==CELL_FS_SUCCEEDED)
+			{
+				open_remote_file_2(ns, tempstr, &abort_connection);
+
+				int bytes_read, boff=0;
+				while(boff<file_size)
+				{
+					bytes_read = read_remote_file(ns, (char*)tempstr, boff, 4000, &abort_connection);
+					if(bytes_read)
+						cellFsWrite(fdw, (char*)tempstr, bytes_read, NULL);
+					boff+=bytes_read;
+					if(bytes_read<4000 || abort_connection) break;
+				}
+				open_remote_file_2(ns, (char*)"/CLOSEFILE", &bytes_read);
+				cellFsClose(fdw);
+			}
+			cellFsChmod(templn, MODE);
+		}
+
+		get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
+	}
+	else
+		{get_name(templn, data[v3_entry].name, 0); htmlenc(tempstr, templn, 1);}
+
+	if(data[v3_entry].is_directory && IS_ISO_FOLDER)
+	{
+		char iso_ext[4][4] = {"iso", "bin", "mdf", "img"}; u8 e;
+		for(e=0; e<5; e++)
+		{
+			if(e>=4) return FAILED;
+			sprintf(tempstr, "%s/%s.%s", data[v3_entry].name, data[v3_entry].name, iso_ext[e]);
+
+			sprintf(enc_dir_name, "%s/%s", param, tempstr);
+			if(remote_stat(ns, enc_dir_name, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)==0) break;
+		}
+
+		// cover: folder/filename.jpg
+		sprintf(enc_dir_name, "%s/%s/%s.jpg", param, data[v3_entry].name, data[v3_entry].name);
+		if(remote_stat(ns, enc_dir_name, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)==0)
+			sprintf(icon, "%s%s", neth, enc_dir_name);
+		else
+			get_default_icon(icon, param, tempstr, data[v3_entry].is_directory, tempID, ns, abort_connection);
+
+		urlenc(enc_dir_name, tempstr);
+	}
+	else
+	{
+		urlenc(enc_dir_name, data[v3_entry].name);
+		get_default_icon(icon, param, data[v3_entry].name, data[v3_entry].is_directory, tempID, ns, abort_connection);
+	}
+
+	return 0;
+}
+#endif
+#endif
 
 static void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn, char *name, char *fsize, CellRtcDateTime rDate, u16 flen, unsigned long long sz, char *sf, u8 is_net)
 {
@@ -4811,7 +4904,7 @@ static void handleclient(u64 conn_s_p)
 
 		if(webman_config->spsid)
 		{
-			uint64_t j, newPSID[2] = {0,0};
+			uint64_t j, newPSID[2] = {0, 0};
 
 			newPSID[0] = convertH(webman_config->vPSID1);
 			newPSID[1] = convertH(webman_config->vPSID2);
@@ -4849,7 +4942,7 @@ static void handleclient(u64 conn_s_p)
 
 		if(webman_config->sidps)
 		{
-			uint64_t j, newIDPS[2] = {0,0};
+			uint64_t j, newIDPS[2] = {0, 0};
 
 			newIDPS[0] = convertH(webman_config->vIDPS1);
 			newIDPS[1] = convertH(webman_config->vIDPS2);
@@ -5192,67 +5285,7 @@ read_folder_xml:
 #ifndef LITE_EDITION
 						if(is_net)
 						{
-							if(!data[v3_entry].is_directory)
-							{
-                                int flen = strlen(data[v3_entry].name)-4;
-								if(flen<0 || data[v3_entry].name[flen]!='.') {v3_entry++; continue;}
-								if(!strcasestr(data[v3_entry].name + flen, ".iso") && !strcasestr(data[v3_entry].name + flen, ".bin")) {v3_entry++; continue;}
-							}
-							else
-							{
-								if(data[v3_entry].name[0]=='.') continue;
-								//if(!strstr(param, "/GAME")) {v3_entry++; continue;}
-							}
-
-							if(IS_PS3_FOLDER) //PS3 games only
-							{
-								if(data[v3_entry].is_directory)
-									sprintf(templn, WMTMP "/%s.SFO", data[v3_entry].name);
-								else
-									{get_name(templn, data[v3_entry].name, 1); strcat(templn, ".SFO\0");}
-
-								if(data[v3_entry].is_directory && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
-								{
-									sprintf(tempstr, "%s/%s/PS3_GAME/PARAM.SFO", param, data[v3_entry].name);
-
-									if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
-
-									if(file_size && cellFsOpen(templn, CELL_FS_O_CREAT|CELL_FS_O_RDWR|CELL_FS_O_TRUNC, &fdw, NULL, 0)==CELL_FS_SUCCEEDED)
-									{
-										open_remote_file_2(ns, tempstr, &abort_connection);
-
-										int bytes_read, boff=0;
-										while(boff<file_size)
-										{
-											bytes_read = read_remote_file(ns, (char*)tempstr, boff, 4000, &abort_connection);
-											if(bytes_read)
-												cellFsWrite(fdw, (char*)tempstr, bytes_read, NULL);
-											boff+=bytes_read;
-											if(bytes_read<4000 || abort_connection) break;
-										}
-										open_remote_file_2(ns, (char*)"/CLOSEFILE", &bytes_read);
-										cellFsClose(fdw);
-									}
-									cellFsChmod(templn, MODE);
-								}
-
-								get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
-							}
-							else
-								{get_name(templn, data[v3_entry].name, 0); utf8enc(tempstr, templn);} //use file name as title
-
-							get_default_icon(icon, param, data[v3_entry].name, data[v3_entry].is_directory, tempID, ns, abort_connection);
-
-							urlenc(enc_dir_name, data[v3_entry].name);
-
-							if(data[v3_entry].is_directory && IS_ISO_FOLDER)
-							{
-								sprintf(tempstr, "%s/%s/%s.iso", param, data[v3_entry].name, data[v3_entry].name); fdw=0;
-								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s/%s/%s.bin", param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
-								if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
-								if(fdw) sprintf(tempstr, "/%s.bin", enc_dir_name); else sprintf(tempstr, "/%s.iso", enc_dir_name);
-								strcat(enc_dir_name, tempstr);
-							}
+							if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1)==FAILED) {v3_entry++; continue;}
 
 							sprintf(tempstr, "<Table key=\"%04i\">"
 											 XML_PAIR("icon","%s")
@@ -5876,7 +5909,7 @@ quit:
 				//sys_memory_free(sysmem);
 				working=0;
 				{DELETE_TURNOFF}
-				{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN,0,0,0);}
+				{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
 				sys_ppu_thread_exit(0);
 				break;
 			}
@@ -6977,8 +7010,8 @@ just_leave:
 						if(system_bgm==0)
 						{
 							system_bgm=-1;
-							BgmPlaybackEnable  = (void*)((int)getNIDfunc("vshmain",0xEDAB5E5E, 16*2));
-							BgmPlaybackDisable = (void*)((int)getNIDfunc("vshmain",0xEDAB5E5E, 17*2));
+							BgmPlaybackEnable  = (void*)((int)getNIDfunc("vshmain", 0xEDAB5E5E, 16*2));
+							BgmPlaybackDisable = (void*)((int)getNIDfunc("vshmain", 0xEDAB5E5E, 17*2));
 						}
 
 						if(strstr(param, "?1") || strstr(param, "?e")) system_bgm=-1;
@@ -8507,73 +8540,11 @@ bgm_status:
 #ifndef LITE_EDITION
 										if(is_net)
 										{
-											icon[0]=tempID[0]=0;
-
-											if(!data[v3_entry].is_directory)
-											{
-												int flen = strlen(data[v3_entry].name)-4;
-												if(flen<0 || data[v3_entry].name[flen]!='.') {v3_entry++; continue;}
-												if(!strcasestr(data[v3_entry].name + flen, ".iso") && !strstr(data[v3_entry].name + flen, ".bin")) {v3_entry++; continue;}
-											}
-											else
-											{
-												if(data[v3_entry].name[0]=='.') {v3_entry++; continue;}
-												//if(!strstr(param, "/GAME")) {v3_entry++; continue;}
-											}
-
 											if(filter_name[0]>=' ' && strcasestr(param, filter_name)==NULL && strcasestr(data[v3_entry].name, filter_name)==NULL) {v3_entry++; continue;}
 
-											if(IS_PS3_FOLDER) //PS3 games only
-											{
-												if(data[v3_entry].is_directory)
-													sprintf(templn, WMTMP "/%s.SFO", data[v3_entry].name);
-												else
-													{get_name(templn, data[v3_entry].name, 1); strcat(templn, ".SFO\0");}
+											if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1)==FAILED) {v3_entry++; continue;}
 
-												if(data[v3_entry].is_directory && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
-												{
-													sprintf(tempstr, "%s/%s/PS3_GAME/PARAM.SFO", param, data[v3_entry].name);
-
-													if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
-
-													if(cellFsOpen(templn, CELL_FS_O_CREAT|CELL_FS_O_RDWR|CELL_FS_O_TRUNC, &fdw, NULL, 0)==CELL_FS_SUCCEEDED)
-													{
-														open_remote_file_2(ns, tempstr, &abort_connection);
-
-														int bytes_read, boff=0;
-														while(boff<file_size)
-														{
-															bytes_read = read_remote_file(ns, (char*)tempstr, boff, 4000, &abort_connection);
-															if(bytes_read)
-																cellFsWrite(fdw, (char*)tempstr, bytes_read, NULL);
-															boff+=bytes_read;
-															if(bytes_read<4000 || abort_connection) break;
-														}
-														open_remote_file_2(ns, (char*)"/CLOSEFILE", &bytes_read);
-														cellFsClose(fdw);
-													}
-													cellFsChmod(templn, MODE);
-												}
-
-												get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
-											}
-											else
-												{get_name(templn, data[v3_entry].name, 0); htmlenc(tempstr, templn, 1);}
-
-											get_default_icon(icon, param, data[v3_entry].name, data[v3_entry].is_directory, tempID, ns, abort_connection);
-
-											urlenc(enc_dir_name, data[v3_entry].name);
 											snprintf(ename, 6, "%s    ", templn);
-
-											if(data[v3_entry].is_directory && IS_ISO_FOLDER)
-											{
-												sprintf(tempstr, "%s/%s/%s.iso", param, data[v3_entry].name, data[v3_entry].name); fdw=0;
-												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {sprintf(tempstr, "%s/%s/%s.bin", param, data[v3_entry].name, data[v3_entry].name); fdw=1;}
-												if(remote_stat(ns, tempstr, &is_directory, &file_size, &mtime, &ctime, &atime, &abort_connection)!=0) {v3_entry++; continue;}
-												if(fdw) sprintf(tempstr, "/%s.bin", enc_dir_name); else sprintf(tempstr, "/%s.iso", enc_dir_name);
-												strcat(enc_dir_name, tempstr);
-											}
-
 											sprintf(tempstr, "%c%c%c%c<div class=\"gc\"><div class=\"ic\"><a href=\"/mount.ps3%s%s/%s?random=%x\"><img src=\"%s\" class=\"gi\"></a></div><div class=\"gn\"><a href=\"%s%s/%s\">%s</a></div></div>",
 												ename[0], ename[1], ename[2], ename[3],
 												neth, param, enc_dir_name, (u16)pTick.tick, icon, neth, param, enc_dir_name, templn);
@@ -9054,7 +9025,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 
 							working=0;
 							{DELETE_TURNOFF}
-							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN,0,0,0);}
+							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
 						}
 						else
@@ -10462,7 +10433,7 @@ static void poll_thread(uint64_t poll)
 							// power off
 							working=0;
 							{DELETE_TURNOFF}
-							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN,0,0,0);}
+							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
 						}
 						else if(!(webman_config->combo & RESTARTPS) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CIRCLE) ) // L3+R2+O (restart)
@@ -10508,7 +10479,7 @@ static void poll_thread(uint64_t poll)
 							// soft reboot
 							working=0;
 							{DELETE_TURNOFF}
-							{system_call_4(SC_SYS_POWER,SYS_SOFT_REBOOT,0,0,0);}
+							{system_call_4(SC_SYS_POWER,SYS_SOFT_REBOOT, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
 						}
 					}
@@ -11759,7 +11730,7 @@ static void wwwd_thread(uint64_t arg)
 
 	View_Find = (void*)((int)getNIDfunc("paf", 0xF21655F3, 0));
 	plugin_GetInterface = (void*)((int)getNIDfunc("paf", 0x23AFB290, 0));
-	vsh_sprintf = (void*)((int)getNIDfunc("stdc",0x273B9711, 0)); // sprintf
+	vsh_sprintf = (void*)((int)getNIDfunc("stdc", 0x273B9711, 0)); // sprintf
 
 	//pokeq(0x8000000000003560ULL, 0x386000014E800020ULL); // li r3, 0 / blr
 	//pokeq(0x8000000000003D90ULL, 0x386000014E800020ULL); // li r3, 0 / blr
@@ -12841,25 +12812,8 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			show_msg(path2);
 		}
 
-		{
-			//rawseciso_loaded=0;
-			sys_ppu_thread_t t;
-			uint64_t exit_code;
-			sys_ppu_thread_create(&t, rawseciso_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
-			sys_ppu_thread_join(t, &exit_code);
-#ifndef LITE_EDITION
-			//netiso_loaded=0
-			sys_ppu_thread_create(&t, netiso_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
-			sys_ppu_thread_join(t, &exit_code);
-#else
-			netiso_loaded=0;
-#endif
-		}
+		do_umount(false);
 
-		while(netiso_loaded)	{sys_timer_usleep(100000);}
-		while(rawseciso_loaded)	{sys_timer_usleep(100000);}
-
-		do_umount_iso();
 		sys_timer_usleep(4000);
 		cobra_send_fake_disc_eject_event();
 		sys_timer_usleep(4000);
@@ -12872,8 +12826,6 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 				sys_timer_sleep(1);
 			else
 				sys_timer_usleep(50000);
-
-			do_umount(false);
 
 			u8 iso_num=1;
 			char templn[MAX_LINE_LEN];
@@ -12991,7 +12943,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 						tracks[0].lba = 0;
 						tracks[0].is_audio = 0;
 						mynet_iso->emu_mode=EMU_PSX;
-						mynet_iso->numtracks=1;
+						mynet_iso->num_tracks=1;
 						memcpy(mynet_iso->tracks, tracks, sizeof(TrackDef));
 					}
 					else if(strstr(_path, "/GAMES/") || strstr(_path, "/GAMEZ/"))
@@ -13666,7 +13618,7 @@ patch:
 						cellFsRead(fdw, (void *)&libfs_new, 0x8e07, &msiz);
 						cellFsClose(fdw);
 
-						if(msiz==0x8e07 && cellFsOpen(expplg, CELL_FS_O_CREAT | CELL_FS_O_TRUNC | CELL_FS_O_WRONLY, &fdw, 0,0)==CELL_FS_SUCCEEDED)
+						if(msiz==0x8e07 && cellFsOpen(expplg, CELL_FS_O_CREAT | CELL_FS_O_TRUNC | CELL_FS_O_WRONLY, &fdw, 0, 0)==CELL_FS_SUCCEEDED)
 						{
 							cellFsWrite(fdw, (void *)&libfs_new, 0x8e07, &msiz);
 							cellFsClose(fdw);
@@ -13679,7 +13631,7 @@ patch:
 		else if(save_libfs_new && cellFsStat(expplg, &buf2)==CELL_FS_SUCCEEDED)
 		{
 			int fdw;
-			if(cellFsOpen(expplg, CELL_FS_O_CREAT | CELL_FS_O_TRUNC | CELL_FS_O_WRONLY, &fdw, 0,0)==CELL_FS_SUCCEEDED)
+			if(cellFsOpen(expplg, CELL_FS_O_CREAT | CELL_FS_O_TRUNC | CELL_FS_O_WRONLY, &fdw, 0, 0)==CELL_FS_SUCCEEDED)
 			{
 				uint64_t msiz = 0;
 				cellFsWrite(fdw, (void *)&libfs_new, 0x8e92, &msiz);
