@@ -2390,7 +2390,6 @@ static int process_read_cd_2352_cmd_iso(uint8_t *buf, uint32_t sector, uint32_t 
 			}
 			else
 			{
-
 				copy_ptr = cd_cache+((-dif) * CD_SECTOR_SIZE_2352);
 				copy_size = MIN((int)remaining, CD_CACHE_SIZE+dif);
 			}
@@ -4498,7 +4497,7 @@ static void mount_autoboot()
 
 #ifdef COBRA_ONLY
 #ifndef LITE_EDITION
-static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry, char *neth, char *param, char *templn, char *tempstr, char *enc_dir_name, char *icon, char *tempID, u8 f1)
+static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry, char *neth, char *param, char *templn, char *tempstr, char *enc_dir_name, char *icon, char *tempID, u8 f1, u8 is_html)
 {
 	int abort_connection=0, is_directory=0, fdw = 0; int64_t file_size; u64 mtime, ctime, atime;
 
@@ -4553,7 +4552,9 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 		get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
 	}
 	else
-		{get_name(templn, data[v3_entry].name, 0); htmlenc(tempstr, templn, 1);}
+		{get_name(templn, data[v3_entry].name, 0);}
+
+	if(is_html) htmlenc(tempstr, templn, true); else if(!(IS_PS3_FOLDER)) utf8enc(tempstr, templn);
 
 	if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 	{
@@ -5285,7 +5286,7 @@ read_folder_xml:
 #ifndef LITE_EDITION
 						if(is_net)
 						{
-							if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1)==FAILED) {v3_entry++; continue;}
+							if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1, 0)==FAILED) {v3_entry++; continue;}
 
 							sprintf(tempstr, "<Table key=\"%04i\">"
 											 XML_PAIR("icon","%s")
@@ -6259,7 +6260,7 @@ html_response:
 					max_temp=0;
 					if(webman_config->fanc)
 					{
-						if(webman_config->temp0==0) max_temp=webman_config->temp1; else max_temp=0;
+						if(webman_config->temp0==0) max_temp=webman_config->temp1;
 						fan_control(webman_config->temp0, 0);
 					}
 					else
@@ -6377,7 +6378,7 @@ html_response:
 								"<html xmlns=\"http://www.w3.org/1999/xhtml\">"
 								"<meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\">"
 								"<meta http-equiv=\"cache-control\" content=\"no-cache\">");
-				if(is_cpursx) strcat(buffer, "<meta http-equiv=\"refresh\" content=\"5\">");
+				if(is_cpursx) strcat(buffer, "<meta http-equiv=\"refresh\" content=\"6;URL=/cpursx.ps3\">");
 				strcat(buffer,	"<head><title>webMAN MOD</title>"
 								"<style type=\"text/css\"><!--\r\n"
 								"a:visited{color:#909090;text-decoration:none;}"
@@ -6386,7 +6387,7 @@ html_response:
 								"a.f:visited{color:#E0E0E0;text-decoration:none;}a.f:hover{color:#F0F0F0;}"
 								"a.f:active{color:#F8F8F8;text-decoration:none;}"
 								"a.f:link{color:#D0D0D0;text-decoration:none;}a.f:link:hover{color:#FFFFFF;}"
-								"body,td,th{color:#F0F0F0;}"
+								"body,a.s,td,th{color:#F0F0F0;white-space:nowrap}"
 								".list{display:inline;}"
 								"input:focus{border:2px solid #0099FF;}"
 								".gc{float:left;overflow:hidden;position:relative;text-align:center;width:280px;height:260px;margin:3px;border:1px dashed grey;}"
@@ -6488,6 +6489,30 @@ html_response:
 						game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+0x04); strcat(buffer, templn);
 					}
 
+					if(strstr(param, "?"))
+					{
+
+						if(strstr(param, "?m")) if(max_temp) max_temp=0; else max_temp=webman_config->temp1;
+
+						if(max_temp) //auto mode
+						{
+							if(strstr(param, "?u")) max_temp++;
+							if(strstr(param, "?d")) max_temp--;
+							webman_config->temp1=RANGE(max_temp, 40, 85); //°C
+						}
+						else
+						{
+							if(strstr(param, "?u")) webman_config->manu++;
+							if(strstr(param, "?d")) webman_config->manu--;
+							webman_config->manu=RANGE(webman_config->manu, 20, 99); //%
+
+							webman_config->temp0= (u8)(((float)webman_config->manu * 255.f)/100.f);
+							webman_config->temp0=RANGE(webman_config->temp0, 0x33, MAX_FANSPEED);
+							fan_control(webman_config->temp0, 0);
+						}
+						save_settings();
+					}
+
 					char max_temp1[50], max_temp2[50]; max_temp2[0]=0;
 
 					if(!webman_config->fanc || (!webman_config->temp0 && !max_temp))
@@ -6500,17 +6525,23 @@ html_response:
 					else
 						sprintf(max_temp1, " <small>[FAN: %i%% %s]</small>", webman_config->manu, STR_MANUAL);
 
-					sprintf( templn, "<hr><font size=42px><b>CPU: %i°C%s<br>"
-															"RSX: %i°C<hr>"
+					sprintf( templn, "<hr><font size=42px><b><a class=\"s\" href=\"/cpursx.ps3?up\">"
+															"CPU: %i°C%s<br>"
+															"RSX: %i°C</a><hr>"
+															"<a class=\"s\" href=\"/cpursx.ps3?dn\">"
 															"CPU: %i°F%s<br>"
-															"RSX: %i°F<hr>"
-                                                            "MEM: %iKB  HDD: %i %s<hr>"
-															"FAN SPEED: %i%% (0x%X)<hr><small>"
+															"RSX: %i°F</a><hr>"
+															"<a class=\"s\" href=\"/\">"
+															"MEM: %iKB  HDD: %i %s</a><hr>"
+															"<a class=\"s\" href=\"/cpursx.ps3?mode\">"
+															"FAN SPEED: %i%% (0x%X)</a><hr>"
+															"<a class=\"s\" href=\"/setup.ps3\">"
+															"<small>"
 															"PSID LV2 : %016llX%016llX<hr>"
 															"IDPS EID0: %016llX%016llX<br>"
 															"IDPS LV2 : %016llX%016llX<br>"
-                                                            "MAC Addr : %010llX</b>"
-									"</small></font><hr>",
+                                                            "MAC Addr : %010llX</small></a></b>"
+									"</font><hr>",
 									t1, max_temp1, t2,
 									t1f, max_temp2, t2f,
                                     (meminfo.avail>>10), (int)((blockSize*freeSize)>>20), STR_MBFREE,
@@ -8542,7 +8573,7 @@ bgm_status:
 										{
 											if(filter_name[0]>=' ' && strcasestr(param, filter_name)==NULL && strcasestr(data[v3_entry].name, filter_name)==NULL) {v3_entry++; continue;}
 
-											if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1)==FAILED) {v3_entry++; continue;}
+											if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1, 1)==FAILED) {v3_entry++; continue;}
 
 											snprintf(ename, 6, "%s    ", templn);
 											sprintf(tempstr, "%c%c%c%c<div class=\"gc\"><div class=\"ic\"><a href=\"/mount.ps3%s%s/%s?random=%x\"><img src=\"%s\" class=\"gi\"></a></div><div class=\"gn\"><a href=\"%s%s/%s\">%s</a></div></div>",
@@ -10351,9 +10382,9 @@ static void poll_thread(uint64_t poll)
 							else
 							{
 								if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2) webman_config->manu+=5; else webman_config->manu+=1;
+								webman_config->manu=RANGE(webman_config->manu, 20, 99); //%
 								webman_config->temp0= (u8)(((float)webman_config->manu * 255.f)/100.f);
-								if(webman_config->temp0<0x33) webman_config->temp0=0x33;
-								if(webman_config->temp0>MAX_FANSPEED) webman_config->temp0=MAX_FANSPEED;
+								webman_config->temp0=RANGE(webman_config->temp0, 0x33, MAX_FANSPEED);
 								fan_control(webman_config->temp0, 0);
 								sprintf((char*)msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH2, webman_config->manu);
 							}
@@ -12675,14 +12706,15 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	{
 		if(strstr(_path, ".ntfs[BDFILE]") || (strstr(_path, ".ntfs[") && strstr(_path, "[raw]")))
 		{
+
 			bool found=false; u8 n;
 			const char raw_iso_sprx[4][40] = {  "/dev_flash/vsh/module/raw_iso.sprx",
 												"/dev_hdd0/raw_iso.sprx",
 												"/dev_hdd0/plugins/raw_iso.sprx",
 												"/dev_hdd0/game/IRISMAN00/sprx_iso" };
 
-			for(n = 0; n < 4 && !found; n++)
-				found = (cellFsStat((char*)raw_iso_sprx[n], &s)==CELL_FS_SUCCEEDED);
+			for(n = 0; n < 4; n++)
+				if(cellFsStat(raw_iso_sprx[n], &s)==CELL_FS_SUCCEEDED) {found = true; break;}
 
 			if(found)
 			{
