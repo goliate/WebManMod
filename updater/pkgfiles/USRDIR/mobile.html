@@ -1306,11 +1306,6 @@ var m = Math,
 var SwipeView = (function (window, document) {
 	var numberOfImages=0,gTransitionDuration=500,percent=24;
 
-	if(!isPS3 && navigator.userAgent.toLowerCase().indexOf('windows') == -1)
-	{
-		if(window.orientation==0 || window.orientation==180) percent=80; else percent=50;
-	}
-
 	var dummyStyle = document.createElement('div').style,
 		vendor = (function () {
 			var vendors = 't,webkitT,MozT,msT,OT'.split(','),
@@ -1376,6 +1371,11 @@ var SwipeView = (function (window, document) {
 				hastyPageFlip: false,
 				loop: true,
 			};
+
+			if(isPS3)
+				percent=Math.ceil(42000 / this.wrapper.clientWidth);
+			else
+				percent=Math.ceil(25000 / this.wrapper.clientWidth);
 
 			// User defined options
 			for (i in options) this.options[i] = options[i];
@@ -1801,7 +1801,7 @@ var SwipeView = (function (window, document) {
 			else
 			{
 				for(var i=0; i<numberOfImages; i++)
-					if(this.masterPages[i].style.opacity!=0.25) {this.masterPages[i].style.opacity=0.25; this.masterPages[i].style.zoom='85%'; }
+					if(this.masterPages[i].style.opacity!=0.6) {this.masterPages[i].style.opacity=0.6; this.masterPages[i].style.zoom='60%'; }
 
 				this.masterPages[this.currentMasterPage].style.zoom='100%';
 			}
@@ -1996,7 +1996,7 @@ function mouseupEvent(e)
 	e = e || window.event;
 	var target = e.target || e.srcElement;
 
-	if((new Date()-md)<120) {showWait(); prompt(slides[gallery.pageIndex].url); window.open('http://10.0.0.8/mount.ps3'+slides[gallery.pageIndex].url, '_self');}
+	if((new Date()-md)<120) {showWait(); window.open('/mount.ps3'+slides[gallery.pageIndex].url, '_self');}
 }
 
 function updatePage()
