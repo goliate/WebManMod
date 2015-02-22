@@ -1,4 +1,4 @@
-STR_TRADBY			[]
+STR_TRADBY			[<br>]
 
 STR_FILES			[Files]
 STR_GAMES			[Games]

@@ -156,12 +156,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_setup" attr="webman_setup"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost0 as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net0 as /dev_bdvd -->
 	<View id="seg_webman_nethost0">
 		<Attributes>
 			<Table key="webman_nethost0">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost0 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net0 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/.</String></Pair>
@@ -170,12 +170,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0" attr="webman_nethost0"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost0/PKG as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net0/PKG as /dev_bdvd -->
 	<View id="seg_webman_nethost0_pkg">
 		<Attributes>
 			<Table key="webman_nethost0_pkg">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost0/PKG 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net0/PKG 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/PKG</String></Pair>
@@ -184,12 +184,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_pkg" attr="webman_nethost0_pkg"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost0/VIDEO as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net0/VIDEO as /dev_bdvd -->
 	<View id="seg_webman_nethost0_video">
 		<Attributes>
 			<Table key="webman_nethost0_video">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost0/VIDEO 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net0/VIDEO 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/VIDEO</String></Pair>
@@ -198,12 +198,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_video" attr="webman_nethost0_video"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost0/MUSIC as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net0/MUSIC as /dev_bdvd -->
 	<View id="seg_webman_nethost0_music">
 		<Attributes>
 			<Table key="webman_nethost0_music">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost0/MUSIC 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net0/MUSIC 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/MUSIC</String></Pair>
@@ -212,12 +212,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_music" attr="webman_nethost0_music"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost0/PICTURE as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net0/PICTURE as /dev_bdvd -->
 	<View id="seg_webman_nethost0_picture">
 		<Attributes>
 			<Table key="webman_nethost0_picture">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost0/PICTURE 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net0/PICTURE 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/PICTURE</String></Pair>
@@ -226,12 +226,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_picture" attr="webman_nethost0_picture"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost0/ROMS as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net0/ROMS as /dev_bdvd -->
 	<View id="seg_webman_nethost0_roms">
 		<Attributes>
 			<Table key="webman_nethost0_roms">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost0/ROMS 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net0/ROMS 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/ROMS</String></Pair>
@@ -240,12 +240,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_roms" attr="webman_nethost0_roms"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost1 as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net1 as /dev_bdvd -->
 	<View id="seg_webman_nethost1">
 		<Attributes>
 			<Table key="webman_nethost1">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost1 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net1 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/.</String></Pair>
@@ -254,12 +254,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1" attr="webman_nethost1"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost1/PKG as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net1/PKG as /dev_bdvd -->
 	<View id="seg_webman_nethost1_pkg">
 		<Attributes>
 			<Table key="webman_nethost1_pkg">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost1/PKG 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net1/PKG 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/PKG</String></Pair>
@@ -268,12 +268,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1_pkg" attr="webman_nethost1_pkg"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost1/VIDEO as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net1/VIDEO as /dev_bdvd -->
 	<View id="seg_webman_nethost1_video">
 		<Attributes>
 			<Table key="webman_nethost1_video">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost1/VIDEO 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net1/VIDEO 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/VIDEO</String></Pair>
@@ -282,12 +282,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1_video" attr="webman_nethost1_video"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost1/MUSIC as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net1/MUSIC as /dev_bdvd -->
 	<View id="seg_webman_nethost1_music">
 		<Attributes>
 			<Table key="webman_nethost1_music">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost1/MUSIC 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net1/MUSIC 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/MUSIC</String></Pair>
@@ -296,12 +296,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1_music" attr="webman_nethost1_music"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost1/PICTURE as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net1/PICTURE as /dev_bdvd -->
 	<View id="seg_webman_nethost1_picture">
 		<Attributes>
 			<Table key="webman_nethost1_picture">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost1/PICTURE 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net1/PICTURE 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/PICTURE</String></Pair>
@@ -310,12 +310,12 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1_picture" attr="webman_nethost1_picture"/></Items>
 	</View>
 
-	<!-- Main > webMAN > Mount /nethost1/ROMS as /dev_bdvd -->
+	<!-- Main > webMAN > Mount /net1/ROMS as /dev_bdvd -->
 	<View id="seg_webman_nethost1_roms">
 		<Attributes>
 			<Table key="webman_nethost1_roms">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
-				<Pair key="title"><String>掛載 /nethost1/ROMS 做為 /dev_bdvd</String></Pair>
+				<Pair key="title"><String>掛載 /net1/ROMS 做為 /dev_bdvd</String></Pair>
 				<Pair key="info"><String></String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/ROMS</String></Pair>

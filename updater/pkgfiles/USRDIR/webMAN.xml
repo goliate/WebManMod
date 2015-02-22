@@ -28,6 +28,7 @@
 			<Query class="type:x-xmb/folder-pixmap" key="webman_webman_cpursx" src="#seg_webman_cpursx"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_games_link" src="#seg_webman_games"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_files_link" src="#seg_webman_files"/>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_cache_link" src="#seg_webman_cache"/>
 
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost_link" src="#seg_webman_nethost_links"/>
 
@@ -53,11 +54,78 @@
 			</Table>
 		</Attributes>
 		<Items>
-			<Query class="type:x-xmb/folder-pixmap" key="nethost_links" attr="nethost_links" src="#seg_webman_nethost_links_items"/>
+			<Query class="type:x-xmb/folder-pixmap" key="nethost_links" attr="nethost_links" src="#seg_webman_nethost_sublinks"/>
 		</Items>
 	</View>
 
-	<View id="seg_webman_nethost_links_items">
+	<View id="seg_webman_nethost_sublinks">
+		<Items>
+			<Query class="type:x-xmb/folder-pixmap" key="nethost_links0" attr="nethost_links0" src="#seg_webman_nethost_links_items0"/>
+			<Query class="type:x-xmb/folder-pixmap" key="nethost_links1" attr="nethost_links1" src="#seg_webman_nethost_links_items1"/>
+			<Query class="type:x-xmb/folder-pixmap" key="nethost_links2" attr="nethost_links2" src="#seg_webman_nethost_links_items2"/>
+			<Query class="type:x-xmb/folder-pixmap" key="seg_webman_system"  src="#seg_webman_system_files"/>
+		</Items>
+	</View>
+
+	<View id="seg_webman_system_files">
+		<Attributes>
+			<Table key="webman_system_files">
+				<Pair key="icon_rsc"><String>tex_album_icon</String></Pair>
+				<Pair key="icon_notation"><String>WNT_XmbItemAlbum</String></Pair>
+				<Pair key="title"><String>System Files</String></Pair>
+				<Pair key="child"><String>segment</String></Pair>
+			</Table>
+		</Attributes>
+		<Items><Query class="type:x-xmb/folder-pixmap" key="webman_system_files" attr="webman_system_files" src="host://localhost/"/></Items>
+	</View>
+
+	<View id="seg_webman_nethost_links_items0">
+		<Attributes>
+			<Table key="nethost0_links">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
+				<Pair key="icon_notation"><String>WNT_XmbItemBrowser</String></Pair>
+				<Pair key="title"><String>Net0 Folders </String></Pair>
+				<Pair key="info"><String>Mount /net0 folders as local /dev_bdvd</String></Pair>
+				<Pair key="child"><String>segment</String></Pair>
+			</Table>
+		</Attributes>
+		<Items>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0" attr="nethost0_links" src="#seg_webman_nethost_links_items_net0"/>
+		</Items>
+	</View>
+
+	<View id="seg_webman_nethost_links_items1">
+		<Attributes>
+			<Table key="nethost0_links">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
+				<Pair key="icon_notation"><String>WNT_XmbItemBrowser</String></Pair>
+				<Pair key="title"><String>Net1 Folders</String></Pair>
+				<Pair key="info"><String>Mount /net1 folders as local /dev_bdvd</String></Pair>
+				<Pair key="child"><String>segment</String></Pair>
+			</Table>
+		</Attributes>
+		<Items>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0" attr="nethost0_links" src="#seg_webman_nethost_links_items_net1"/>
+		</Items>
+	</View>
+
+	<View id="seg_webman_nethost_links_items2">
+		<Attributes>
+			<Table key="nethost0_links">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
+				<Pair key="icon_notation"><String>WNT_XmbItemBrowser</String></Pair>
+				<Pair key="title"><String>Net2 Folders</String></Pair>
+				<Pair key="info"><String>Mount /net2 folders as local /dev_bdvd</String></Pair>
+				<Pair key="child"><String>segment</String></Pair>
+			</Table>
+		</Attributes>
+		<Items>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0" attr="nethost0_links" src="#seg_webman_nethost_links_items_net2"/>
+		</Items>
+	</View>
+
+
+	<View id="seg_webman_nethost_links_items_net0">
 		<Items>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0_link1" src="#seg_webman_nethost0"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0_link2" src="#seg_webman_nethost0_pkg"/>
@@ -65,20 +133,31 @@
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0_link4" src="#seg_webman_nethost0_music"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0_link5" src="#seg_webman_nethost0_picture"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0_link6" src="#seg_webman_nethost0_roms"/>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost0_link7" src="#seg_webman_nethost0_pup"/>
+		</Items>
+	</View>
 
+	<View id="seg_webman_nethost_links_items_net1">
+		<Items>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link1" src="#seg_webman_nethost1"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link2" src="#seg_webman_nethost1_pkg"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link3" src="#seg_webman_nethost1_video"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link4" src="#seg_webman_nethost1_music"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link5" src="#seg_webman_nethost1_picture"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link6" src="#seg_webman_nethost1_roms"/>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost1_link7" src="#seg_webman_nethost1_pup"/>
+		</Items>
+	</View>
 
+	<View id="seg_webman_nethost_links_items_net2">
+		<Items>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link1" src="#seg_webman_nethost2"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link2" src="#seg_webman_nethost2_pkg"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link3" src="#seg_webman_nethost2_video"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link4" src="#seg_webman_nethost2_music"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link5" src="#seg_webman_nethost2_picture"/>
 			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link6" src="#seg_webman_nethost2_roms"/>
+			<Query class="type:x-xmb/folder-pixmap" key="webman_nethost2_link7" src="#seg_webman_nethost2_pup"/>
 		</Items>
 	</View>
 
@@ -151,6 +230,21 @@
 		</Attributes>
 		<Items><Item class="type:x-xmb/module-action" key="webman_files" attr="webman_files"/></Items>
 	</View>
+
+	<!-- Main > webMAN > PS3 webMAN [Cache] -->
+	<View id="seg_webman_cache">
+		<Attributes>
+			<Table key="seg_webman_cache">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/gamedata.png</String></Pair>
+				<Pair key="title"><String>PS3 webMAN [Cache]</String></Pair>
+				<Pair key="info"><String>Delete files from /dev_hdd0/tmp/wmtmp</String></Pair>
+				<Pair key="child"><String>segment</String></Pair>
+			</Table>
+		</Attributes>
+		<Items><Query class="type:x-xmb/folder-pixmap" key="seg_webman_cache" attr="seg_webman_cache" src="#seg_webman_cache_files"/></Items>
+	</View>
+
+	<View id="seg_webman_cache_files"><Items><Query class="type:x-xmb/folder-pixmap" key="seg_webman_cache_files" src="host://localhost/dev_hdd0/tmp/wmtmp"/></Items></View>
 
 	<!-- Main > webMAN > PS3 webMAN [Setup] -->
 	<View id="seg_webman_setup">
@@ -250,6 +344,20 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_roms" attr="webman_nethost0_roms"/></Items>
 	</View>
 
+	<!-- Main > webMAN > Mount /net0/FIRMWARE as /dev_bdvd -->
+	<View id="seg_webman_nethost0_pup">
+		<Attributes>
+			<Table key="webman_nethost0_pup">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
+				<Pair key="title"><String>Mount /net0/FIRMWARE as /dev_bdvd</String></Pair>
+				<Pair key="info"><String></String></Pair>
+				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
+				<Pair key="module_action"><String>http://localhost/mount_ps3/net0/FIRMWARE</String></Pair>
+			</Table>
+		</Attributes>
+		<Items><Item class="type:x-xmb/module-action" key="webman_nethost0_pup" attr="webman_nethost0_pup"/></Items>
+	</View>
+
 	<!-- Main > webMAN > Mount /net1 as /dev_bdvd -->
 	<View id="seg_webman_nethost1">
 		<Attributes>
@@ -334,6 +442,20 @@
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1_roms" attr="webman_nethost1_roms"/></Items>
 	</View>
 
+	<!-- Main > webMAN > Mount /net1/FIRMWARE as /dev_bdvd -->
+	<View id="seg_webman_nethost1_pup">
+		<Attributes>
+			<Table key="webman_nethost1_pup">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
+				<Pair key="title"><String>Mount /net1/FIRMWARE as /dev_bdvd</String></Pair>
+				<Pair key="info"><String></String></Pair>
+				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
+				<Pair key="module_action"><String>http://localhost/mount_ps3/net1/FIRMWARE</String></Pair>
+			</Table>
+		</Attributes>
+		<Items><Item class="type:x-xmb/module-action" key="webman_nethost1_pup" attr="webman_nethost1_pup"/></Items>
+	</View>
+
 	<!-- Main > webMAN > Mount /net2 as /dev_bdvd -->
 	<View id="seg_webman_nethost2">
 		<Attributes>
@@ -416,6 +538,20 @@
 			</Table>
 		</Attributes>
 		<Items><Item class="type:x-xmb/module-action" key="webman_nethost2_roms" attr="webman_nethost2_roms"/></Items>
+	</View>
+
+	<!-- Main > webMAN > Mount /net2/FIRMWARE as /dev_bdvd -->
+	<View id="seg_webman_nethost2_pup">
+		<Attributes>
+			<Table key="webman_nethost2_pup">
+				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/network.png</String></Pair>
+				<Pair key="title"><String>Mount /net2/FIRMWARE as /dev_bdvd</String></Pair>
+				<Pair key="info"><String></String></Pair>
+				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
+				<Pair key="module_action"><String>http://localhost/mount_ps3/net2/FIRMWARE</String></Pair>
+			</Table>
+		</Attributes>
+		<Items><Item class="type:x-xmb/module-action" key="webman_nethost2_pup" attr="webman_nethost2_pup"/></Items>
 	</View>
 
 	<!-- Main > webMAN > gameDATA -->

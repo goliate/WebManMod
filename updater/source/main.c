@@ -329,6 +329,8 @@ int main()
 	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/LANG_TR.TXT","/dev_hdd0/tmp/wm_lang/LANG_TR.TXT");
 	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/LANG_ZH.TXT","/dev_hdd0/tmp/wm_lang/LANG_ZH.TXT");
 
+	sysLv2FsMkdir("/dev_hdd0/xmlhost/game_plugin", 0777);
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/mobile.html","/dev_hdd0/xmlhost/game_plugin/mobile.html");
 
 	sysLv2FsMkdir("/dev_hdd0/tmp/wm_icons", 0777);
 
