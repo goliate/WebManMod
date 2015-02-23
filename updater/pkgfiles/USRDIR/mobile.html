@@ -38,7 +38,7 @@ body {
 	z-index:100;
 	top:8px;
 	width:200px;
-	height:20px;
+	height:24px;
 	left:50%;
 	background:rgba(0,0,0,0.75);
 	padding:0;
@@ -1858,7 +1858,7 @@ var SwipeView = (function (window, document) {
 <div id="curpage" style="position:absolute;left:10px;top:10px;font-size:20px;"></div>
 
 <div id="prevpage" style="position:absolute;left:2%;top:45%;font-size:60px;z-index:9999;"><a id="nav-left" href="javascript:void(0);" onclick="javascript:gallery.prev();this.style.color='white';" onmouseout="this.style.color='#404040';this.style.opacity=0.33;" onmousemove="this.style.color='#808080';this.style.opacity=1;" style="color:#404040;opacity:.33;">&#9664;</div>
-<div id="nextpage" style="position:absolute;right:2%;top:45%;font-size:60px;z-index:9999;"><a id="nav-right" href="javascript:void(0);" onclick="javascript:gallery.next();this.style.color='white';" onmouseout="this.style.color='#404040';this.style.opacity=1;" onmousemove="this.style.color='#808080';this.style.opacity=1;" style="color:#404040;opacity:1.33;">&#9654;</div>
+<div id="nextpage" style="position:absolute;right:2%;top:45%;font-size:60px;z-index:9999;"><a id="nav-right" href="javascript:void(0);" onclick="javascript:gallery.next();this.style.color='white';" onmouseout="this.style.color='#404040';this.style.opacity=1;" onmousemove="this.style.color='#808080';this.style.opacity=1;" style="color:#404040;opacity:.33;">&#9654;</div>
 </div>
 
 <div id="menu" style="display:none">
@@ -1871,18 +1871,19 @@ var SwipeView = (function (window, document) {
 				<li><a id="nav-menuItem3"  onclick="showWait()" href="/setup.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAMAAADzapwJAAAAB3RJTUUH3wIUFDgN+AZcGAAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACKUExURf///9be3oyUnEpSWiEhIf///97n5+/v9zlCUqWlpSEpKTk5Qs7W3nN7hNbW3jE5OSkpKSkpMSEhKdbe57W9xsbGzmNrc2trc1paY1JaWoSMlHuEjGtzc2Nra729xu/v7+/3/zlCSpScpVJaY62ttc7O1jExOTExMXuMnLW9vaWtrbXGzjlKUmNjawUgndwAAAABdFJOUwBA5thmAAAA1klEQVR42m2R6xqCIAyGMcEUEaXU1Eo7WWl6/7fXHOgT1X7At/fZgTFCZqvHMSW/NlA6WIClAg6fUp8RIl7M0CdNut6lYG7fKfrUPKNfliFu7jZ9NLpKyz/ppjUtb3b0TXc8FeidL5cziiuDnnWcoBNCxSZEmcQ1qUxqNWXOznFRe8hke+MciCxKrKIEYwIVLws5pea6Yr5TKHLzwK8xM4NTaxxuvner7Gi1RSwhOFkYTC/1mAEPhYgmGAkZ82D+cG8N57QGuNYes3YEe3D/7NJZrZzFeQM6ewy7ZXtahwAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; SETUP WEBMAN </a></li>
 				<li><a id="nav-menuItem4"  onclick="showWait()" href="/"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAUCAQAAAA9vDUIAAAAB3RJTUUH3wIUFQQptjSrAQAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAADlSURBVHjaY2BgWOGi+p8fCdp92mPLgBOwMDDcN7zL8A9J6BBv4YIlVQwn0JVyMOi9V/sE1PCJ/x+a1GWl7BX8GGYzMeTMZUgBauBzwLT4IxBignsaIG0MtxmIBW+BmHER9xEWonUw2Pxh2f9guwjxGr6+YXki8oJ49QyvRJiESVDOwCDIwCROkgYxBqZbG0nR8OkkEz8p6hm+vGBSJEmDFAOT6BtSNMgzMN05RoqG29uYpBgYSdDA+5tJi4GNaOXMDAoMTBcPsBKtgZVBi4Hp3kcuEjTs28NS9evb2z1Epg/jt6YfAP77PxQ5JPzrAAAAAElFTkSuQmCC" border=0 style="position:relative;top:2px;left:5px">&nbsp; FILE MANAGER </a></li>
 				<li><a id="nav-menuItem5"  onclick="showWait()" href="/mount.ps3/unmount"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAUCAQAAAAjdQW7AAAAB3RJTUUH3wIUFQgPyIxh8AAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACPSURBVHjatdGxDYMwFITh3xQowcyAMgszZFhAGESVFbJCMgFd4keFsYVfityV/mSdbIhjWXwtitSMfHzHPLe4jUrdOd/TDK8YAioduKXpHFHp5E+iAX2SSvtwTGpAOKbS0h2/0mWptOPC4bHO6goazbduaQylXK/Kqr5WYrjTquSDp/HD1Sl+mfFP/Fbb1xfsHITyNa0xJgAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; UNMOUNT GAME </a></li>
-				<li><a id="nav-menuItem11" onclick="showWait()" href="/index.ps3?ps3&mobile">&#9654; PS3 GAMES & ISO </a></li>
-				<li><a id="nav-menuItem12" onclick="showWait()" href="/index.ps3?games&mobile">&#9654; PS3 GAMES </a></li>
-				<li><a id="nav-menuItem13" onclick="showWait()" href="/index.ps3?PS3ISO&mobile">&#9654; PS3ISO </a></li>
-				<li><a id="nav-menuItem14" onclick="showWait()" href="/index.ps3?PS2ISO&mobile">&#9654; PS2ISO </a></li>
-				<li><a id="nav-menuItem15" onclick="showWait()" href="/index.ps3?PSPISO&mobile">&#9654; PSPISO </a></li>
-				<li><a id="nav-menuItem16" onclick="showWait()" href="/index.ps3?PSXISO&mobile">&#9654; PSXISO </a></li>
-				<li><a id="nav-menuItem17" onclick="showWait()" href="/index.ps3?BDISO&mobile">&#9654; BDISO </a></li>
-				<li><a id="nav-menuItem18" onclick="showWait()" href="/index.ps3?DVDISO&mobile">&#9654; DVDISO </a></li>
-				<li><a id="nav-menuItem19" onclick="showWait()" href="/index.ps3?hdd&mobile">&#9654; Games on HDD </a></li>
-				<li><a id="nav-menuItem20" onclick="showWait()" href="/index.ps3?usb&mobile">&#9654; Games on USB </a></li>
-				<li><a id="nav-menuItem21" onclick="showWait()" href="/index.ps3?ntfs&mobile">&#9654; Games on NTFS </a></li>
-				<li><a id="nav-menuItem22" onclick="showWait()" href="/index.ps3?net&mobile">&#9654; Games on NETSVR </a></li>
+				<li><a id="nav-menuItem10" onclick="showWait()" href="/games.ps3?html">&#9654; ALL GAMES </a></li>
+				<li><a id="nav-menuItem11" onclick="showWait()" href="/games.ps3?ps3">&#9654; PS3 GAMES & ISO </a></li>
+				<li><a id="nav-menuItem12" onclick="showWait()" href="/games.ps3?games">&#9654; PS3 GAMES </a></li>
+				<li><a id="nav-menuItem13" onclick="showWait()" href="/games.ps3?PS3ISO">&#9654; PS3ISO </a></li>
+				<li><a id="nav-menuItem14" onclick="showWait()" href="/games.ps3?PS2ISO">&#9654; PS2ISO </a></li>
+				<li><a id="nav-menuItem15" onclick="showWait()" href="/games.ps3?PSPISO">&#9654; PSPISO </a></li>
+				<li><a id="nav-menuItem16" onclick="showWait()" href="/games.ps3?PSXISO">&#9654; PSXISO </a></li>
+				<li><a id="nav-menuItem17" onclick="showWait()" href="/games.ps3?BDISO">&#9654; BDISO </a></li>
+				<li><a id="nav-menuItem18" onclick="showWait()" href="/games.ps3?DVDISO">&#9654; DVDISO </a></li>
+				<li><a id="nav-menuItem19" onclick="showWait()" href="/games.ps3?hdd">&#9654; Games on HDD </a></li>
+				<li><a id="nav-menuItem20" onclick="showWait()" href="/games.ps3?usb">&#9654; Games on USB </a></li>
+				<li><a id="nav-menuItem21" onclick="showWait()" href="/games.ps3?ntfs">&#9654; Games on NTFS </a></li>
+				<li><a id="nav-menuItem22" onclick="showWait()" href="/games.ps3?net">&#9654; Games on NETSVR </a></li>
 				<li><a id="nav-menuItem23" onclick="showWait()" href="http://st.aldostools.org">&#9655; Movian Remote </a></li>
 				<li><a id="nav-menuItem24" onclick="showWait()" href="/home.ps3mapi">&#9762; PS3 Manager API </a></li>				
 				<li><a id="nav-menuItem25" onclick="showWait()" href="/videorec.ps3">&#9673; Record In-Game Video </a></li>
@@ -1953,7 +1954,7 @@ function keyDownEvent(e)
 
 	if(keyCode==37) gallery.prev(); // Right
 	if(keyCode==39) gallery.next(); // Left
-	if(keyCode==13) {showWait(); window.open('/mount.ps3'+slides[gallery.pageIndex].url, '_self');}
+	if(keyCode==13) {var index = gallery.currentMasterPage - 1; if(index<0) index = slides.length - 1; showWait(); window.open('/mount.ps3'+slides[index].url, '_self');}
 	if(keyCode==27) hideMenu();
 	if(keyCode==113) showMenu();   //F2
 	if(keyCode==114) {e.preventDefault(); searchGame();} //F3
@@ -1995,8 +1996,9 @@ function mouseupEvent(e)
 {
 	e = e || window.event;
 	var target = e.target || e.srcElement;
+	var index = gallery.currentMasterPage - 1; if(index<0) index = slides.length - 1;
 
-	if((new Date()-md)<120) {showWait(); window.open('/mount.ps3'+slides[gallery.pageIndex].url, '_self');}
+	if((new Date()-md)<120) {showWait(); window.open('/mount.ps3'+slides[index].url, '_self');}
 }
 
 function updatePage()
@@ -2019,7 +2021,7 @@ document.onmousedown = mousedownEvent;
 document.oncontextmenu = mousedownEvent;
 
 window.addEventListener('orientationchange', doOnOrientationChange);
-window.addEventListener('resize', function() { gallery.refreshSize(); }, true);
+window.addEventListener('resize', doOnOrientationChange);
 
 document.addEventListener('touchmove', function (e) { e.preventDefault(); }, false);
 document.addEventListener("keydown", keyDownEvent, false);
@@ -2038,7 +2040,7 @@ for (i=0; i<slides.length; i++) {
 	newlink.href = "javascript:void(0);";
 
 	el = document.createElement('img');
-	el.id = slides[page].url;
+	el.id = 'pic' + i;
 	el.className = 'loading';
 	el.src = slides[page].img;
 	el.width = slides[page].width;
@@ -2096,6 +2098,24 @@ function loaded() {
 }
 
 document.addEventListener('DOMContentLoaded', loaded, false);
+
+function animate()
+{
+	if(slides.length<1) return;
+
+	var img = document.getElementById('pic'+ gallery.currentMasterPage).style;
+
+	if(img.zoom=='100%') {img.zoom='102%';} else
+	if(img.zoom=='102%') {img.zoom='103%';} else
+	if(img.zoom=='103%') {img.zoom='101%';} else
+	if(img.zoom=='101%') {img.zoom='99%'; } else
+	if(img.zoom=='99%')  {img.zoom='98%'; } else {img.zoom='100%';}
+
+	setTimeout(animate, 175);
+}
+
+
+setTimeout(animate, 1500);
 
 </script>
 </body>

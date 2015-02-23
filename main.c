@@ -120,7 +120,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.20 MOD"						// webMAN version
+#define WM_VERSION			"1.41.21 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -2127,14 +2127,6 @@ retry_psx:
 
 	fake_insert_event(BDVD_DRIVE, real_disctype);
 
-	if(emu_mode == EMU_PSX && retry < 3)
-	{
-		retry++;
-
-		sys_timer_usleep(500000);
-		if(!isDir("/dev_bdvd")) goto retry_psx;
-	}
-
 	if(ret != 0)
 	{
 		sys_event_port_destroy(result_port);
@@ -2194,6 +2186,14 @@ retry_psx:
 	if(real_disctype != 0)
 	{
 		fake_insert_event(BDVD_DRIVE, real_disctype);
+	}
+
+	if(emu_mode == EMU_PSX && retry < 3)
+	{
+		retry++;
+
+		sys_timer_usleep(500000);
+		if(!isDir("/dev_bdvd")) goto retry_psx;
 	}
 
 	if(cd_cache)
