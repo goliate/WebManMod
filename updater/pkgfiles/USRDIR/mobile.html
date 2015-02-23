@@ -1857,20 +1857,21 @@ var SwipeView = (function (window, document) {
 <div id="menu-icon" style="position:absolute;right:20px;top:13px;"><a id="nav-menu" href="javascript:void(0)" onclick="showMenu();"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACMAAAAdCAQAAACKoB0PAAAAB3RJTUUH3wIUFTUMO2149AAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAAArSURBVHjaY/z/n4Fi8IqBiXJDQGBYGjMKRhhgHM1TtDZmFIwwMJqnaG4MAM5nCNRqWuBjAAAAAElFTkSuQmCC" border=0 style="position:relative;top:6px"></a></div>
 <div id="curpage" style="position:absolute;left:10px;top:10px;font-size:20px;"></div>
 
-<div id="prevpage" style="position:absolute;left:2%;top:45%;font-size:60px;z-index:9999;"><a id="nav-left" href="javascript:void(0);" onclick="javascript:gallery.prev();this.style.color='white';" onmouseout="this.style.color='#404040';this.style.opacity=0.33;" onmousemove="this.style.color='#808080';this.style.opacity=1;" style="color:#404040;opacity:.33;">&#9664;</div>
-<div id="nextpage" style="position:absolute;right:2%;top:45%;font-size:60px;z-index:9999;"><a id="nav-right" href="javascript:void(0);" onclick="javascript:gallery.next();this.style.color='white';" onmouseout="this.style.color='#404040';this.style.opacity=1;" onmousemove="this.style.color='#808080';this.style.opacity=1;" style="color:#404040;opacity:.33;">&#9654;</div>
+<div id="prev-page" style="position:absolute;left: 2%;top:40%;font-size:60px;z-index:9999;"><a id="nav-left"  href="javascript:void(0);" onclick="javascript:gallery.prev();this.style.color='white';" style="color:#404040;opacity:0.33;" onmousemove="this.style.color='#808080';this.style.opacity=1;" onmouseout="this.style.color='#404040';this.style.opacity=0.33;">&#9664;</div>
+<div id="next-page" style="position:absolute;right:2%;top:40%;font-size:60px;z-index:9999;"><a id="nav-right" href="javascript:void(0);" onclick="javascript:gallery.next();this.style.color='white';" style="color:#404040;opacity:0.33;" onmousemove="this.style.color='#808080';this.style.opacity=1;" onmouseout="this.style.color='#404040';this.style.opacity=0.33;">&#9654;</div>
 </div>
 
 <div id="menu" style="display:none">
-	<div id="header"><a id="nav-close" href="javascript:void(0)" onclick="hideMenu();">webMAN MOD 1.41.20</a></div>
+	<div id="header"><a id="nav-close" href="javascript:void(0)" onclick="hideMenu();">webMAN MOD 1.41.21</a></div>
 	<div id="wrapper-menu">
 		<div id="scroller">
 			<ul id="thelist">
-				<li><a id="nav-menuItem1"  onclick="showWait()" href="/cpursx.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAMAAAAM7l6QAAAAB3RJTUUH3wIUFCsA51hhNwAAAAlwSFlzAAAewgAAHsIBbtB1PgAAAARnQU1BAACxjwv8YQUAAAAVUExURf///8zMzJmZmf///zMzMwAAAGZmZqUuTSIAAAABdFJOUwBA5thmAAAAbklEQVR42uWSOw7AMAhD4/C5/5EDtFkqM7QdOtSKGPLAEonHuCNIz0Qt5F2HmwNRmmEzqfo/POu02F/hr8zF9zT9cLeNKY/rTJOK1etdhCDIrEEZriE7e0ga0xihbCG4nEsKupke1Ckthzlb9kALuw4D9LKqcegAAAAASUVORK5CYII=" border=0 style="position:relative;top:6px"> CPU & RSX TEMPERATURE </a></li>
-				<li><a id="nav-menuItem2" onclick="showWait()" href="/index.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAVCAQAAADyFTaQAAAAB3RJTUUH3wIUFQ4zsbm68QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAARnQU1BAACxjwv8YQUAAAEvSURBVHjaY2RgkJZhOcooxwAH//YzRj18wYAHMDEwMFciawEKOf4PY8ALGMXEOS8ziqIK/n/02+bZYzya5OYxJWIK/1vOdBOXlt/LGBX+M5AI/t8mQxM4IEgHLGhWf2Sc/+87YzqjEJT/7v9MJs7/iYz8KAGB7Lz/n/55Pz7CwCCrzTwFHBz3/rc9vgvk2zBtZeTDpWnJw1jsDpJfzBiDw0//juDyBSOKDIomxnfEBQSK8x5wMPzErkxCnuMBDptwgxcoCRgpyP+fY/gDoqVk2YrgYm8edjP8AjH+f2HkwabpJsNfsFAEQwHc9Qxyvx51Axm//m9mjMTpPAV5xkIUTxdIyKOrQdLEqCMlLCf5fyujJIomKfYuOUkpYUYdHKFHLCArwTLzMzI6kKblfyMAFnRYMZYg+WIAAAAASUVORK5CYII=" border=0 style="position:relative;top:2px;left:5px">&nbsp; MY GAMES </a></li>
-				<li><a id="nav-menuItem3"  onclick="showWait()" href="/setup.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAMAAADzapwJAAAAB3RJTUUH3wIUFDgN+AZcGAAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACKUExURf///9be3oyUnEpSWiEhIf///97n5+/v9zlCUqWlpSEpKTk5Qs7W3nN7hNbW3jE5OSkpKSkpMSEhKdbe57W9xsbGzmNrc2trc1paY1JaWoSMlHuEjGtzc2Nra729xu/v7+/3/zlCSpScpVJaY62ttc7O1jExOTExMXuMnLW9vaWtrbXGzjlKUmNjawUgndwAAAABdFJOUwBA5thmAAAA1klEQVR42m2R6xqCIAyGMcEUEaXU1Eo7WWl6/7fXHOgT1X7At/fZgTFCZqvHMSW/NlA6WIClAg6fUp8RIl7M0CdNut6lYG7fKfrUPKNfliFu7jZ9NLpKyz/ppjUtb3b0TXc8FeidL5cziiuDnnWcoBNCxSZEmcQ1qUxqNWXOznFRe8hke+MciCxKrKIEYwIVLws5pea6Yr5TKHLzwK8xM4NTaxxuvner7Gi1RSwhOFkYTC/1mAEPhYgmGAkZ82D+cG8N57QGuNYes3YEe3D/7NJZrZzFeQM6ewy7ZXtahwAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; SETUP WEBMAN </a></li>
-				<li><a id="nav-menuItem4"  onclick="showWait()" href="/"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAUCAQAAAA9vDUIAAAAB3RJTUUH3wIUFQQptjSrAQAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAADlSURBVHjaY2BgWOGi+p8fCdp92mPLgBOwMDDcN7zL8A9J6BBv4YIlVQwn0JVyMOi9V/sE1PCJ/x+a1GWl7BX8GGYzMeTMZUgBauBzwLT4IxBignsaIG0MtxmIBW+BmHER9xEWonUw2Pxh2f9guwjxGr6+YXki8oJ49QyvRJiESVDOwCDIwCROkgYxBqZbG0nR8OkkEz8p6hm+vGBSJEmDFAOT6BtSNMgzMN05RoqG29uYpBgYSdDA+5tJi4GNaOXMDAoMTBcPsBKtgZVBi4Hp3kcuEjTs28NS9evb2z1Epg/jt6YfAP77PxQ5JPzrAAAAAElFTkSuQmCC" border=0 style="position:relative;top:2px;left:5px">&nbsp; FILE MANAGER </a></li>
-				<li><a id="nav-menuItem5"  onclick="showWait()" href="/mount.ps3/unmount"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAUCAQAAAAjdQW7AAAAB3RJTUUH3wIUFQgPyIxh8AAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACPSURBVHjatdGxDYMwFITh3xQowcyAMgszZFhAGESVFbJCMgFd4keFsYVfityV/mSdbIhjWXwtitSMfHzHPLe4jUrdOd/TDK8YAioduKXpHFHp5E+iAX2SSvtwTGpAOKbS0h2/0mWptOPC4bHO6goazbduaQylXK/Kqr5WYrjTquSDp/HD1Sl+mfFP/Fbb1xfsHITyNa0xJgAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; UNMOUNT GAME </a></li>
+				<li><a id="nav-menuItem1"  href="javascript:refreshScreen();">&#8635; REFRESH</a></li>
+				<li><a id="nav-menuItem2"  onclick="showWait()" href="/cpursx.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAMAAAAM7l6QAAAAB3RJTUUH3wIUFCsA51hhNwAAAAlwSFlzAAAewgAAHsIBbtB1PgAAAARnQU1BAACxjwv8YQUAAAAVUExURf///8zMzJmZmf///zMzMwAAAGZmZqUuTSIAAAABdFJOUwBA5thmAAAAbklEQVR42uWSOw7AMAhD4/C5/5EDtFkqM7QdOtSKGPLAEonHuCNIz0Qt5F2HmwNRmmEzqfo/POu02F/hr8zF9zT9cLeNKY/rTJOK1etdhCDIrEEZriE7e0ga0xihbCG4nEsKupke1Ckthzlb9kALuw4D9LKqcegAAAAASUVORK5CYII=" border=0 style="position:relative;top:6px"> CPU & RSX TEMPERATURE </a></li>
+				<li><a id="nav-menuItem3"  onclick="showWait()" href="/index.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAVCAQAAADyFTaQAAAAB3RJTUUH3wIUFQ4zsbm68QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAARnQU1BAACxjwv8YQUAAAEvSURBVHjaY2RgkJZhOcooxwAH//YzRj18wYAHMDEwMFciawEKOf4PY8ALGMXEOS8ziqIK/n/02+bZYzya5OYxJWIK/1vOdBOXlt/LGBX+M5AI/t8mQxM4IEgHLGhWf2Sc/+87YzqjEJT/7v9MJs7/iYz8KAGB7Lz/n/55Pz7CwCCrzTwFHBz3/rc9vgvk2zBtZeTDpWnJw1jsDpJfzBiDw0//juDyBSOKDIomxnfEBQSK8x5wMPzErkxCnuMBDptwgxcoCRgpyP+fY/gDoqVk2YrgYm8edjP8AjH+f2HkwabpJsNfsFAEQwHc9Qxyvx51Axm//m9mjMTpPAV5xkIUTxdIyKOrQdLEqCMlLCf5fyujJIomKfYuOUkpYUYdHKFHLCArwTLzMzI6kKblfyMAFnRYMZYg+WIAAAAASUVORK5CYII=" border=0 style="position:relative;top:2px;left:5px">&nbsp; MY GAMES </a></li>
+				<li><a id="nav-menuItem4"  onclick="showWait()" href="/setup.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAMAAADzapwJAAAAB3RJTUUH3wIUFDgN+AZcGAAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACKUExURf///9be3oyUnEpSWiEhIf///97n5+/v9zlCUqWlpSEpKTk5Qs7W3nN7hNbW3jE5OSkpKSkpMSEhKdbe57W9xsbGzmNrc2trc1paY1JaWoSMlHuEjGtzc2Nra729xu/v7+/3/zlCSpScpVJaY62ttc7O1jExOTExMXuMnLW9vaWtrbXGzjlKUmNjawUgndwAAAABdFJOUwBA5thmAAAA1klEQVR42m2R6xqCIAyGMcEUEaXU1Eo7WWl6/7fXHOgT1X7At/fZgTFCZqvHMSW/NlA6WIClAg6fUp8RIl7M0CdNut6lYG7fKfrUPKNfliFu7jZ9NLpKyz/ppjUtb3b0TXc8FeidL5cziiuDnnWcoBNCxSZEmcQ1qUxqNWXOznFRe8hke+MciCxKrKIEYwIVLws5pea6Yr5TKHLzwK8xM4NTaxxuvner7Gi1RSwhOFkYTC/1mAEPhYgmGAkZ82D+cG8N57QGuNYes3YEe3D/7NJZrZzFeQM6ewy7ZXtahwAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; SETUP WEBMAN </a></li>
+				<li><a id="nav-menuItem5"  onclick="showWait()" href="/"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAUCAQAAAA9vDUIAAAAB3RJTUUH3wIUFQQptjSrAQAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAADlSURBVHjaY2BgWOGi+p8fCdp92mPLgBOwMDDcN7zL8A9J6BBv4YIlVQwn0JVyMOi9V/sE1PCJ/x+a1GWl7BX8GGYzMeTMZUgBauBzwLT4IxBignsaIG0MtxmIBW+BmHER9xEWonUw2Pxh2f9guwjxGr6+YXki8oJ49QyvRJiESVDOwCDIwCROkgYxBqZbG0nR8OkkEz8p6hm+vGBSJEmDFAOT6BtSNMgzMN05RoqG29uYpBgYSdDA+5tJi4GNaOXMDAoMTBcPsBKtgZVBi4Hp3kcuEjTs28NS9evb2z1Epg/jt6YfAP77PxQ5JPzrAAAAAElFTkSuQmCC" border=0 style="position:relative;top:2px;left:5px">&nbsp; FILE MANAGER </a></li>
+				<li><a id="nav-menuItem6"  onclick="showWait()" href="/mount.ps3/unmount"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAUCAQAAAAjdQW7AAAAB3RJTUUH3wIUFQgPyIxh8AAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACPSURBVHjatdGxDYMwFITh3xQowcyAMgszZFhAGESVFbJCMgFd4keFsYVfityV/mSdbIhjWXwtitSMfHzHPLe4jUrdOd/TDK8YAioduKXpHFHp5E+iAX2SSvtwTGpAOKbS0h2/0mWptOPC4bHO6goazbduaQylXK/Kqr5WYrjTquSDp/HD1Sl+mfFP/Fbb1xfsHITyNa0xJgAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; UNMOUNT GAME </a></li>
 				<li><a id="nav-menuItem10" onclick="showWait()" href="/games.ps3?html">&#9654; ALL GAMES </a></li>
 				<li><a id="nav-menuItem11" onclick="showWait()" href="/games.ps3?ps3">&#9654; PS3 GAMES & ISO </a></li>
 				<li><a id="nav-menuItem12" onclick="showWait()" href="/games.ps3?games">&#9654; PS3 GAMES </a></li>
@@ -1917,7 +1918,7 @@ function get(name, defaultval)
 		return defaultval;
 }
 
-function doOnOrientationChange()
+function refreshScreen()
 {
 	curPage=gallery.pageIndex+1;
 	showWait(); window.open('/games.ps3?g='+curPage,'_self');
@@ -1958,6 +1959,7 @@ function keyDownEvent(e)
 	if(keyCode==27) hideMenu();
 	if(keyCode==113) showMenu();   //F2
 	if(keyCode==114) {e.preventDefault(); searchGame();} //F3
+	if(keyCode==116) {e.preventDefault(); refreshScreen();} //F5
 
 	if(document.getElementById('wrapper').style.display=='none')
 	{
@@ -2020,8 +2022,8 @@ if (document.layers) document.captureEvents(Event.MOUSEDOWN);
 document.onmousedown = mousedownEvent;
 document.oncontextmenu = mousedownEvent;
 
-window.addEventListener('orientationchange', doOnOrientationChange);
-window.addEventListener('resize', doOnOrientationChange);
+window.addEventListener('orientationchange', refreshScreen);
+window.addEventListener('resize', refreshScreen);
 
 document.addEventListener('touchmove', function (e) { e.preventDefault(); }, false);
 document.addEventListener("keydown", keyDownEvent, false);
