@@ -7,6 +7,7 @@
 #define DPRINTF(...)
 #endif
 
+/*
 #define HVSC_SYSCALL				811                  	// which syscall to overwrite with hvsc redirect
 #define HVSC_SYSCALL_ADDR_341		0x80000000001BB414ULL	// where above syscall is in lv2 3.41
 #define HVSC_SYSCALL_ADDR_355		0x8000000000195540ULL	// where above syscall is in lv2 3.55
@@ -30,7 +31,7 @@
 #define HVSC_SYSCALL_ADDR_460		0x80000000001A6A14ULL	// where above syscall is in lv2 4.60     <- peek( SYSCALL_TABLE_460  + HVSC_SYSCALL*8)
 #define HVSC_SYSCALL_ADDR_465		0x80000000001A6A1CULL	// where above syscall is in lv2 4.65     <- peek( SYSCALL_TABLE_465  + HVSC_SYSCALL*8)
 #define HVSC_SYSCALL_ADDR_465D		0x80000000001ACECCULL	// where above syscall is in lv2 4.65 DEX <- peek( SYSCALL_TABLE_465D + HVSC_SYSCALL*8)
-#define HVSC_SYSCALL_ADDR_470		0x80000000003436B0ULL	// where above syscall is in lv2 4.70     <- peek( SYSCALL_TABLE_470  + HVSC_SYSCALL*8)
+#define HVSC_SYSCALL_ADDR_470		0x80000000002A0EE0ULL	// where above syscall is in lv2 4.70     <- peek( SYSCALL_TABLE_470  + HVSC_SYSCALL*8)
 
 #define NEW_POKE_SYSCALL			813                  	// which syscall to overwrite with new poke
 #define NEW_POKE_SYSCALL_ADDR_341	0x80000000001BB93CULL	// where above syscall is in lv2 3.41
@@ -55,7 +56,8 @@
 #define NEW_POKE_SYSCALL_ADDR_460	0x80000000001A6F3CULL	// where above syscall is in lv2 4.60     <- peek( SYSCALL_TABLE_460  + NEW_POKE_SYSCALL*8)
 #define NEW_POKE_SYSCALL_ADDR_465	0x80000000001A6F44ULL	// where above syscall is in lv2 4.65     <- peek( SYSCALL_TABLE_465  + NEW_POKE_SYSCALL*8)
 #define NEW_POKE_SYSCALL_ADDR_465D	0x80000000001AD3F4ULL	// where above syscall is in lv2 4.65 DEX <- peek( SYSCALL_TABLE_465D + NEW_POKE_SYSCALL*8)
-#define NEW_POKE_SYSCALL_ADDR_470	0x80000000003436E0ULL	// where above syscall is in lv2 4.70     <- peek( SYSCALL_TABLE_470  + NEW_POKE_SYSCALL*8)
+#define NEW_POKE_SYSCALL_ADDR_470	0x80000000002A1408ULL	// where above syscall is in lv2 4.70     <- peek( SYSCALL_TABLE_470  + NEW_POKE_SYSCALL*8)
+*/
 
 #define SYSCALL_TABLE_341			0x80000000002EB128ULL	// 3.41
 #define SYSCALL_TABLE_355			0x8000000000346570ULL	// 3.55
