@@ -32,7 +32,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define ENGLISH_ONLY	1	// uncomment for english only version
+//#define ENGLISH_ONLY	1	// uncomment for english only version
 
 //// EDITIONS ////
 
@@ -46,10 +46,10 @@
 //// FEATURES ////
 #define FIX_GAME		1	// Auto-Fix game
 #define EXT_GDATA		1	// /extgd.ps3?status /extgd.ps3?enable /extgd.ps3?disable (external gameDATA)
-//#define COPY_PS3		1	// /copy.ps3/<path>
-//#define WEB_CHAT		1	// /chat.ps3
-//#define DEBUG_MEM		1	// /dump.ps3 / peek.lv1 / poke.lv1 / find.lv1 / peek.lv2 / poke.lv2 / find.lv2
-//#define VIDEO_REC		1	// /videorec.ps3  start/stop video recording (in-game only)
+#define COPY_PS3		1	// /copy.ps3/<path>
+#define WEB_CHAT		1	// /chat.ps3
+#define DEBUG_MEM		1	// /dump.ps3 / peek.lv1 / poke.lv1 / find.lv1 / peek.lv2 / poke.lv2 / find.lv2
+#define VIDEO_REC		1	// /videorec.ps3  start/stop video recording (in-game only)
 #define LOAD_PRX		1	// /loadprx.ps3?slot=n&prx=path/file.sprx  (load prx)
 #define FAKEISO 		1	// support .ntfs[BDFILE] (fake ISO)
 
@@ -120,7 +120,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.22 MOD"						// webMAN version
+#define WM_VERSION			"1.41.23 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -12632,8 +12632,8 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 		else
 		if(c_firmware==4.70f)
 		{
-			pokeq(0x80000000002670D8ULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E80002038600000ULL
-			pokeq(0x80000000002670E0ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x7C6307B44E800020ULL
+			pokeq(0x80000000002898DCULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E80002038600000ULL
+			pokeq(0x80000000002898E4ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x7C6307B44E800020ULL
 			pokeq(0x8000000000056588ULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
 			pokeq(0x800000000005664CULL, 0x3FE080013BE00000ULL ); // fix 8001003E error  Original: 0x3FE0800163FF003EULL
 
