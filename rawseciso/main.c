@@ -1048,7 +1048,7 @@ static void rawseciso_thread(uint64_t arg)
 	{   // old psx support
 		num_tracks = args->num_tracks;
 
-		cd_sector_size = (num_tracks & 0xff0000)>>8; // <-- Use: num_tracks = num_of_tracks | (cd_sector_size<<8);
+		cd_sector_size = (num_tracks & 0xffff00)>>4; //  <- Use: trackscount = num_of_tracks | (cd_sector_size<<4);
 		if(cd_sector_size != 2352 && cd_sector_size != 2048 && cd_sector_size != 2336 && cd_sector_size != 2448) cd_sector_size = 2352;
 		num_tracks &= 0xff;
 

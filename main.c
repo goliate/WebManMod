@@ -120,7 +120,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.21 MOD"						// webMAN version
+#define WM_VERSION			"1.41.22 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -146,10 +146,12 @@ SYS_MODULE_STOP(wwwd_stop);
 
 ////////////
 
-#define FB_XML					"/dev_hdd0/xmlhost/game_plugin/fb.xml"
-#define MY_GAMES_XML			"/dev_hdd0/xmlhost/game_plugin/mygames.xml"
-#define MOBILE_HTML				"/dev_hdd0/xmlhost/game_plugin/mobile.html"
-#define GAMELIST_JS				"/dev_hdd0/xmlhost/game_plugin/gamelist.js"
+#define HTML_BASE_PATH			"/dev_hdd0/xmlhost/game_plugin"
+
+#define FB_XML					HTML_BASE_PATH "/fb.xml"
+#define MY_GAMES_XML			HTML_BASE_PATH "/mygames.xml"
+#define MOBILE_HTML				HTML_BASE_PATH "/mobile.html"
+#define GAMELIST_JS				HTML_BASE_PATH "/gamelist.js"
 
 #define DELETE_CACHED_GAMES		{cellFsUnlink((char*)WMTMP "/games.html"); cellFsUnlink((char*)GAMELIST_JS);}
 
@@ -612,6 +614,7 @@ static WebmanCfg *webman_config = (WebmanCfg*) wmconfig;
 static bool gmobile_mode = false;
 
 static char ftp_password[20]="";
+static char html_base_path[MAX_PATH_LEN]="";
 
 static char smonth[12][4]={"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
@@ -2030,6 +2033,7 @@ static void netiso_thread(uint64_t arg)
 	int ret;
 	ScsiTrackDescriptor *tracks;
 	int emu_mode, num_tracks;
+	unsigned int cd_sector_size_param = 0;
 
 	args = (netiso_args *)(uint32_t)arg;
 
@@ -2070,11 +2074,23 @@ static void netiso_thread(uint64_t arg)
 		sys_ppu_thread_exit(ret);
 	}
 
+	CD_SECTOR_SIZE_2352 = 2352;
+
 	emu_mode = args->emu_mode & 0xF;
 	if(emu_mode == EMU_PSX)
 	{
 		num_tracks = args->num_tracks;
 		tracks = &args->tracks[0];
+
+		if(num_tracks > 100)
+		{
+			CD_SECTOR_SIZE_2352 = (num_tracks & 0xffff00)>>4;
+			if(CD_SECTOR_SIZE_2352 != 2352 && CD_SECTOR_SIZE_2352 != 2048 && CD_SECTOR_SIZE_2352 != 2336 && CD_SECTOR_SIZE_2352 != 2448) CD_SECTOR_SIZE_2352 = 2352;
+			num_tracks &= 0xff;
+		}
+
+		if(CD_SECTOR_SIZE_2352 != 2352) cd_sector_size_param = CD_SECTOR_SIZE_2352<<4;
+
 		is_cd2352 = 1;
 	}
 	else
@@ -2084,14 +2100,13 @@ static void netiso_thread(uint64_t arg)
 		is_cd2352 = 0;
 	}
 
+    sys_memory_free((sys_addr_t)args);
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
 
 	if(real_disctype != 0)
 	{
 		fake_eject_event(BDVD_DRIVE);
 	}
-
-	CD_SECTOR_SIZE_2352 = 2352;
 
 	uint64_t original_discsize=discsize;
 
@@ -2100,30 +2115,8 @@ static void netiso_thread(uint64_t arg)
 		discsize = discsize - (discsize % CD_SECTOR_SIZE_2352);
 	}
 
-	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, num_tracks, tracks);
+	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, (num_tracks | cd_sector_size_param), tracks);
 	//DPRINTF("mount = %x\n", ret);
-
-    u8 retry = 0;
-
-retry_psx:
-
-	if(retry > 0)
-	{
-		if(retry == 1) CD_SECTOR_SIZE_2352 = 2048;
-		if(retry == 2) CD_SECTOR_SIZE_2352 = 2448;
-		if(retry == 3) CD_SECTOR_SIZE_2352 = 2336;
-
-		discsize = original_discsize;
-
-		if(discsize % CD_SECTOR_SIZE_2352)
-		{
-			discsize = discsize - (discsize % CD_SECTOR_SIZE_2352);
-		}
-
-		if(retry == 1) {ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, (num_tracks | 0x8000), tracks);}
-		if(retry == 2) {ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, (num_tracks | 0x9900), tracks);}
-		if(retry == 3) {ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue, emu_mode, discsize, _256KB_, (num_tracks | 0x9200), tracks);}
-	}
 
 	fake_insert_event(BDVD_DRIVE, real_disctype);
 
@@ -2186,14 +2179,6 @@ retry_psx:
 	if(real_disctype != 0)
 	{
 		fake_insert_event(BDVD_DRIVE, real_disctype);
-	}
-
-	if(emu_mode == EMU_PSX && retry < 3)
-	{
-		retry++;
-
-		sys_timer_usleep(500000);
-		if(!isDir("/dev_bdvd")) goto retry_psx;
 	}
 
 	if(cd_cache)
@@ -2526,14 +2511,15 @@ static void rawseciso_thread(uint64_t arg)
 	int ret;
 	ScsiTrackDescriptor *tracks;
 	int emu_mode, num_tracks;
+	int cd_sector_size_param = 0;
+
+	CD_SECTOR_SIZE_2352 = 2352;
 
 	args = (rawseciso_args *)(uint32_t)arg;
 
 	num_sections = args->num_sections;
 	sections = (uint32_t *)(args+1);
 	sections_size = sections + num_sections;
-
-	CD_SECTOR_SIZE_2352 = 2352;
 
 	sector_size = 0x200;
 	if(args->device!=0)
@@ -2558,6 +2544,17 @@ static void rawseciso_thread(uint64_t arg)
 	if(emu_mode == EMU_PSX)
 	{
 		num_tracks = args->num_tracks;
+
+        if(num_tracks > 100)
+        {
+            CD_SECTOR_SIZE_2352 = (num_tracks & 0xffff00)>>4;
+            if(CD_SECTOR_SIZE_2352 != 2352 && CD_SECTOR_SIZE_2352 != 2048 && CD_SECTOR_SIZE_2352 != 2336 && CD_SECTOR_SIZE_2352 != 2448) CD_SECTOR_SIZE_2352 = 2352;
+        }
+
+        if(CD_SECTOR_SIZE_2352 != 2352) cd_sector_size_param = CD_SECTOR_SIZE_2352<<4;
+
+		num_tracks &= 0xff;
+
 		tracks = (ScsiTrackDescriptor *)(sections_size + num_sections);
 		is_cd2352 = 1;
 	}
@@ -2605,8 +2602,6 @@ static void rawseciso_thread(uint64_t arg)
 		fake_eject_event(BDVD_DRIVE);
 	}
 
-    uint64_t original_discsize=discsize;
-
 	if(is_cd2352)
 	{
 		if(discsize % CD_SECTOR_SIZE_2352)
@@ -2615,30 +2610,9 @@ static void rawseciso_thread(uint64_t arg)
 		}
 	}
 
-	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue_ntfs, emu_mode, discsize, _256KB_, num_tracks, tracks);
+	ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue_ntfs, emu_mode, discsize, _256KB_, (num_tracks | cd_sector_size_param), tracks);
 	//DPRINTF("mount = %x\n", ret);
 
-    u8 retry = 0;
-
-retry_psx:
-
-	if(retry > 0)
-	{
-		if(retry == 1) CD_SECTOR_SIZE_2352 = 2048;
-		if(retry == 2) CD_SECTOR_SIZE_2352 = 2448;
-		if(retry == 3) CD_SECTOR_SIZE_2352 = 2336;
-
-		discsize = original_discsize;
-
-		if(discsize % CD_SECTOR_SIZE_2352)
-		{
-			discsize = discsize - (discsize % CD_SECTOR_SIZE_2352);
-		}
-
-		if(retry == 1) {ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue_ntfs, emu_mode, discsize, _256KB_, (num_tracks | 0x8000), tracks);}
-		if(retry == 2) {ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue_ntfs, emu_mode, discsize, _256KB_, (num_tracks | 0x9900), tracks);}
-		if(retry == 3) {ret = sys_storage_ext_mount_discfile_proxy(result_port, command_queue_ntfs, emu_mode, discsize, _256KB_, (num_tracks | 0x9200), tracks);}
-	}
 
 	fake_insert_event(BDVD_DRIVE, real_disctype);
 
@@ -2648,6 +2622,7 @@ retry_psx:
 		// Queue destroyed in stop thread sys_event_queue_destroy(command_queue_ntfs);
 		sys_event_port_destroy(result_port);
 		sys_storage_close(handle);
+
 		sys_memory_free((sys_addr_t)args);
 		sys_ppu_thread_exit(0);
 	}
@@ -2712,16 +2687,6 @@ retry_psx:
 		sys_memory_free((sys_addr_t)cd_cache);
 	}
 
-	if(emu_mode == EMU_PSX && retry < 3)
-	{
-		retry++;
-
-		sys_timer_usleep(500000);
-		if(!isDir("/dev_bdvd")) goto retry_psx;
-	}
-
-	sys_memory_free((sys_addr_t)args);
-
 	sys_storage_close(handle);
 
 	sys_event_port_disconnect(result_port);
@@ -2734,6 +2699,8 @@ retry_psx:
 
 	//DPRINTF("Exiting main thread!\n");
 	rawseciso_loaded = 0;
+
+	sys_memory_free((sys_addr_t)args);
 	sys_ppu_thread_exit(0);
 }
 #endif //#ifdef COBRA_ONLY
@@ -3226,6 +3193,13 @@ static void get_idps_psid()
 			PSID[0] = peekq(0x8000000000474F34ULL  );
 			PSID[1] = peekq(0x8000000000474F34ULL+8);
 	}
+	else if(c_firmware==4.70f && !dex_mode)
+	{
+			IDPS[0] = peekq(0x8000000000474AF4ULL  );
+			IDPS[1] = peekq(0x8000000000474AF4ULL+8);
+			PSID[0] = peekq(0x8000000000474B0CULL  );
+			PSID[1] = peekq(0x8000000000474B0CULL+8);
+	}
 }
 
 #ifndef COBRA_ONLY
@@ -3343,6 +3317,7 @@ static void detect_firmware()
 
 	dex_mode=0;
 
+	if(peekq(0x80000000002ED778ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_470;  c_firmware=4.70f;}				else
 	if(peekq(0x80000000002ED860ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_465;  c_firmware=(peekq(0x80000000002FC938ULL)==0x323031342F31312FULL)?4.66f:4.65f;} else
 	if(peekq(0x800000000030F1A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_465D; c_firmware=(peekq(0x800000000031EBA8ULL)==0x323031342F31312FULL)?4.66f:4.65f; dex_mode=2;}	else
 	if(peekq(0x80000000002ED850ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_460;  c_firmware=4.60f;}				else
@@ -3386,7 +3361,8 @@ static void detect_firmware()
 		if(c_firmware==4.55f) {base_addr=0x2D7660; open_hook=0x29F748;} else
 		if(c_firmware==4.60f) {base_addr=0x2D88D0; open_hook=0x2A02BC;} else
 		if(c_firmware==4.65f) {base_addr=0x2D88E0; open_hook=0x2A02C8;} else
-		if(c_firmware==4.66f) {base_addr=0x2D88E0; open_hook=0x2A02C8;}
+		if(c_firmware==4.66f) {base_addr=0x2D88E0; open_hook=0x2A02C8;} else
+		if(c_firmware==4.70f) {base_addr=0x2D8A70; open_hook=0x2975C0;}
 	}
 	else
 	{   // DEX
@@ -3408,9 +3384,9 @@ static void detect_firmware()
 
 	if(!dex_mode)
 	{
-		if(c_firmware>=4.55f && c_firmware<=4.66f)
+		if(c_firmware>=4.55f && c_firmware<=4.70f)
 		{
-			get_fan_policy_offset=0x8000000000009E38ULL; // sys 409 get_fan_policy  4.55/4.60/4.65
+			get_fan_policy_offset=0x8000000000009E38ULL; // sys 409 get_fan_policy  4.55/4.60/4.65/4.70
 			set_fan_policy_offset=0x800000000000A334ULL; // sys 389 set_fan_policy
 		}
 		else if(c_firmware>=4.21f && c_firmware<=4.53f)
@@ -3432,7 +3408,7 @@ static void detect_firmware()
 #endif
 	}
 	else // DEX
-	if(c_firmware>=4.55f && c_firmware<=4.66f)
+	if(c_firmware>=4.55f && c_firmware<=4.70f)
 	{
 			get_fan_policy_offset=0x8000000000009EB8ULL; // sys 409 get_fan_policy  4.55/4.60/4.65
 			set_fan_policy_offset=0x800000000000A3B4ULL; // sys 389 set_fan_policy
@@ -3908,7 +3884,7 @@ static bool fix_param_sfo(unsigned char *mem, char *titleID, u8 msg)
 			char version[8];
 			strncpy(version, (char *) &mem[pos], 7);
 			int fw_ver=10000*((version[1] & 0xFF)-'0') + 1000*((version[3] & 0xFF)-'0') + 100*((version[4] & 0xFF)-'0');
-			if((fw_ver>(int)(c_firmware*10000.0f)) && c_firmware>=4.20f && c_firmware<4.66f)
+			if((fw_ver>(int)(c_firmware*10000.0f)) && c_firmware>=4.20f && c_firmware<4.70f)
 			{
 				if(msg) {char text[64]; sprintf(text, "WARNING: Game requires firmware version %i.%i", (fw_ver/10000), (fw_ver-10000*(fw_ver/10000))/100); show_msg((char*)text);}
 
@@ -3971,7 +3947,11 @@ static void fix_game(char *path)
 
 				if(cellFsOpen(filename, CELL_FS_O_RDWR, &fdw, NULL, 0)==CELL_FS_SUCCEEDED)
 				{
-					offset=!extcasecmp(dir.d_name, ".sprx", 5)?0x258:0x428;
+					cellFsLseek(fdw, 0xC, CELL_FS_SEEK_SET, &msiz);
+					cellFsRead(fdw, (void *)&ps3_sys_version, 4, &msiz);
+
+					offset=ps3_sys_version[0]<<32 + ps3_sys_version[1]<<16 + ps3_sys_version[2]<<8 + ps3_sys_version[3];
+					offset-=0x78; if(offset < 0x90 || offset > 0x800) offset=!extcasecmp(dir.d_name, ".sprx", 5)?0x258:0x428;
 
 					cellFsLseek(fdw, offset, CELL_FS_SEEK_SET, &msiz);
 					cellFsRead(fdw, (void *)&ps3_sys_version, 8, &msiz);
@@ -4092,9 +4072,12 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 					{
 						if(t==0) fix_eboot=false;
 
-						lba*=0x800ULL; offset=(t>2)?0x258:0x428;
+						lba*=0x800ULL;
 						cellFsLseek(fd, lba, CELL_FS_SEEK_SET, &msiz2);
 						cellFsRead(fd, (void *)&chunk, chunk_size, &msiz1); if(msiz1<=0) break;
+
+    					offset=chunk[0xC]<<32 + chunk[0xD]<<16 + chunk[0xE]<<8 + chunk[0xF];
+	    				offset-=0x78; if(offset < 0x90 || offset > 0x800) offset=(t>2)?0x258:0x428;
 
 						for(u8 i=0;i<8;i++) ps3_sys_version[i]=chunk[offset+i];
 
@@ -4809,11 +4792,13 @@ static void add_xmb_entry(char *param, char *tempstr, char *templn, char *skey, 
 
 static void prepare_header(char *header, char *param, u8 is_binary)
 {
+	bool set_base_path = false;
+
 	strcpy(header, "HTTP/1.1 200 OK\r\nContent-Type: \0");
 	if(is_binary==1)
 	{
 		if(!extcasecmp(param, ".htm", 4) || !extcasecmp(param, ".html", 5) || strcasestr(param, ".shtm"))
-			strcat(header, "text/html");
+			{strcat(header, "text/html"); set_base_path = true;}
 		else
 		if(!extcasecmp(param, ".jpg", 4) || !extcasecmp(param, ".jpeg", 5) || !extcmp(param, ".STH", 4))
 			strcat(header, "image/jpeg");
@@ -4883,7 +4868,9 @@ static void prepare_header(char *header, char *param, u8 is_binary)
 			strcat(header, "application/octet-stream");
 	}
 	else
-		strcat(header, "text/html");
+		{strcat(header, "text/html"); set_base_path = true;}
+
+	if(set_base_path && param[0]=='/') {strncpy(html_base_path, param, MAX_PATH_LEN); html_base_path[MAX_PATH_LEN]=0; html_base_path[strrchr(html_base_path, '/')-html_base_path]=0;}
 
 	strcat(header, "\r\n");
 }
@@ -4988,8 +4975,8 @@ static void handleclient(u64 conn_s_p)
 			{   // cobra spoofer not working on 4.53 & 4.65
     			if((c_firmware!=4.53f && c_firmware<4.65f))
 				{
-					cobra_config->spoof_version=0x0466;
-					cobra_config->spoof_revision=64645;
+					cobra_config->spoof_version=0x0470;
+					cobra_config->spoof_revision=64978;
 				}
 			}
 
@@ -5025,6 +5012,12 @@ static void handleclient(u64 conn_s_p)
 				{
 					pokeq(0x8000000000474F34ULL  , newPSID[0]);
 					pokeq(0x8000000000474F34ULL+8, newPSID[1]);
+				}
+				else
+				if(c_firmware==4.55f && dex_mode)
+				{
+					pokeq(0x8000000000474B0CULL  , newPSID[0]);
+					pokeq(0x8000000000474B0CULL+8, newPSID[1]);
 				}
 				else if(c_firmware<=4.53f)
 				{
@@ -5075,6 +5068,13 @@ static void handleclient(u64 conn_s_p)
 					pokeq(0x80000000003E2BB0ULL+8, newIDPS[1]);
 					pokeq(0x8000000000474F1CULL  , newIDPS[0]);
 					pokeq(0x8000000000474F1CULL+8, newIDPS[1]);
+				}
+				else if(c_firmware==4.70f && !dex_mode)
+				{
+					pokeq(0x80000000003E2DB0ULL  , newIDPS[0]);
+					pokeq(0x80000000003E2DB0ULL+8, newIDPS[1]);
+					pokeq(0x8000000000474AF4ULL  , newIDPS[0]);
+					pokeq(0x8000000000474AF4ULL+8, newIDPS[1]);
 				}
 				else if(c_firmware<=4.53f)
 				{
@@ -6039,6 +6039,7 @@ restart:
 			{
 mobile_response:
 				mobile_mode = false;
+
 				if(cellFsStat((char*)MOBILE_HTML, &buf)!=CELL_FS_SUCCEEDED)
 					sprintf(param, "/index.ps3%s", param+10);
 				else if(strstr(param, "?g="))
@@ -6116,8 +6117,11 @@ mobile_response:
 				is_binary=0;
 			else
 			{
-				is_binary=1;
-				if(cellFsStat(param, &buf)==CELL_FS_SUCCEEDED)
+				is_binary=(cellFsStat(param, &buf)==CELL_FS_SUCCEEDED);
+
+				if(!is_binary) {strcpy(header, param);  sprintf(param, "%s/%s", html_base_path, header); is_binary=(cellFsStat(param, &buf)==CELL_FS_SUCCEEDED);} // use html path (if path is omitted)
+
+				if(is_binary)
 				{
 					c_len=buf.st_size;
 					if((buf.st_mode & S_IFDIR) != 0) is_binary=2;
@@ -6516,14 +6520,29 @@ html_response:
 				if(is_cpursx) strcat(buffer, "<meta http-equiv=\"refresh\" content=\"6;URL=/cpursx.ps3\">");
 				strcat(buffer,	"<head><title>webMAN MOD</title>"
 								"<style type=\"text/css\"><!--\r\n"
-								"a:visited{color:#909090;text-decoration:none;}"
-								"a:active{color:#F0F0F0;text-decoration:none;}a:hover{color:#C0C0C0;}"
-								"a:link{color:#909090;text-decoration:none;}a:link:hover{color:#FFFFFF;}"
-								"a.f:visited{color:#E0E0E0;text-decoration:none;}a.f:hover{color:#F0F0F0;}"
-								"a.f:active{color:#F8F8F8;text-decoration:none;}a.f:link:hover{color:#FFFFFF;}"
-								"a.f:link{color:#D0D0D0;text-decoration:none;}"
-								"a.d:link{color:#D0D0D0;text-decoration:none;background-position:0px 2px;background-image:url('data:image/gif;base64,R0lGODlhEAAMAIMAAOenIumzLbmOWOuxN++9Me+1Pe+9QvDAUtWxaffKXvPOcfTWc/fWe/fWhPfckgAAACH5BAMAAA8ALAAAAAAQAAwAAARQMI1Agzk4n5Sa+84CVNUwHAz4KWzLMo3SzDStOkrHMO8O2zmXsAXD5DjIJEdxyRie0KfzYChYr1jpYVAweb/cwrMbAJjP54AXwRa433A2IgIAOw==');padding:0 0 0 20px;background-repeat:no-repeat;margin-left:auto;margin-right: auto;}a.d:link:hover{color:#FFFFFF;}a.d:visited{color:#D0D0D0;}"
-								"a.w:link{color:#D0D0D0;text-decoration:none;background-image:url('data:image/gif;base64,R0lGODlhDgAQAIMAAAAAAOfn5+/v7/f39////////////////////////////////////////////wAAACH5BAMAAA8ALAAAAAAOABAAAAQx8D0xqh0iSHl70FxnfaDohWYloOk6papEwa5g37gt5/zO475fJvgDCW8gknIpWToDEQA7');padding:0 0 0 20px;background-repeat:no-repeat; margin-left:auto; margin-right:auto;}a.w:link:hover{color:#FFFFFF;}a.w:visited{color:#D0D0D0;}"
+
+								"a:active{color:#F0F0F0;}"
+								"a:hover{color:#C0C0C0;}"
+								"a:visited{color:#909090;}"
+
+								"a:link{color:#909090;text-decoration:none;}"
+								"a:link:hover{color:#FFFFFF;}"
+
+								"a.f:active{color:#F8F8F8;}"
+								"a.f:visited{color:#E0E0E0;}"
+								"a.f:hover{color:#F0F0F0;}"
+
+								"a.f:link{color:#D0D0D0;}"
+								"a.f:link:hover{color:#FFFFFF;}"
+
+								"a.d:link{color:#D0D0D0;background-position:0px 2px;background-image:url('data:image/gif;base64,R0lGODlhEAAMAIMAAOenIumzLbmOWOuxN++9Me+1Pe+9QvDAUtWxaffKXvPOcfTWc/fWe/fWhPfckgAAACH5BAMAAA8ALAAAAAAQAAwAAARQMI1Agzk4n5Sa+84CVNUwHAz4KWzLMo3SzDStOkrHMO8O2zmXsAXD5DjIJEdxyRie0KfzYChYr1jpYVAweb/cwrMbAJjP54AXwRa433A2IgIAOw==');padding:0 0 0 20px;background-repeat:no-repeat;margin-left:auto;margin-right: auto;}"
+								"a.d:link:hover{color:#FFFFFF;}"
+								"a.d:visited{color:#D0D0D0;}"
+
+								"a.w:link{color:#D0D0D0;background-image:url('data:image/gif;base64,R0lGODlhDgAQAIMAAAAAAOfn5+/v7/f39////////////////////////////////////////////wAAACH5BAMAAA8ALAAAAAAOABAAAAQx8D0xqh0iSHl70FxnfaDohWYloOk6papEwa5g37gt5/zO475fJvgDCW8gknIpWToDEQA7');padding:0 0 0 20px;background-repeat:no-repeat; margin-left:auto; margin-right:auto;}"
+								"a.w:link:hover{color:#FFFFFF;}"
+								"a.w:visited{color:#D0D0D0;}"
+
 								"body,a.s,td,th{color:#F0F0F0;white-space:nowrap}"
 								".list{display:inline;}"
 								"input:focus{border:2px solid #0099FF;}"
@@ -7462,7 +7481,7 @@ bgm_status:
 #endif
 
 #ifdef FIX_GAME
-						if(c_firmware>=4.20f && c_firmware<4.66f)
+						if(c_firmware>=4.20f && c_firmware<4.70f)
 						{
 							add_check_box("nf", "3", STR_FIXGAME,  " : <select name=\"fm\">", (webman_config->fixgame==FIX_GAME_DISABLED), buffer);
 							add_option_item("0", "Auto"  , (webman_config->fixgame==FIX_GAME_AUTO) , buffer);
@@ -7638,7 +7657,7 @@ bgm_status:
 						add_check_box("pr1", "1", STR_RBGNORM, 	" : <b>L3+L2+O</b><br>"            , !(webman_config->combo2 & NORMAMODE), buffer);
 						add_check_box("pr2", "1", STR_RBGMENU, 	" : <b>L3+L2+X</b><br>"            , !(webman_config->combo2 & DEBUGMENU), buffer);
 
-						if(is_rebug && (c_firmware==4.65f || c_firmware==4.66f))
+						if(is_rebug && (c_firmware>=4.65f))
 						add_check_box("p2c", "1", "PS2 CLASSIC",  " : <b>SELECT+L2+&#8710;</b><br>", !(webman_config->combo2 & PS2TOGGLE), buffer);
 #endif
 
@@ -8542,9 +8561,12 @@ bgm_status:
 						else
 							strcat(buffer, " <br>");
 
-						while(loading_games && working) sys_timer_usleep(20000);
+						c_len = 0; while(loading_games && working && c_len < 500) {sys_timer_usleep(200000); c_len++;}
 
 						u32 buf_len=strlen(buffer);
+
+						if(c_len >= 500) {strcat(buffer, "503 Server is busy"); goto send_response;}
+
 /*
 						CellRtcTick pTick, pTick2;
 						cellRtcGetCurrentTick(&pTick);
@@ -10388,7 +10410,7 @@ static void poll_thread(uint64_t poll)
 						if( !(webman_config->combo2 & PS2TOGGLE)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_L2)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE) // SELECT+L2+TRIANGLE
-							&& is_rebug && (c_firmware==4.65f || c_firmware==4.66f) )
+							&& is_rebug && (c_firmware>=4.65f) )
 						{
 							if(cellFsStat((char*)PS2_CLASSIC_TOGGLER, &s)==CELL_FS_SUCCEEDED)
 							{
@@ -10409,7 +10431,7 @@ static void poll_thread(uint64_t poll)
 						if( !(webman_config->combo2 & PS2SWITCH)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_L2) // Clone ps2emu habib's switcher
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2) // SELECT+L2+R2
-							&& (c_firmware==4.53f || c_firmware==4.55f || c_firmware==4.60f || c_firmware==4.65f || c_firmware==4.66f) )
+							&& (c_firmware>=4.53f) )
 						{
 								enable_dev_blind((char*)"Swapping ps2emu activated!");
  #ifdef REX_ONLY
@@ -10495,7 +10517,7 @@ static void poll_thread(uint64_t poll)
 								{
 									show_msg((char*)"Restoring original ps2emu...");
 
-									if(c_firmware==4.65f || c_firmware==4.66f)
+									if(c_firmware>=4.65f)
 									{
 										cellFsRename(PS2_EMU_PATH "ps2_netemu.self", PS2_EMU_PATH "ps2_netemu.self.swap");
 										cellFsRename(PS2_EMU_PATH "ps2_netemu.tmp" , PS2_EMU_PATH "ps2_netemu.self");
@@ -12059,7 +12081,7 @@ relisten:
 		while(working)
 		{
 			sys_timer_usleep(10000);
-			while(loading_html>2 && working)
+			while(loading_html>3 && working)
 			{
 #ifdef USE_DEBUG
 	sprintf(debug, "THREADS: %i\r\n", loading_html);
@@ -12607,6 +12629,31 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			sc_142=0x306488; //0x363A18 + 142*8 = 00363E88 -> 80 00 00 00 00 30 64 88
 #endif
 		}
+		else
+		if(c_firmware==4.70f)
+		{
+			pokeq(0x80000000002670D8ULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E80002038600000ULL
+			pokeq(0x80000000002670E0ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x7C6307B44E800020ULL
+			pokeq(0x8000000000056588ULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
+			pokeq(0x800000000005664CULL, 0x3FE080013BE00000ULL ); // fix 8001003E error  Original: 0x3FE0800163FF003EULL
+
+			pokeq(0x80000000000565F8ULL, 0x419E00D860000000ULL ); // Original: 0x419E00D8419D00C0ULL
+			pokeq(0x8000000000056600ULL, 0x2F84000448000098ULL ); // Original: 0x2F840004409C0048ULL //PATCH_JUMP
+			pokeq(0x800000000005A6DCULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
+			pokeq(0x800000000005A6F0ULL, 0x2F83000060000000ULL ); // fix 80010009 error  Original: 0x2F830000419E00ACULL
+
+			pokeq(0x800000000005622CULL, 0x386000012F830000ULL ); // ignore LIC.DAT check
+			pokeq(0x80000000002275ECULL, 0x38600000F8690000ULL ); // fix 0x8001002B / 80010017 errors (2015-01-03)
+
+			pokeq(0x8000000000055C58ULL, 0xF821FE917C0802A6ULL ); // just restore the original
+			pokeq(0x8000000000058E18ULL, 0x419E0038E8610098ULL ); // just restore the original
+
+#ifndef COBRA_ONLY
+			sc_600=0x33FE88;
+			sc_604=0x33FFF0;
+			sc_142=0x306618;
+#endif
+		}
 	}
 	else
 	{ //DEX
@@ -12969,7 +13016,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			show_msg(temp);
 
 #ifdef REX_ONLY
-			if(is_rebug && (c_firmware==4.65f || c_firmware==4.66f))
+			if(is_rebug && (c_firmware>=4.65f))
 			{   // Auto create "classic_ps2 flag" for PS2 Classic (.BIN.ENC) on rebug 4.65.2
 				do_umount(false);
 				enable_classic_ps2_mode();
@@ -13012,7 +13059,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	}
 
 #ifdef REX_ONLY
-		if(is_rebug && (c_firmware==4.65f || c_firmware==4.66f) && strstr(_path, "/PS2ISO/")!=NULL)
+		if(is_rebug && (c_firmware>=4.65f) && strstr(_path, "/PS2ISO/")!=NULL)
 		{   // Auto remove "classic_ps2" flag for PS2 ISOs on rebug 4.65.2
 			disable_classic_ps2_mode();
 		}
@@ -13189,6 +13236,27 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 						tracks[0].is_audio = 0;
 						mynet_iso->emu_mode=EMU_PSX;
 						mynet_iso->num_tracks=1;
+
+						int ns, abort_connection;
+
+						//detect sector size
+						if(strstr(_path, "[2048]")) mynet_iso->num_tracks|=0x8000; else
+						if(strstr(_path, "[2448]")) mynet_iso->num_tracks|=0x9900; else
+						if(strstr(_path, "[2336]")) mynet_iso->num_tracks|=0x9200; else
+						{
+							ns=connect_to_remote_server(_path[4]-'0');
+							if(ns>=0 && open_remote_file_2(ns, (char*)_path+5, &abort_connection)>0 && !abort_connection)
+							{
+								int fdw, bytes_read, boff=0; char buffer[0x10];
+								bytes_read = read_remote_file(ns, (char*)buffer, 0x9320LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x9300; else {
+								bytes_read = read_remote_file(ns, (char*)buffer, 0x8020LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x8000; else {
+								bytes_read = read_remote_file(ns, (char*)buffer, 0x9920LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x9900; else {
+								bytes_read = read_remote_file(ns, (char*)buffer, 0x9220LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x9200; }}}
+
+								open_remote_file_2(ns, (char*)"/CLOSEFILE", &abort_connection);
+							}
+						}
+
 						memcpy(mynet_iso->tracks, tracks, sizeof(TrackDef));
 					}
 					else if(strstr(_path, "/GAMES/") || strstr(_path, "/GAMEZ/"))
@@ -13276,6 +13344,8 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 				}
 				else if(strstr(_path, "/PSPISO/") || strstr(_path, "/ISO/"))
 				{
+					delete_history(false);
+
 					cellFsUnlink((char*)"/dev_hdd0/game/PSPC66820/PIC1.PNG");
 					cobra_unset_psp_umd();
 					int result=cobra_set_psp_umd2(_path, NULL, (char*)"/dev_hdd0/tmp/psp_icon.png", 2);
@@ -13542,7 +13612,7 @@ patch:
 			poke_lv1(HV_START_OFFSET_430 + 0x18, 0x65140cd200000000ULL);
 		}
         else
-		if(c_firmware>=4.55f && c_firmware<=4.66f)
+		if(c_firmware>=4.55f && c_firmware<=4.70f)
 		{
 			poke_lv1(HV_START_OFFSET_460 + 0x00, 0x0000000000000001ULL);
 			poke_lv1(HV_START_OFFSET_460 + 0x08, 0xe0d251b556c59f05ULL);
@@ -13552,7 +13622,7 @@ patch:
 
 		if(do_eject) eject_insert(1, 1);
 
-		if(c_firmware>=4.30f && c_firmware<=4.66f)
+		if(c_firmware>=4.30f && c_firmware<=4.70f)
 		{	// add and enable lv2 peek/poke + lv1 peek/poke
 			pokeq(0x800000000000171CULL + 0x00, 0x7C0802A6F8010010ULL);
 			pokeq(0x800000000000171CULL + 0x08, 0x396000B644000022ULL);
@@ -13827,6 +13897,8 @@ patch:
 		sprintf(expplg, "%s/IEXP0_450.BIN", app_sys);
 	else if(c_firmware==4.60f || c_firmware==4.65f || c_firmware==4.66f)
 		sprintf(expplg, "%s/IEXP0_460.BIN", app_sys);
+	else if(c_firmware==4.70f)
+		sprintf(expplg, "%s/IEXP0_470.BIN", app_sys);
 	else
         sprintf(expplg, "%s/none", app_sys);
 
@@ -13933,7 +14005,7 @@ exit_mount:
 	}
 
 #ifdef FIX_GAME
-	if(ret && (c_firmware<4.66f) && cellFsOpen("/dev_bdvd/PS3_GAME/PARAM.SFO", CELL_FS_O_RDONLY, &fs, NULL, 0)==CELL_FS_SUCCEEDED)
+	if(ret && (c_firmware<4.70f) && cellFsOpen("/dev_bdvd/PS3_GAME/PARAM.SFO", CELL_FS_O_RDONLY, &fs, NULL, 0)==CELL_FS_SUCCEEDED)
 	{
 		char paramsfo[_4KB_]; unsigned char *mem = (u8*)paramsfo;
 		uint64_t msiz = 0;

@@ -331,6 +331,7 @@ int main()
 
 	sysLv2FsMkdir("/dev_hdd0/xmlhost/game_plugin", 0777);
 	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/mobile.html","/dev_hdd0/xmlhost/game_plugin/mobile.html");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/background.gif","/dev_hdd0/xmlhost/game_plugin/background.gif");
 
 	sysLv2FsMkdir("/dev_hdd0/tmp/wm_icons", 0777);
 

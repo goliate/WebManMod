@@ -836,7 +836,20 @@ next_ntfs_entry:
 									{
 										emu_mode = EMU_PSX;
 										cue=0;
-										int fd;
+										int fd, cd_sector_size; cd_sector_size = 2352;
+
+										// detect sector size
+										fd = ps3ntfs_open(path, O_RDONLY, 0);
+										if(fd >= 0)
+										{
+											char buffer[0x10]; memset(buffer, 0xF, 0);
+											ps3ntfs_seek64(fd, 0x9320LL, SEEK_SET); ps3ntfs_read(fd, (char *)buffer, 0xD); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) cd_sector_size = 2352; else {
+											ps3ntfs_seek64(fd, 0x8020LL, SEEK_SET); ps3ntfs_read(fd, (char *)buffer, 0xD); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) cd_sector_size = 2048; else {
+											ps3ntfs_seek64(fd, 0x9920LL, SEEK_SET); ps3ntfs_read(fd, (char *)buffer, 0xD); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) cd_sector_size = 2448; else {
+											ps3ntfs_seek64(fd, 0x9220LL, SEEK_SET); ps3ntfs_read(fd, (char *)buffer, 0xD); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) cd_sector_size = 2336; }}}
+											ps3ntfs_close(fd);
+										}
+
 										path[strlen(path)-3]='C'; path[strlen(path)-2]='U'; path[strlen(path)-1]='E';
 										fd = ps3ntfs_open(path, O_RDONLY, 0);
 										if(fd<0)
@@ -863,6 +876,8 @@ next_ntfs_entry:
 													cue=1;
 											}
 										}
+
+										if(cd_sector_size != 2352) num_tracks |= cd_sector_size<<4;
 									}
 
 									p_args = (rawseciso_args *)plugin_args; memset(p_args, 0, 0x10000);

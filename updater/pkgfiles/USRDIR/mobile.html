@@ -31,6 +31,8 @@ body {
 	width:100%;
 	min-width:320px;
 	height:100%;
+	background: url("background.gif") fixed center;
+	/*background-size: 100% 100%;*/
 }
 
 #nav {
@@ -75,6 +77,7 @@ body {
 
 #swipeview-slider > div {
 	position:relative;
+	top:50%;
 	display:-webkit-box;
 	-webkit-box-orient:vertical;
 	-webkit-box-pack:center;
@@ -103,7 +106,7 @@ body {
 	padding:20px 0;
 	display:block;
 	background:rgba(0,0,0,0.75);
-	font-size:20px;
+	font-size:24px;
 	text-align:center;
 	text-shadow:0 1px 0 #000;
 	border-top:1px solid rgba(255,255,255,0.2);
@@ -235,6 +238,8 @@ a, a:hover, a:active, a:visited, a:focus {color: white; text-decoration: none; o
 </style>
 <script>
 var isPS3 = (navigator.userAgent.toLowerCase().indexOf('playstation 3') > -1);
+var isFireFox = (navigator.userAgent.toLowerCase().indexOf('firefox') > -1);
+var isMSIE = !isFireFox && (navigator.userAgent.toLowerCase().indexOf('trident') > -1);
 
 (function(){
 var m = Math,
@@ -1372,7 +1377,7 @@ var SwipeView = (function (window, document) {
 				loop: true,
 			};
 
-			if(isPS3)
+			if(isPS3 || isFireFox )
 				percent=Math.ceil(42000 / this.wrapper.clientWidth);
 			else
 				percent=Math.ceil(25000 / this.wrapper.clientWidth);
@@ -1388,6 +1393,7 @@ var SwipeView = (function (window, document) {
 			div = document.createElement('div');
 			div.id = 'swipeview-slider';
 			div.style.cssText = 'position:relative;top:0;height:100%;width:100%;' + cssVendor + 'transition-duration:0;' + cssVendor + 'transform:translateZ(0);' + cssVendor + 'transition-timing-function:ease-out;';
+
 			this.wrapper.appendChild(div);
 			this.slider = div;
 
@@ -1397,7 +1403,9 @@ var SwipeView = (function (window, document) {
 			for (i=0; i<=numberOfImages; i++) {
 				div = document.createElement('div');
 				div.id = 'swipeview-masterpage-' + i;
+
 				div.style.cssText = cssVendor + 'transform:translateZ(0);position:absolute;top:0;height:100%;width:100%;left:' + (i-1)*percent + '%';
+
 				if (!div.dataset) div.dataset = {};
 
 				if(numberOfImages == 2)
@@ -1798,6 +1806,44 @@ var SwipeView = (function (window, document) {
 
 				this.masterPages[this.currentMasterPage].style.zoom='180%';
 			}
+			else if(isMSIE)
+			{
+				var elem;
+
+				for(var i=0; i<numberOfImages; i++)
+					{
+						this.masterPages[i].style.opacity=0.5;
+						this.masterPages[i].style.top='20%';
+
+						elem = document.getElementById('pic' + (this.currentMasterPage - i));
+						if(elem && elem.style.zoom!='60%') {elem.style.zoom='60%'; elem.style.top = '10%';}
+
+						elem = document.getElementById('pic' + (this.currentMasterPage + i));
+						if(elem && elem.style.zoom!='60%') {elem.style.zoom='60%'; elem.style.top = '10%';}
+
+						elem = document.getElementById('span' + (this.currentMasterPage - i));
+						if(elem) elem.style.display = 'none';
+
+						elem = document.getElementById('span' + (this.currentMasterPage + i));
+						if(elem) {elem.style.display = 'none';}
+					}
+
+				this.masterPages[this.currentMasterPage].style.zoom='100%';
+				this.masterPages[this.currentMasterPage].style.top=0;
+
+				{
+					elem = document.getElementById('span' + this.currentMasterPage);
+					if(elem) elem.style.display = '';
+
+					elem = document.getElementById('pic' + this.currentMasterPage);
+					if(elem && elem.style.zoom != '100%') {elem.style.zoom = '100%'; elem.style.top = '20%'; elem.style.zIndex=50000;}
+				}
+			}
+			else if(isFireFox)
+			{
+				for(var i=0; i<numberOfImages; i++)
+					if(this.masterPages[i].style.opacity!=0.25) {this.masterPages[i].style.opacity=0.25; }
+			}
 			else
 			{
 				for(var i=0; i<numberOfImages; i++)
@@ -1862,12 +1908,12 @@ var SwipeView = (function (window, document) {
 </div>
 
 <div id="menu" style="display:none">
-	<div id="header"><a id="nav-close" href="javascript:void(0)" onclick="hideMenu();">webMAN MOD 1.41.21</a></div>
+	<div id="header"><a id="nav-close" href="javascript:void(0)" onclick="hideMenu();">webMAN MOD 1.41.22</a></div>
 	<div id="wrapper-menu">
 		<div id="scroller">
 			<ul id="thelist">
 				<li><a id="nav-menuItem1"  href="javascript:refreshScreen();">&#8635; REFRESH</a></li>
-				<li><a id="nav-menuItem2"  onclick="showWait()" href="/cpursx.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAMAAAAM7l6QAAAAB3RJTUUH3wIUFCsA51hhNwAAAAlwSFlzAAAewgAAHsIBbtB1PgAAAARnQU1BAACxjwv8YQUAAAAVUExURf///8zMzJmZmf///zMzMwAAAGZmZqUuTSIAAAABdFJOUwBA5thmAAAAbklEQVR42uWSOw7AMAhD4/C5/5EDtFkqM7QdOtSKGPLAEonHuCNIz0Qt5F2HmwNRmmEzqfo/POu02F/hr8zF9zT9cLeNKY/rTJOK1etdhCDIrEEZriE7e0ga0xihbCG4nEsKupke1Ckthzlb9kALuw4D9LKqcegAAAAASUVORK5CYII=" border=0 style="position:relative;top:6px"> CPU & RSX TEMPERATURE </a></li>
+				<li><a id="nav-menuItem2"  onclick="showWait()" href="/cpursx.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAMAAAAM7l6QAAAAB3RJTUUH3wIUFCsA51hhNwAAAAlwSFlzAAAewgAAHsIBbtB1PgAAAARnQU1BAACxjwv8YQUAAAAVUExURf///8zMzJmZmf///zMzMwAAAGZmZqUuTSIAAAABdFJOUwBA5thmAAAAbklEQVR42uWSOw7AMAhD4/C5/5EDtFkqM7QdOtSKGPLAEonHuCNIz0Qt5F2HmwNRmmEzqfo/POu02F/hr8zF9zT9cLeNKY/rTJOK1etdhCDIrEEZriE7e0ga0xihbCG4nEsKupke1Ckthzlb9kALuw4D9LKqcegAAAAASUVORK5CYII=" border=0 style="position:relative;top:6px"> CPU & RSX </a></li>
 				<li><a id="nav-menuItem3"  onclick="showWait()" href="/index.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABoAAAAVCAQAAADyFTaQAAAAB3RJTUUH3wIUFQ4zsbm68QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAARnQU1BAACxjwv8YQUAAAEvSURBVHjaY2RgkJZhOcooxwAH//YzRj18wYAHMDEwMFciawEKOf4PY8ALGMXEOS8ziqIK/n/02+bZYzya5OYxJWIK/1vOdBOXlt/LGBX+M5AI/t8mQxM4IEgHLGhWf2Sc/+87YzqjEJT/7v9MJs7/iYz8KAGB7Lz/n/55Pz7CwCCrzTwFHBz3/rc9vgvk2zBtZeTDpWnJw1jsDpJfzBiDw0//juDyBSOKDIomxnfEBQSK8x5wMPzErkxCnuMBDptwgxcoCRgpyP+fY/gDoqVk2YrgYm8edjP8AjH+f2HkwabpJsNfsFAEQwHc9Qxyvx51Axm//m9mjMTpPAV5xkIUTxdIyKOrQdLEqCMlLCf5fyujJIomKfYuOUkpYUYdHKFHLCArwTLzMzI6kKblfyMAFnRYMZYg+WIAAAAASUVORK5CYII=" border=0 style="position:relative;top:2px;left:5px">&nbsp; MY GAMES </a></li>
 				<li><a id="nav-menuItem4"  onclick="showWait()" href="/setup.ps3"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAMAAADzapwJAAAAB3RJTUUH3wIUFDgN+AZcGAAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAACKUExURf///9be3oyUnEpSWiEhIf///97n5+/v9zlCUqWlpSEpKTk5Qs7W3nN7hNbW3jE5OSkpKSkpMSEhKdbe57W9xsbGzmNrc2trc1paY1JaWoSMlHuEjGtzc2Nra729xu/v7+/3/zlCSpScpVJaY62ttc7O1jExOTExMXuMnLW9vaWtrbXGzjlKUmNjawUgndwAAAABdFJOUwBA5thmAAAA1klEQVR42m2R6xqCIAyGMcEUEaXU1Eo7WWl6/7fXHOgT1X7At/fZgTFCZqvHMSW/NlA6WIClAg6fUp8RIl7M0CdNut6lYG7fKfrUPKNfliFu7jZ9NLpKyz/ppjUtb3b0TXc8FeidL5cziiuDnnWcoBNCxSZEmcQ1qUxqNWXOznFRe8hke+MciCxKrKIEYwIVLws5pea6Yr5TKHLzwK8xM4NTaxxuvner7Gi1RSwhOFkYTC/1mAEPhYgmGAkZ82D+cG8N57QGuNYes3YEe3D/7NJZrZzFeQM6ewy7ZXtahwAAAABJRU5ErkJggg==" border=0 style="position:relative;top:2px;left:5px">&nbsp; SETUP WEBMAN </a></li>
 				<li><a id="nav-menuItem5"  onclick="showWait()" href="/"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAUCAQAAAA9vDUIAAAAB3RJTUUH3wIUFQQptjSrAQAAAAlwSFlzAAALEgAACxIB0t1+/AAAAARnQU1BAACxjwv8YQUAAADlSURBVHjaY2BgWOGi+p8fCdp92mPLgBOwMDDcN7zL8A9J6BBv4YIlVQwn0JVyMOi9V/sE1PCJ/x+a1GWl7BX8GGYzMeTMZUgBauBzwLT4IxBignsaIG0MtxmIBW+BmHER9xEWonUw2Pxh2f9guwjxGr6+YXki8oJ49QyvRJiESVDOwCDIwCROkgYxBqZbG0nR8OkkEz8p6hm+vGBSJEmDFAOT6BtSNMgzMN05RoqG29uYpBgYSdDA+5tJi4GNaOXMDAoMTBcPsBKtgZVBi4Hp3kcuEjTs28NS9evb2z1Epg/jt6YfAP77PxQ5JPzrAAAAAElFTkSuQmCC" border=0 style="position:relative;top:2px;left:5px">&nbsp; FILE MANAGER </a></li>
@@ -1901,7 +1947,7 @@ var SwipeView = (function (window, document) {
 
 <div id="wait-dialog" style="display:none"><center><h2><font color=white>Please wait...</font></h2></center><div>
 
-<script type="text/javascript" src="/dev_hdd0/xmlhost/game_plugin/gamelist.js"></script>
+<script type="text/javascript" src="gamelist.js"></script>
 
 <script type="text/javascript">
 var	gallery,
@@ -1945,8 +1991,8 @@ function hideMenu()
 
 function searchGame()
 {
-	var text=prompt("Search:");
-	if(text) {showWait(); window.open("/games.ps3?" + encodeURI(text), "_self");}
+	var text=prompt("Search:", "");
+	if(text) {showWait(); window.open("http://" + location.host + "/games.ps3?" + encodeURI(text), "_self");}
 }
 
 function keyDownEvent(e)
@@ -1955,7 +2001,7 @@ function keyDownEvent(e)
 
 	if(keyCode==37) gallery.prev(); // Right
 	if(keyCode==39) gallery.next(); // Left
-	if(keyCode==13) {var index = gallery.currentMasterPage - 1; if(index<0) index = slides.length - 1; showWait(); window.open('/mount.ps3'+slides[index].url, '_self');}
+	if(keyCode==13) {var index = gallery.currentMasterPage - 1; if(index<0) index = slides.length - 1; showWait(); window.open('/mount.ps3'+slides[gallery.currentMasterPage-1].url, '_self');}
 	if(keyCode==27) hideMenu();
 	if(keyCode==113) showMenu();   //F2
 	if(keyCode==114) {e.preventDefault(); searchGame();} //F3
@@ -1998,6 +2044,7 @@ function mouseupEvent(e)
 {
 	e = e || window.event;
 	var target = e.target || e.srcElement;
+
 	var index = gallery.currentMasterPage - 1; if(index<0) index = slides.length - 1;
 
 	if((new Date()-md)<120) {showWait(); window.open('/mount.ps3'+slides[index].url, '_self');}
@@ -2048,14 +2095,28 @@ for (i=0; i<slides.length; i++) {
 	el.width = slides[page].width;
 	el.height = slides[page].height;
 	el.onload = function () { this.className = '';}
+	el.style.position = 'relative';
+
+	if(isFireFox)
+	{
+		el.style.top = '25%';
+		el.style.left = (gallery.wrapper.clientWidth - el.width) / 2 + 'px';
+	}
+	else if(isMSIE)
+	{
+		el.style.top = '10%';
+		el.style.left = (gallery.wrapper.clientWidth - el.width) / 2 + 'px';
+	}
 
 	newlink.appendChild(el);
 
 	gallery.masterPages[i].appendChild(newlink);
 
 	el = document.createElement('span');
+	el.id = 'span' + i;
 	el.innerHTML = '<a href="'+slides[page].url+'">'+slides[page].desc+'</a>';
 	if(isPS3) el.style['-webkit-transition-duration'] = '0ms';
+	if(isMSIE) el.style['display'] = 'none';
 
 	gallery.masterPages[i].appendChild(el);
 }
@@ -2090,6 +2151,9 @@ gallery.onMoveIn(function () {
 });
 
 curPage=get("g", 1)-1;
+
+if(isMSIE) gallery.goToPage(curPage+1);
+
 gallery.goToPage(curPage);
 
 updatePage();
