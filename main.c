@@ -120,7 +120,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.24 MOD"						// webMAN version
+#define WM_VERSION			"1.41.25 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -6116,6 +6116,10 @@ mobile_response:
 					strstr(param, "eject.ps3")   ||
 					strstr(param, "insert.ps3"))
 				is_binary=0;
+			else if(param[1]=='n' && param[2]=='e' && param[3]=='t' && (param[3]>='0' && param[4]<='2')) //net0/net1/net2
+			{
+				is_binary=2;
+			}
 			else
 			{
 				is_binary=(cellFsStat(param, &buf)==CELL_FS_SUCCEEDED);
@@ -6129,25 +6133,18 @@ mobile_response:
 				}
 				else
 				{
-					if(param[1]=='n')//net0/net1/net2
-					{
-						is_binary=2;
-					}
-					else
-					{
-						c_len=0;
-						is_binary=0;
-						sprintf(header, "HTTP/1.1 %i OK\r\n"
-										"X-PS3-Info: [%s]\r\n"
-										"Content-Type: text/html\r\n"
-										"Content-Length: %i\r\n\r\n"
-										"<body bgcolor=black text=white><h2>%s</h2></body>",
-										 is_busy ? 503:400, param, is_busy ? 65:62, is_busy ? "503 Server is Busy":"400 Bad Request");
-						ssend(conn_s, header);
-						sclose(&conn_s);
-						loading_html--;
-						sys_ppu_thread_exit(0);
-					}
+					c_len=0;
+					is_binary=0;
+					sprintf(header, "HTTP/1.1 %i OK\r\n"
+									"X-PS3-Info: [%s]\r\n"
+									"Content-Type: text/html\r\n"
+									"Content-Length: %i\r\n\r\n"
+									"<body bgcolor=black text=white><h2>%s</h2></body>",
+									 is_busy ? 503:400, param, is_busy ? 65:62, is_busy ? "503 Server is Busy":"400 Bad Request");
+					ssend(conn_s, header);
+					sclose(&conn_s);
+					loading_html--;
+					sys_ppu_thread_exit(0);
 				}
 			}
 
