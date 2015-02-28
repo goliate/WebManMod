@@ -14000,7 +14000,7 @@ patch:
 exit_mount:
 	if(ret && extcmp(_path, ".BIN.ENC", 8))
 	{
-		if(!isDir("/dev_bdvd")) sys_timer_sleep(2);
+		waitfor("/dev_bdvd", 6);
 		if(!isDir("/dev_bdvd")) ret = false;
 	}
 
@@ -14019,7 +14019,8 @@ exit_mount:
 #endif
 
 	delete_history(false);
-	if(!ret) {char msg[MAX_PATH_LEN]; sprintf(msg, "%s %s", STR_ERROR, _path); show_msg(msg);}
+
+	if(!ret && !isDir("/dev_bdvd")) {char msg[MAX_PATH_LEN]; sprintf(msg, "%s %s", STR_ERROR, _path); show_msg(msg);}
 
 #ifdef COBRA_ONLY
 	{
