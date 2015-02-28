@@ -2101,7 +2101,7 @@ static void netiso_thread(uint64_t arg)
 		is_cd2352 = 0;
 	}
 
-    sys_memory_free((sys_addr_t)args);
+	sys_memory_free((sys_addr_t)args);
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
 
 	if(real_disctype != 0)
