@@ -120,7 +120,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.23 MOD"						// webMAN version
+#define WM_VERSION			"1.41.24 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -1576,6 +1576,7 @@ static void utf8dec(char *dst, char *src)
 	dst[j] = '\0';
 }
 */
+
 static int val(const char *c)
 {
     int previous_result=0, result=0;
@@ -4625,7 +4626,7 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 	else
 		{get_name(templn, data[v3_entry].name, 0);}
 
-	if(is_html) htmlenc(tempstr, templn, true); else if(!(IS_PS3_FOLDER)) utf8enc(tempstr, templn);
+	if(!(IS_PS3_FOLDER)) utf8enc(tempstr, templn);
 
 	if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 	{
@@ -4667,7 +4668,7 @@ static void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn
 	else {sprintf(sf, "%s", STR_GIGABYTE); sz>>=30;}
 
 	urlenc(tempstr, templn); strncpy(templn, tempstr, MAX_LINE_LEN);
-	strcpy(tempstr, name); htmlenc(name,  tempstr, 0);
+	strcpy(tempstr, name);
 
 	flen=strlen(name);
 
@@ -5486,7 +5487,7 @@ next_xml_entry:
 											if(f1==6 && !strstr(entry.d_name+flen, ".ntfs[PSXISO]")) continue;
 										}
 #endif
-										get_name(templn, entry.d_name, 0); utf8enc(tempstr, templn);
+										get_name(templn, entry.d_name, 0);
 									}
 
 									if(f0<NTFS && tempID[0]==0 && strstr(param, "/PS3ISO"))
@@ -8878,12 +8879,14 @@ next_html_entry:
 														if(f0==NTFS)
 														{   //ntfs
 															int flen=strlen(entry.d_name)-13; if(flen<0) continue;
+
 															if(f1==2 && !strstr(entry.d_name+flen, ".ntfs[PS3ISO]")) continue;
 															if(f1==3 && !strstr(entry.d_name+flen, ".ntfs[BD" )) continue;
 															if(f1==4 && !strstr(entry.d_name+flen, ".ntfs[DVDISO]")) continue;
 															if(f1==6 && !strstr(entry.d_name+flen, ".ntfs[PSXISO]")) continue;
 														}
-														htmlenc(tempstr, templn, 1);
+
+														get_name(templn, entry.d_name, 0);
 													}
 #endif
 												}
@@ -8956,7 +8959,7 @@ next_html_entry:
 													while(strlen(templn)>MAX_LINE_LEN);
 												}
 
-												if(!mobile_mode && strlen(tempstr)>MAX_LINE_LEN) continue; //ignore lines too long
+												if(strlen(tempstr)>MAX_LINE_LEN) continue; //ignore lines too long
 
 												strncpy(line_entry[idx].path, tempstr, MAX_LINE_LEN); idx++;
 												tlen+=strlen(tempstr);
