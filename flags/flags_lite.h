@@ -11,7 +11,7 @@
 
 //// FEATURES ////
 #define FIX_GAME		1	// Auto-Fix game
-//#define EXT_GDATA		1	// /extgd.ps3?status /extgd.ps3?enable /extgd.ps3?disable (external gameDATA)
+#define EXT_GDATA		1	// /extgd.ps3?status /extgd.ps3?enable /extgd.ps3?disable (external gameDATA)
 //#define COPY_PS3		1	// /copy.ps3/<path>
 //#define WEB_CHAT		1	// /chat.ps3
 //#define DEBUG_MEM		1	// /dump.ps3 / peek.lv1 / poke.lv1 / find.lv1 / peek.lv2 / poke.lv2 / find.lv2
