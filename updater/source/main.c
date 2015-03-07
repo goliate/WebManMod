@@ -39,12 +39,14 @@ int CopyFile(char* path, char* path2)
 
 	if(ret) goto skip;
 
-	if(!memcmp(path, "/dev_hdd0/", 10) && !memcmp(path2, "/dev_hdd0/", 10))
+	if(strstr(path, "/dev_hdd0/") != NULL && strstr(path2, "/dev_hdd0/") != NULL)
 	{
 		if(strcmp(path, path2)==0) return ret;
 
 		sysLv2FsUnlink(path2);
-		return sysLv2FsLink(path, path2);
+		sysLv2FsLink(path, path2);
+
+		if (sysLv2FsStat(path2, &stat) == 0) return 0;
 	}
 
 	ret = sysLv2FsOpen(path, 0, &fd, S_IRWXU | S_IRWXG | S_IRWXO, NULL, 0);
