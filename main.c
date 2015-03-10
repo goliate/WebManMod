@@ -2847,6 +2847,152 @@ void toggle_video_rec()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef ENGLISH_ONLY
+uint32_t get_system_language(uint8_t *lang)
+{
+	int reg = -1;
+	u32 val_lang = 0; // default english
+	u16 off_string, len_data, len_string;
+	u64 read, pos, off_val_data;
+	CellFsStat stat;
+	char string[256];
+
+	cellFsStat("/dev_flash2/etc/xRegistry.sys", &stat);
+	cellFsOpen("/dev_flash2/etc/xRegistry.sys", CELL_FS_O_RDONLY, &reg, NULL, 0);
+	if(reg == -1)
+	{
+		*lang = 0;
+		return val_lang;
+	}
+
+	u64 entry_name = 0x10000;
+
+	while(true)
+	{
+	/** Data entries **/
+		//unk
+		entry_name += 2;
+
+		//relative entry offset
+		cellFsLseek(reg, entry_name, 0, &pos);
+		cellFsRead(reg, &off_string, 2, &read);
+		entry_name += 2;
+
+		//unk2
+		entry_name += 2;
+
+		//data lenght
+		cellFsLseek(reg, entry_name, 0, &pos);
+		cellFsRead(reg, &len_data, 2, &read);
+		entry_name += 2;
+
+		//data type
+		entry_name += 1;
+
+		//data
+		off_val_data = entry_name;
+		entry_name += len_data;
+
+		//Separator 0x0
+		entry_name += 1;
+
+	/** String Entries **/
+		off_string += 0x10;
+
+		//unk
+		off_string += 2;
+
+		//string length
+		cellFsLseek(reg, off_string, 0, &pos);
+		cellFsRead(reg, &len_string, 2, &read);
+		off_string += 2;
+
+		//string type
+		off_string += 1;
+
+		//string
+		memset(string, 0, sizeof(string));
+		cellFsLseek(reg, off_string, 0, &pos);
+		cellFsRead(reg, string, len_string, &read);
+
+		//Find language
+		if(strcmp(string, "/setting/system/language") == 0)
+		{
+			cellFsLseek(reg, off_val_data, 0, &pos);
+			cellFsRead(reg, &val_lang, 4, &read);
+			break;
+		}
+
+		if(off_string == 0xCCDD || entry_name >= stat.st_size) break;
+	}
+
+	switch(val_lang)
+	{
+		case 0x0:
+			*lang = 4;		//ger;
+			break;
+		case 0x1:
+			lang = 0;		//eng-us
+			break;
+		case 0x2:
+			*lang = 3;		//spa
+			break;
+		case 0x3:
+			*lang = 1;		//fre
+			break;
+		case 0x4:
+			*lang = 2;		//ita
+			break;
+		case 0x5:
+			*lang = 5;		//dut //Olandese
+			break;
+		case 0x6:
+			*lang = 6;		//por-por
+			break;
+		case 0x7:
+			*lang = 7;		//rus
+			break;
+		case 0x8:
+			*lang = 18;		//jap
+			break;
+		case 0x9:
+			*lang = 17;		//kor
+			break;
+		case 0xA:
+			*lang = 19;		//chi-tra
+			break;
+		case 0xB:
+			*lang = 19;		//chi-sim
+			break;
+		case 0xC:
+			*lang = 0;		//fin /** missing **/
+			break;
+		case 0xD:
+			*lang = 0;		//swe /** missing**/
+			break;
+		case 0xE:
+			*lang = 20;		//dan
+			break;
+		case 0xF:
+			*lang = 0;		//nor /** missing**/
+			break;
+		case 0x10:
+			*lang = 9;		//pol
+			break;
+		case 0x11:
+			*lang = 12;		//por-bra
+			break;
+		case 0x12:
+			*lang = 0;		//eng-uk
+			break;
+		default:
+			*lang = 0;
+			break;
+	}
+	cellFsClose(reg);
+
+	return val_lang;
+}
+
 static bool language(const char *file_str, char *default_str)
 {
 	uint64_t siz = 0;
@@ -11299,6 +11445,13 @@ static void poll_thread(uint64_t poll)
 								show_msg((char*)"COBRA is active!\r\nDeactivating COBRA...");
 
 								cellFsRename(SYS_COBRA_PATH "stage2.bin", SYS_COBRA_PATH "stage2_disabled.bin");
+
+								if(cellFsStat((char*)"/dev_blind/vsh/resource/coldboot.raf.normal", &s)==CELL_FS_SUCCEEDED)
+								{
+									cellFsRename("/dev_blind/vsh/resource/coldboot.raf", "/dev_blind/vsh/resource/coldboot.raf.cobra");
+									cellFsRename("/dev_blind/vsh/resource/coldboot.raf.normal", "/dev_blind/vsh/resource/coldboot.raf");
+								}
+
 								reboot=true;
 							}
 							else if(cellFsStat((char*)SYS_COBRA_PATH "stage2_disabled.bin", &s)==CELL_FS_SUCCEEDED)
@@ -11306,6 +11459,13 @@ static void poll_thread(uint64_t poll)
 								show_msg((char*)"COBRA is inactive!\r\nActivating COBRA...");
 
 								cellFsRename(SYS_COBRA_PATH "stage2_disabled.bin", SYS_COBRA_PATH "stage2.bin");
+
+								if(cellFsStat((char*)"/dev_blind/vsh/resource/coldboot.raf.cobra", &s)==CELL_FS_SUCCEEDED)
+								{
+									cellFsRename("/dev_blind/vsh/resource/coldboot.raf", "/dev_blind/vsh/resource/coldboot.raf.normal");
+									cellFsRename("/dev_blind/vsh/resource/coldboot.raf.cobra", "/dev_blind/vsh/resource/coldboot.raf");
+								}
+
 								reboot=true;
 							}
  #endif //#ifdef REX_ONLY
@@ -11661,7 +11821,12 @@ static void reset_settings()
 		if(cellFsStat(upath, &buf)==CELL_FS_SUCCEEDED) {sprintf(webman_config->uaccount, "%08i", acc); break;}
 	}
 
-	webman_config->lang=0; //english
+#ifndef ENGLISH_ONLY
+	get_system_language(&webman_config->lang);
+#else
+	webman_config->lang=0; // english
+#endif
+
 	strcpy(webman_config->autoboot_path, DEFAULT_AUTOBOOT_PATH);
 
     int fdwm=0; cellFsStat(WMCONFIG, &buf);
@@ -13129,6 +13294,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 		else
 		if(c_firmware==4.70f)
 		{
+			//patches by deank
 			pokeq(0x80000000002670D8ULL, 0x4E80002038600000ULL ); // fix 8001003C error  Original: 0x4E8000208003026CULL //0x80000000002898DCULL??
 			pokeq(0x80000000002670E0ULL, 0x7C6307B44E800020ULL ); // fix 8001003C error  Original: 0x3D6000463D201B43ULL //0x80000000002898E4ULL??
 			pokeq(0x8000000000056588ULL, 0x63FF003D60000000ULL ); // fix 8001003D error  Original: 0x63FF003D419EFFD4ULL
