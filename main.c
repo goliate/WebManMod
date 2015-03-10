@@ -188,7 +188,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS3MAPI_SERVER_VERSION						0x0111
 #define PS3MAPI_SERVER_MINVERSION					0x0111
 
-#define PS3MAPI_WEBUI_VERSION						0x0101
+#define PS3MAPI_WEBUI_VERSION						0x0120
 #define PS3MAPI_WEBUI_MINVERSION					0x0100
 
 #define PS3MAPI_CORE_MINVERSION						0x0111
@@ -7944,11 +7944,11 @@ static void ps3mapi_home(char *buffer, char *templn)
 	int syscall8_state = -1;
 	{system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_PCHECK_SYSCALL8); syscall8_state = (int)p1;}
 	int version = 0;
-	if (syscall8_state>0) {system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1);}
+	if (syscall8_state>=0) {system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1);}
 	int versionfw = 0;
-	if (syscall8_state>0) {system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_VERSION); versionfw = (int)(p1);}
+	if (syscall8_state>=0) {system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_VERSION); versionfw = (int)(p1);}
 	char fwtype[32];
-	if (syscall8_state>0) {system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)fwtype);}
+	if (syscall8_state>=0) {system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)fwtype);}
 	//---------------------------------------------
 	//PS3 Commands---------------------------------
 	//---------------------------------------------
@@ -8028,11 +8028,11 @@ static void ps3mapi_home(char *buffer, char *templn)
 							"<tr><td style=\"text-align: left; float: left;\"><u>%s:</u><br><br></td></tr>"
 							"<tr><td style=\"text-align: left; float: left;\">", "CFW syscall 8");
 			strcat(buffer, templn);
-			add_radio_button("mode", syscall8_state<0?"0\" disabled=\"disabled":"0", "sc8_0", "Fully enabled", NULL, (syscall8_state == 0), buffer);
-			add_radio_button("mode", syscall8_state<0?"1\" disabled=\"disabled":"1", "sc8_1", "Partially disabled : Keep only COBRA/MAMBA/PS3MAPI features", NULL, (syscall8_state == 1), buffer);
-			add_radio_button("mode", syscall8_state<0?"2\" disabled=\"disabled":"2", "sc8_2", "Partially disabled : Keep only PS3MAPI features", NULL, (syscall8_state == 2), buffer);
-			add_radio_button("mode", syscall8_state<0?"3\" disabled=\"disabled":"3", "sc8_3", "Fake disabled (can be re-enabled)", NULL, (syscall8_state == 3), buffer);
-			add_radio_button("mode", syscall8_state<0?"4\" disabled=\"disabled":"4", "sc8_4", "Fully disabled (cant be re-enabled)", NULL, (syscall8_state<0), buffer);
+			add_radio_button("mode", "0", "sc8_0", "Fully enabled", NULL, (syscall8_state == 0), buffer);
+			add_radio_button("mode", "1", "sc8_1", "Partially disabled : Keep only COBRA/MAMBA/PS3MAPI features", NULL, (syscall8_state == 1), buffer);
+			add_radio_button("mode", "2", "sc8_2", "Partially disabled : Keep only PS3MAPI features", NULL, (syscall8_state == 2), buffer);
+			add_radio_button("mode", "3", "sc8_3", "Fake disabled (can be re-enabled)", NULL, (syscall8_state == 3), buffer);
+			add_radio_button("mode", "4", "sc8_4", "Fully disabled (cant be re-enabled)", NULL, (syscall8_state<0), buffer);
 
 			sprintf(templn, "</td></tr><tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form>", "Set");
 			strcat(buffer, templn);
@@ -8049,6 +8049,11 @@ static void ps3mapi_home(char *buffer, char *templn)
 								"<td style=\"text-align: left; float: left;\"><u>%s:</u><br><br>" HTML_INPUT("psid1", "%016llX", "16", "18") HTML_INPUT("psid2", "%016llX", "16", "18") "</td></tr>"
 								"<tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form></table><br>",
 								"IDPS", IDPS[0], IDPS[1], "PSID", PSID[0], PSID[1], "Set");
+				strcat(buffer, templn);
+			}
+			else
+			{
+				sprintf(templn, "%s", "</table><br>");
 				strcat(buffer, templn);
 			}
 			//---------------------------------------------
@@ -8078,7 +8083,7 @@ static void ps3mapi_home(char *buffer, char *templn)
 			sprintf(templn, "</select>"
 							"   %s: " HTML_INPUT("addr", "0", "16", "18")
 							"   %s: <input name=\"len\" type=\"number\" value=\"1\" min=\"1\" max=\"2048\">"
-							"   <input type=\"submit\" value=\" %s \"%s/></form><br>", "Address", "Length", "Get", ret_val<0?" disabled=\"disabled\"":"");
+							"   <input type=\"submit\" value=\" %s \"/></form><br>", "Address", "Length", "Get");
 			strcat(buffer, templn);
 
 	strcat(buffer, "Dump: [<a href=\"/dump.ps3?mem\">Full Memory</a>] [<a href=\"/dump.ps3?lv1\">LV1</a>] [<a href=\"/dump.ps3?lv2\">LV2</a>]<p>");
@@ -8103,14 +8108,14 @@ static void ps3mapi_home(char *buffer, char *templn)
 							"   %s: " HTML_INPUT("addr", "0", "16", "18")
 							"<br><br>%s:<br><br><table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\"><tr><td style=\"text-align: left; float: left;\">"
 							"<textarea name=\"val\" cols=\"111\" rows=\"3\" maxlength=\"199\">00</textarea></td></tr>"
-							"<tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"%s/></td></tr></table></form><br>",
-							"Address", "Value", "Set", ret_val<0?" disabled=\"disabled\"":"");
+							"<tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></table></form><br>",
+							"Address", "Value", "Set");
 			strcat(buffer, templn);
 			//---------------------------------------------
 			//VSH Plugin-----------------------------------
 			//---------------------------------------------
 			sprintf(templn, "<b>%s</b><hr color=\"#0099FF\"/><br>"
-							"<table width=\"1000\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
+							"<table border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
 							"<tr><td width=\"75\" style=\"text-align: left; float: left;\">%s</td>"
 							"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
 							"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
@@ -8129,7 +8134,7 @@ static void ps3mapi_home(char *buffer, char *templn)
 					sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
 									"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
 									"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
-									"<td width=\"125\" style=\"text-align: right; float: right;\">"
+									"<td width=\"100\" style=\"text-align: right; float: right;\">"
 									"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
 									"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" value=\" Unload \"/></form></td></tr>",
 									slot, tmp_name, tmp_filename, slot);
@@ -8139,8 +8144,9 @@ static void ps3mapi_home(char *buffer, char *templn)
  				{
 					sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
 									"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
-									"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
-									"<td width=\"125\" style=\"text-align: right; float: right;\"> </td></tr>", slot, "NULL", "EMPTY SLOT");
+									"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
+									HTML_INPUT("prx", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
+									"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" value=\" Load \"/></td></form></tr>", slot, "NULL", slot, slot);
 					strcat(buffer, templn);	
 				} 
 			}
@@ -8614,24 +8620,25 @@ loadvshplug_err_arg:
 		memset(tmp_filename, 0, sizeof(tmp_filename));
 		{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_VSH_PLUGIN_INFO, (u64)slot, (u64)tmp_name, (u64)tmp_filename); }
 		if (strlen(tmp_filename) > 0)
-		{
-			sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
-						"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
-						"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
-						"<td width=\"125\" style=\"text-align: right; float: right;\">"
-						"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
-						"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" value=\" Unload \"/></form></td></tr>",
-						slot, tmp_name, tmp_filename, slot);
-			strcat(buffer, templn);	
-		}
-		else
- 		{
-			sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
-						"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
-						"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
-						"<td width=\"125\" style=\"text-align: right; float: right;\"> </td></tr>", slot, "NULL", "EMPTY SLOT");
-			strcat(buffer, templn);	
-		} 
+			{
+				sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
+								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
+								"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
+								"<td width=\"100\" style=\"text-align: right; float: right;\">"
+								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
+								"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" value=\" Unload \"/></form></td></tr>",
+								slot, tmp_name, tmp_filename, slot);
+				strcat(buffer, templn);	
+			}
+			else
+ 			{
+				sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
+								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
+								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
+								HTML_INPUT("prx", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
+								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" value=\" Load \"/></td></form></tr>", slot, "NULL", slot, slot);
+				strcat(buffer, templn);	
+			} 
 	}
 	sprintf(templn, "%s", "</table><hr color=\"#FF0000\"/>");
 	strcat(buffer, templn);
