@@ -6344,6 +6344,7 @@ static void setup_parse_settings(char *param)
 	if(pos) get_value(webman_config->home_url, pos + 5, 255);
 
 #ifdef COBRA_ONLY
+#ifdef BDVD_REGION
 		//if(cobra_mode)
 		{
 			u8 cconfig[15]; char region[2];
@@ -6369,7 +6370,7 @@ static void setup_parse_settings(char *param)
 
 		}
 #endif
-
+#endif
 }
 
 static void setup_form(char *buffer, char *templn)
@@ -6597,6 +6598,7 @@ static void setup_form(char *buffer, char *templn)
 #endif
 
 #ifdef COBRA_ONLY
+#ifdef BDVD_REGION
 	u8 cconfig[15];
 	CobraConfig *cobra_config = (CobraConfig*) cconfig;
 	memset(cobra_config, 0, 15);
@@ -6618,6 +6620,7 @@ static void setup_form(char *buffer, char *templn)
 	add_option_item("16" , "5"      , (cobra_config->dvd_video_region==16) , buffer);
 	add_option_item("32" , "6"      , (cobra_config->dvd_video_region==32) , buffer);
 	strcat(buffer, "</select>");
+#endif
 #endif
 
 	//combos
@@ -8616,9 +8619,6 @@ static void handleclient(u64 conn_s_p)
 			CobraConfig *cobra_config = (CobraConfig*) cconfig;
 			memset(cobra_config, 0, 15);
 			cobra_read_config(cobra_config);
-
-			cobra_config->bd_video_region=webman_config->noss;
-			cobra_config->dvd_video_region=0x0470;
 
 			if(webman_config->nospoof)
 			{

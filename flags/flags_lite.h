@@ -18,6 +18,7 @@
 //#define VIDEO_REC		1	// /videorec.ps3  start/stop video recording (in-game only)
 #define LOAD_PRX		1	// /loadprx.ps3?slot=n&prx=path/file.sprx  (load prx)
 #define FAKEISO 		1	// support .ntfs[BDFILE] (fake ISO)
+#define BDVD_REGION		1	// change BD/DVD region
 
 //// TEST FEATURES ////
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)
