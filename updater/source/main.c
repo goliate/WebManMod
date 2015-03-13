@@ -338,23 +338,20 @@ int main()
 	sysLv2FsMkdir("/dev_hdd0/tmp/wm_icons", 0777);
 
 	// copy new icons
-	if((sysLv2FsStat("/dev_hdd0/game/IRISMAN01/USRDIR/webftp_server.sprx", &stat) == SUCCESS))
-	{
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_ps3.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_ps3.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_psx.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_psx.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_ps2.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_ps2.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_psp.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_psp.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_dvd.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_dvd.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_ps3.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_ps3.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_psx.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_psx.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_ps2.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_ps2.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_psp.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_psp.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_album_dvd.png", "/dev_hdd0/tmp/wm_icons/icon_wm_album_dvd.png");
 
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_ps3.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_ps3.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_psx.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_psx.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_ps2.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_ps2.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_psp.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_psp.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_dvd.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_dvd.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_ps3.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_ps3.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_psx.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_psx.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_ps2.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_ps2.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_psp.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_psp.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_dvd.png"      , "/dev_hdd0/tmp/wm_icons/icon_wm_dvd.png");
 
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_settings.png" , "/dev_hdd0/tmp/wm_icons/icon_wm_settings.png");
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_eject.png"    , "/dev_hdd0/tmp/wm_icons/icon_wm_eject.png"   );
-	}
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_settings.png" , "/dev_hdd0/tmp/wm_icons/icon_wm_settings.png");
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/icon_wm_eject.png"    , "/dev_hdd0/tmp/wm_icons/icon_wm_eject.png"   );
 
 	// XMBM+ webMAN
 	sysLv2FsMkdir("/dev_hdd0/game/XMBMANPLS", 0777);
