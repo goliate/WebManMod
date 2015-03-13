@@ -10,7 +10,7 @@
 //#define LITE_EDITION	1	// no ps3netsrv support, smaller memory footprint
 
 //// FEATURES ////
-//#define FIX_GAME		1	// Auto-Fix game
+#define FIX_GAME		1	// Auto-Fix game
 #define EXT_GDATA		1	// /extgd.ps3?status /extgd.ps3?enable /extgd.ps3?disable (external gameDATA)
 //#define COPY_PS3		1	// /copy.ps3/<path>
 //#define WEB_CHAT		1	// /chat.ps3
@@ -19,6 +19,8 @@
 //#define LOAD_PRX		1	// /loadprx.ps3?slot=n&prx=path/file.sprx  (load prx)
 #define FAKEISO 		1	// support .ntfs[BDFILE] (fake ISO)
 //#define BDVD_REGION	1	// change BD/DVD region
+//#define REMOVE_SYSCALLS	1	// remove syscalls on startup and using R2+/\
+//#define SPOOF_CONSOLEID	1	// spoof idps/psid
 
 //// TEST FEATURES ////
 //#define PS2_DISC		1	// uncomment to support /mount.ps2 (mount ps2 game folder as /dev_ps2disc)

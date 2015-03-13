@@ -879,7 +879,9 @@ static char STR_PREVGAME[100]		= "PREV GAME";
 static char STR_NEXTGAME[100]		= "NEXT GAME";
 static char STR_SHUTDOWN2[100]		= "SHUTDOWN ";
 static char STR_RESTART2[100]		= "RESTART&nbsp; ";
+#ifdef REMOVE_SYSCALLS
 static char STR_DELCFWSYS2[100] 	= "DEL CFW SYSCALLS";
+#endif
 static char STR_UNLOADWM[100]		= "UNLOAD WM";
 static char STR_FANCTRL2[100]		= "CTRL FAN";
 static char STR_FANCTRL4[100]		= "CTRL DYN FAN";
@@ -989,12 +991,23 @@ static int ssplit(const char* str, char* left, int lmaxlen, char* right, int rma
 static int slisten(int port, int backlog);
 static void sclose(int *socket_e);
 
-static int del(char *path, bool recursive);
-static void  import_edats(char *path1, char *path2);
-static void update_language();
 static void detect_firmware();
+#ifndef ENGLISH_ONLY
+static void update_language();
+#endif
+#ifdef REMOVE_SYSCALLS
 static void remove_cfw_syscalls();
+#endif
+#ifdef SPOOF_CONSOLEID
 static void spoof_idps_psid();
+#endif
+#ifndef LITE_EDITION
+static int del(char *path, bool recursive);
+#endif
+#ifdef COPY_PS3
+static void  import_edats(char *path1, char *path2);
+#endif
+
 static void delete_history(bool delete_folders);
 static bool language(const char *file_str, char *default_str);
 static void block_online_servers();
@@ -1428,6 +1441,7 @@ static int folder_copy(char *path1, char *path2)
 	return CELL_FS_SUCCEEDED;
 }
 
+#ifdef COPY_PS3
 static void import_edats(char *path1, char *path2)
 {
 	int fd; bool from_usb;
@@ -1467,6 +1481,7 @@ static void import_edats(char *path1, char *path2)
 
 	return CELL_FS_SUCCEEDED;
 }
+#endif
 
 static char h2a(char hex)
 {
@@ -3141,7 +3156,9 @@ static void update_language()
 		language("STR_NEXTGAME", STR_NEXTGAME);
 		language("STR_SHUTDOWN2", STR_SHUTDOWN2);
 		language("STR_RESTART2", STR_RESTART2);
+#ifdef REMOVE_SYSCALLS
 		language("STR_DELCFWSYS2", STR_DELCFWSYS2);
+#endif
 		language("STR_UNLOADWM", STR_UNLOADWM);
 		language("STR_FANCTRL2", STR_FANCTRL2);
 		language("STR_FANCTRL4", STR_FANCTRL4);
@@ -3603,6 +3620,7 @@ static void block_online_servers()
 	}
 }
 
+#ifdef SPOOF_CONSOLEID
 static void spoof_idps_psid()
 {
 	if(webman_config->spsid)
@@ -3722,7 +3740,9 @@ static void spoof_idps_psid()
 
 	get_idps_psid();
 }
+#endif
 
+#ifdef REMOVE_SYSCALLS
 static void remove_cfw_syscalls()
 {
 	detect_firmware();
@@ -3773,6 +3793,7 @@ static void remove_cfw_syscalls()
 	{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_PDISABLE_SYSCALL8, 1); }//Partial disable syscall8 (Keep cobra/mamba+ps3mapi features only)
 	#endif
 }
+#endif
 
 static void delete_history(bool delete_folders)
 {
@@ -6389,14 +6410,17 @@ static void setup_parse_settings(char *param)
 	if(strstr(param, "fp=2")) webman_config->foot=2; //MAX
 	if(strstr(param, "fp=3")) webman_config->foot=3; //MIN+
 
-	if(strstr(param, "id1=1"))  webman_config->sidps=1; //spoof IDPS
-	if(strstr(param, "id2=1"))  webman_config->spsid=1; //spoof PSID
-
 	webman_config->spp=0;
 #ifdef COBRA_ONLY
+	#ifdef REMOVE_SYSCALLS
 	if(strstr(param, "spp=1"))  webman_config->spp|=1;  //remove syscalls & history
+	#endif
 	if(strstr(param, "shh=1"))  webman_config->spp|=2;  //remove history only
 #endif
+
+#ifdef SPOOF_CONSOLEID
+	if(strstr(param, "id1=1"))  webman_config->sidps=1; //spoof IDPS
+	if(strstr(param, "id2=1"))  webman_config->spsid=1; //spoof PSID
 
 	pos=strstr(param, "vID1=");
 	if(pos) get_value(webman_config->vIDPS1, pos + 5, 16);
@@ -6409,6 +6433,9 @@ static void setup_parse_settings(char *param)
 
 	pos=strstr(param, "vPS2=");
 	if(pos) get_value(webman_config->vPSID2, pos + 5, 16);
+
+	spoof_idps_psid();
+#endif
 
 	webman_config->lang=0; //English
 
@@ -6644,6 +6671,7 @@ static void setup_form(char *buffer, char *templn)
 	add_radio_button("s", "5",  "s_2", "5 sec",  NULL, (webman_config->boots==5), buffer);
 	add_radio_button("s", "10", "s_3", "10 sec", NULL, (webman_config->boots==10), buffer);
 
+#ifdef SPOOF_CONSOLEID
 	//Change idps and psid in lv2 memory at system startup
 	sprintf(templn, "<hr color=\"#0099FF\"/><u> %s:</u><br>", STR_SPOOFID); strcat(buffer, templn);
 
@@ -6657,6 +6685,9 @@ static void setup_form(char *buffer, char *templn)
 	add_check_box("id2", "1", "PSID", " : ", (webman_config->spsid), buffer);
 	sprintf(templn, HTML_INPUT("vPS1", "%s", "16", "22")       , webman_config->vPSID1); strcat(buffer, templn);
 	sprintf(templn, HTML_INPUT("vPS2", "%s", "16", "22") "<br><br>", webman_config->vPSID2); strcat(buffer, templn);
+#else
+	strcat(buffer, "<hr color=\"#0099FF\"/>");
+#endif
 
 	//Home
 	sprintf(templn, " : " HTML_INPUT("hurl", "%s", "255", "50") "<br>", webman_config->home_url);
@@ -6664,7 +6695,9 @@ static void setup_form(char *buffer, char *templn)
 
 	//Disable lv1&lv2 peek&poke syscalls (6,7,9,10,36) and delete history files at system startup
 #ifdef COBRA_ONLY
+	#ifdef REMOVE_SYSCALLS
 	add_check_box("spp", "1", STR_DELCFWSYS, " ", (webman_config->spp & 1), buffer);
+	#endif
 	add_check_box("shh", "1", "Offline", NULL, (webman_config->spp & 2), buffer);
 #endif
 	strcat(buffer, "<hr color=\"#0099FF\"/>");
@@ -6801,7 +6834,9 @@ static void setup_form(char *buffer, char *templn)
 	add_check_box("puw", "1", STR_UNLOADWM,   " : <b>L3+R2+R3</b><br>"         , !(webman_config->combo & UNLOAD_WM), buffer);
 	add_check_box("pf1", "1", STR_FANCTRL2,   " : <b>SELECT+"                  , !(webman_config->combo & MANUALFAN), buffer); sprintf(templn, "%s</b><br>", STR_UPDN); strcat(buffer, templn);
 	add_check_box("pf2", "1", STR_FANCTRL5,   " : <b>SELECT+"                  , !(webman_config->combo & MINDYNFAN), buffer); sprintf(templn, "%s</b><br>", STR_LFRG); strcat(buffer, templn);
+#ifdef REMOVE_SYSCALLS
 	add_check_box("psc", "1", STR_DELCFWSYS2, " : <b>R2+&#8710;</b><br>"       , !(webman_config->combo & DISABLESH), buffer);
+#endif
 #ifdef COBRA_ONLY
 	add_check_box("pdc", "1", STR_DISCOBRA,   " : <b>L3+L2+&#8710;</b><br>"    , !(webman_config->combo & DISACOBRA), buffer);
 #endif
@@ -8881,9 +8916,12 @@ static void handleclient(u64 conn_s_p)
 		}
 #endif
 
+#ifdef SPOOF_CONSOLEID
 		spoof_idps_psid();
+#endif
 
 #ifdef COBRA_ONLY
+	#ifdef REMOVE_SYSCALLS
 		if(webman_config->spp & 1) //remove syscalls & history
         {
 			sys_timer_sleep(5);
@@ -8892,6 +8930,7 @@ static void handleclient(u64 conn_s_p)
 			delete_history(true);
 		}
 		else
+	#endif
 		if(webman_config->spp & 2) //remove history only
 		{
 			delete_history(false);
@@ -11449,6 +11488,7 @@ static void poll_thread(uint64_t poll)
 						{
 							fix_aborted=copy_aborted=true;
 						}
+#ifdef REMOVE_SYSCALLS
 						else
 						if(!(webman_config->combo & DISABLESH) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE) ) // R2+/\ Disable CFW Sycalls
 						{
@@ -11471,6 +11511,7 @@ static void poll_thread(uint64_t poll)
 								}
 							}
 						}
+#endif
 						else
 						if(!(webman_config->combo2 & BLOCKSVRS) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_SQUARE) ) // R2+SQUARE
 						{
