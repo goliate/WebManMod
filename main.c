@@ -93,7 +93,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.30 MOD"						// webMAN version
+#define WM_VERSION			"1.41.31 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -5340,9 +5340,11 @@ static bool update_mygames_xml(u64 conn_s_p)
 	if(!(webman_config->nogrp))
 	{
 		if(!(webman_config->cmask & PS3)) strcpy(myxml_ps3, "<View id=\"seg_wm_ps3_items\"><Attributes>");
-		if(!(webman_config->cmask & PS2)) {
+		if(!(webman_config->cmask & PS2))
+		{
 			strcpy(myxml_ps2, "<View id=\"seg_wm_ps2_items\"><Attributes>");
-			if(webman_config->ps2l && cellFsStat((char*)"/dev_hdd0/game/PS2U10000", &buf)==CELL_FS_SUCCEEDED) {
+			if(webman_config->ps2l && cellFsStat((char*)"/dev_hdd0/game/PS2U10000", &buf)==CELL_FS_SUCCEEDED)
+			{
 				sprintf(templn, "<Table key=\"ps2_classic_launcher\">"
 								XML_PAIR("icon","/dev_hdd0/game/PS2U10000/ICON0.PNG")
 								XML_PAIR("title","PS2 Classic Launcher")
@@ -5352,9 +5354,11 @@ static bool update_mygames_xml(u64 conn_s_p)
 		}
 #ifdef COBRA_ONLY
 		if(!(webman_config->cmask & PS1)) strcpy(myxml_psx, "<View id=\"seg_wm_psx_items\"><Attributes>");
-		if(!(webman_config->cmask & PSP)) {
+		if(!(webman_config->cmask & PSP))
+		{
 			strcpy(myxml_psp, "<View id=\"seg_wm_psp_items\"><Attributes>");
-			if(webman_config->pspl && cellFsStat((char*)"/dev_hdd0/game/PSPC66820", &buf)==CELL_FS_SUCCEEDED) {
+			if(webman_config->pspl && cellFsStat((char*)"/dev_hdd0/game/PSPC66820", &buf)==CELL_FS_SUCCEEDED)
+			{
 				sprintf(templn, "<Table key=\"cobra_psp_launcher\">"
 								XML_PAIR("icon","/dev_hdd0/game/PSPC66820/ICON0.PNG")
 								XML_PAIR("title","PSP Launcher")
@@ -5362,14 +5366,18 @@ static bool update_mygames_xml(u64 conn_s_p)
 								STR_LAUNCHPSP, "</Table>"); strcat(myxml_psp, templn);
 			}
 		}
-		if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)) strcpy(myxml_dvd, "<View id=\"seg_wm_dvd_items\"><Attributes>");
-
-		if(webman_config->rxvid && (!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)))
+		if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU))
+		{
+			strcpy(myxml_dvd, "<View id=\"seg_wm_dvd_items\"><Attributes>");
+			if(webman_config->rxvid)
+			{
 				sprintf(templn, "<Table key=\"rx_video\">"
 								XML_PAIR("icon","%s")
 								XML_PAIR("title","%s")
 								XML_PAIR("child","segment") "%s",
 								wm_icons[4], STR_VIDLG, STR_NOITEM_PAIR); strcat(myxml_dvd, templn);
+			}
+		}
 #endif
 	}
 
@@ -5725,7 +5733,7 @@ continue_reading_folder_xml:
 
 	if( !(webman_config->nogrp))
 	{
-		if(!(webman_config->cmask & PS3))  strcat(myxml_ps3, "</Attributes><Items>");
+		if(!(webman_config->cmask & PS3)) {strcat(myxml_ps3, "</Attributes><Items>");}
 		if(!(webman_config->cmask & PS2)) {strcat(myxml_ps2, "</Attributes><Items>"); if(webman_config->ps2l && cellFsStat((char*)PS2_CLASSIC_PLACEHOLDER, &buf)==CELL_FS_SUCCEEDED) strcat(myxml_ps2, QUERY_XMB("ps2_classic_launcher", "xcb://127.0.0.1/query?limit=1&cond=Ae+Game:Game.titleId PS2U10000"));}
 
 #ifdef COBRA_ONLY
@@ -5962,12 +5970,12 @@ continue_reading_folder_xml:
 	}
 	else
 	{
-		cellFsWrite(fdxml, (char*)myxml_ps3, strlen(myxml_ps3), NULL);
-		cellFsWrite(fdxml, (char*)myxml_ps2, strlen(myxml_ps2), NULL);
+		if(!(webman_config->cmask & PS3)) cellFsWrite(fdxml, (char*)myxml_ps3, strlen(myxml_ps3), NULL);
+		if(!(webman_config->cmask & PS2)) cellFsWrite(fdxml, (char*)myxml_ps2, strlen(myxml_ps2), NULL);
 #ifdef COBRA_ONLY
-		cellFsWrite(fdxml, (char*)myxml_psx, strlen(myxml_psx), NULL);
-		cellFsWrite(fdxml, (char*)myxml_psp, strlen(myxml_psp), NULL);
-		cellFsWrite(fdxml, (char*)myxml_dvd, strlen(myxml_dvd), NULL);
+		if(!(webman_config->cmask & PS1)) cellFsWrite(fdxml, (char*)myxml_psx, strlen(myxml_psx), NULL);
+		if(!(webman_config->cmask & PSP)) cellFsWrite(fdxml, (char*)myxml_psp, strlen(myxml_psp), NULL);
+		if(!(webman_config->cmask & DVD) || !(webman_config->cmask & BLU)) cellFsWrite(fdxml, (char*)myxml_dvd, strlen(myxml_dvd), NULL);
 #endif
 		sprintf(myxml, "</XMBML>\r\n");
 	}
@@ -7286,7 +7294,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 	{
 		if(strstr(param, "/index.ps3?")) cellFsUnlink((char*)WMTMP "/games.html");
 
-		if(cellFsStat((char*)WMTMP "/games.html", &buf)==CELL_FS_SUCCEEDED)
+		if(cellFsStat((char*)WMTMP "/games.html", &buf)==CELL_FS_SUCCEEDED && buf.st_size > 10)
 		{
 			int fdu;
 			if(cellFsOpen((char*)WMTMP "/games.html", CELL_FS_O_RDONLY, &fdu, NULL, 0)==CELL_FS_SUCCEEDED)
@@ -13705,7 +13713,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	struct CellFsStat s; int fs;
 	char titleID[10];
 
-	char _path[strlen(_path0)+2];
+	char _path[MAX_PATH_LEN];
 
 	strcpy(_path, _path0);
 
