@@ -11026,7 +11026,7 @@ static void poll_thread(uint64_t poll)
  DYNAMIC TEMP : SELECT+LEFT/RIGHT
  MANUAL TEMP  : SELECT+UP/DOWN
 
- SYSCALLS     : R2+/\
+ SYSCALLS     : R2+TRIANGLE
  SHOW IDPS    : R2+O
  OFFLINE MODE : R2+口
 
@@ -11034,10 +11034,10 @@ static void poll_thread(uint64_t poll)
  MOUNT net0/  : SELECT+R2+口
  MOUNT net1/  : SELECT+L2+口
 
- TOGGLE PS2CLASSIC    : SELECT+L2+/\
+ TOGGLE PS2CLASSIC    : SELECT+L2+TRIANGLE
  SWITCH PS2EMU        : SELECT+L2+R2
 
- COBRA TOGGLE         : L3+L2+/\
+ COBRA TOGGLE         : L3+L2+TRIANGLE
  REBUG  Mode Switcher : L3+L2+口
  Normal Mode Switcher : L3+L2+O
  DEBUG  Menu Switcher : L3+L2+X
@@ -11498,7 +11498,7 @@ static void poll_thread(uint64_t poll)
 						}
 #ifdef REMOVE_SYSCALLS
 						else
-						if(!(webman_config->combo & DISABLESH) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE) ) // R2+/\ Disable CFW Sycalls
+						if(!(webman_config->combo & DISABLESH) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE) ) // R2+TRIANGLE Disable CFW Sycalls
 						{
 							if(peekq(0x8000000000003000ULL)==SYSCALLS_UNAVAILABLE) {
 								system_call_3(SC_RING_BUZZER, 0x1004, 0x7, 0x36);
@@ -11579,7 +11579,7 @@ static void poll_thread(uint64_t poll)
 #ifdef COBRA_ONLY
 						if(!(webman_config->combo & DISACOBRA)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE))
-						{ // L3+L2+/\ COBRA Toggle
+						{ // L3+L2+TRIANGLE COBRA Toggle
 							enable_dev_blind((char*)"COBRA Toggle activated!");
  #ifdef REX_ONLY
 							if( (cellFsStat((char*) REBUG_COBRA_PATH "stage2.cex", &s)==CELL_FS_SUCCEEDED) &&

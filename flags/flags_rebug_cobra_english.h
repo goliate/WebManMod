@@ -19,7 +19,7 @@
 #define LOAD_PRX		1	// /loadprx.ps3?slot=n&prx=path/file.sprx  (load prx)
 #define FAKEISO 		1	// support .ntfs[BDFILE] (fake ISO)
 #define BDVD_REGION		1	// change BD/DVD region
-#define REMOVE_SYSCALLS	1	// remove syscalls on startup and using R2+/\
+#define REMOVE_SYSCALLS	1	// remove syscalls on startup and using R2+TRIANGLE
 #define SPOOF_CONSOLEID	1	// spoof idps/psid
 
 //// TEST FEATURES ////
