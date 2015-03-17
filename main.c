@@ -1883,6 +1883,7 @@ static int process_read_cd_2048_cmd(uint8_t *buf, uint32_t start_sector, uint32_
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode = NETISO_CMD_READ_CD_2048_CRITICAL;
+	cmd.pad = CD_SECTOR_SIZE_2048;
 	cmd.start_sector = start_sector;
 	cmd.sector_count = sector_count;
 
@@ -4945,6 +4946,8 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 		get_default_icon(icon, param, data[v3_entry].name, data[v3_entry].is_directory, tempID, ns, abort_connection);
 	}
 
+	if(webman_config->tid && tempID[0]>'@' && strlen(templn) < 50 && strstr(templn, " [")==NULL) {strcat(templn, " ["); strcat(templn, tempID); strcat(templn, "]");}
+
 	return 0;
 }
 #endif //#ifndef LITE_EDITION
@@ -5697,6 +5700,8 @@ next_xml_entry:
 								sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
 
 							get_default_icon(icon, param, entry.d_name, 0, tempID, ns, abort_connection);
+
+							if(webman_config->tid && tempID[0]>'@' && strlen(templn) < 50 && strstr(templn, " [")==NULL) {strcat(templn, " ["); strcat(templn, tempID); strcat(templn, "]");}
 
 							urlenc(enc_dir_name, entry.d_name);
 
@@ -7644,6 +7649,8 @@ next_html_entry:
 							}
 
 							get_default_icon(icon, param, entry.d_name, 0, tempID, ns, abort_connection);
+
+							if(webman_config->tid && tempID[0]>'@' && strlen(templn) < 50 && strstr(templn, " [")==NULL) {strcat(templn, " ["); strcat(templn, tempID); strcat(templn, "]");}
 
 							urlenc(enc_dir_name, entry.d_name);
 							templn[64]=0; flen=strlen(templn);
