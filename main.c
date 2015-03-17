@@ -93,7 +93,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.31 MOD"						// webMAN version
+#define WM_VERSION			"1.41.32 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -530,6 +530,9 @@ typedef struct
 	uint8_t noss;
 	uint8_t fixgame;
 	uint8_t bus;
+	uint8_t dev_sd;
+	uint8_t dev_ms;
+	uint8_t dev_cf;
 } __attribute__((packed)) WebmanCfg;
 
 //combo
@@ -602,7 +605,7 @@ static char html_base_path[MAX_PATH_LEN]="";
 
 static char smonth[12][4]={"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-static char drives[11][12]={"/dev_hdd0", "/dev_usb000", "/dev_usb001", "/dev_usb002", "/dev_usb003", "/dev_usb006", "/dev_usb007", "/net0", "/net1", "/net2", "/ext"};
+static char drives[14][12]={"/dev_hdd0", "/dev_usb000", "/dev_usb001", "/dev_usb002", "/dev_usb003", "/dev_usb006", "/dev_usb007", "/net0", "/net1", "/net2", "/ext", "/dev_sd", "/dev_ms", "/dev_cf"};
 static char paths [11][12]={"GAMES", "GAMEZ", "PS3ISO", "BDISO", "DVDISO", "PS2ISO", "PSXISO", "PSXGAMES", "PSPISO", "ISO", "video"};
 
 static char wm_icons[12][60]={WM_ICONS_PATH "icon_wm_album_ps3.png", //024.png  [0]
@@ -979,7 +982,7 @@ static int remote_stat(int s, char *path, int *is_directory, int64_t *file_size,
 static void get_temperature(u32 _dev, u32 *_temp);
 static void fan_control(u8 temp0, u8 maxtemp);
 static void led(u64 color, u64 mode);
-static void restore_fan(u8 settemp);
+static void restore_fan(u8 set_ps2_temp);
 
 static int savefile(char *file, char *mem, u64 size);
 static int filecopy(char *file1, char *file2, uint64_t maxbytes);
@@ -4411,6 +4414,8 @@ static void get_name(char *name, char *filename, u8 cache)
 		if(!extcmp(name, ".BIN.ENC", 8)) name[flen-8]=0;
 	}
 	if(cache) return;
+
+	if(name[4] == '_' && name[8] == '.' && (name[0] == 'B' || name[0] == 'N' || name[0] == 'S' || name[0] == 'U') && (name[9] >= '0' && name[9] <= '9') && (name[10] >= '0' && name[10] <= '9')) strcpy(&name[0], &name[12]);
 	if(name[9]== '-' && name[10]=='[') {strcpy(&name[0], &name[11]); name[strlen(name)-1]='\0';}
 	if(name[10]=='-' && name[11]=='[') {strcpy(&name[0], &name[12]); name[strlen(name)-1]='\0';}
 	if(!webman_config->tid && strstr(name, " [")) *strstr(name, " [")='\0';
@@ -4622,6 +4627,10 @@ static bool get_cover_from_name(char *icon, char *name, char *titleid)
 			strncpy(titleid, strstr(name, " [N") + 2, 10); //NP*
 		else
 			strncpy(titleid, strstr(name, " [S") + 2, 10); //SLES/SCES/SCUS/SLUS/etc.
+	}
+	else if(titleid[0]==0 && name[4] == '_' && name[8] == '.' && (name[0] == 'B' || name[0] == 'N' || name[0] == 'S' || name[0] == 'U') && (name[9] >= '0' && name[9] <= '9') && (name[10] >= '0' && name[10] <= '9'))
+	{
+		sprintf(titleid, "%c%c%c%c%c%c%c%c%c", name[0], name[1], name[2], name[3], name[5], name[6], name[7], name[9], name[10]); //SCUS_999.99.filename.iso
 	}
 
 	if(titleid[4]=='-') strncpy(&titleid[4], &titleid[5], 5); titleid[9]='\0';
@@ -5392,10 +5401,24 @@ static bool update_mygames_xml(u64 conn_s_p)
 
 	led(YELLOW, BLINK_FAST);
 
-	for(u8 f0=0; f0<11; f0++)  // drives: 0="/dev_hdd0", 1="/dev_usb000", 2="/dev_usb001", 3="/dev_usb002", 4="/dev_usb003", 5="/dev_usb006", 6="/dev_usb007", 7="/net0", 8="/net1", 9="/net2", 10="/ext"
+	for(u8 f0=0; f0<14; f0++)  // drives: 0="/dev_hdd0", 1="/dev_usb000", 2="/dev_usb001", 3="/dev_usb002", 4="/dev_usb003", 5="/dev_usb006", 6="/dev_usb007", 7="/net0", 8="/net1", 9="/net2", 10="/ext", 11="/dev_sd", 12="/dev_ms", 13="/dev_cf"
 	{
+		if(!webman_config->usb0 && (f0==1)) continue;
+		if(!webman_config->usb1 && (f0==2)) continue;
+		if(!webman_config->usb2 && (f0==3)) continue;
+		if(!webman_config->usb3 && (f0==4)) continue;
+		if(!webman_config->usb6 && (f0==5)) continue;
+		if(!webman_config->usb7 && (f0==6)) continue;
+
+		if(!webman_config->dev_sd && (f0==11)) continue;
+		if(!webman_config->dev_ms && (f0==12)) continue;
+		if(!webman_config->dev_cf && (f0==13)) continue;
+
+		if( f0==NTFS && (!webman_config->usb0 && !webman_config->usb1 && !webman_config->usb2 &&
+						 !webman_config->usb3 && !webman_config->usb6 && !webman_config->usb7)) continue;
+
 		int ns=-2; u8 uprofile=profile;
-		for(u8 f1=0; f1<13; f1++) // paths: 0="GAMES", 1="GAMEZ", 2="PS3ISO", 3="BDISO", 4="DVDISO", 5="PS2ISO", 6="PSXISO", 7="PSXGAMES", 8="PSPISO", 9="ISO", 10="video"
+		for(u8 f1=0; f1<11; f1++) // paths: 0="GAMES", 1="GAMEZ", 2="PS3ISO", 3="BDISO", 4="DVDISO", 5="PS2ISO", 6="PSXISO", 7="PSXGAMES", 8="PSPISO", 9="ISO", 10="video"
 		{
 #ifndef COBRA_ONLY
 			if(IS_ISO_FOLDER && !(IS_PS2_FOLDER)) continue; // 0="GAMES", 1="GAMEZ", 5="PS2ISO", 10="video"
@@ -5405,7 +5428,7 @@ static bool update_mygames_xml(u64 conn_s_p)
 			cellRtcGetCurrentTick(&pTick);
 
 			if(IS_PS2_FOLDER && f0>0)  continue; // PS2ISO is supported only from /dev_hdd0
-			if(f1>=10) {if(f0<7) strcpy(paths[10], f0==0 ? "video" : "GAMES_DUP"); else break;}
+            if(f1>=10) {if(f0<7 || f0>NTFS) strcpy(paths[10], f0==0 ? "video" : "GAMES_DUP"); else continue;}
 			if(f0==NTFS) {if(f1>6 || !cobra_mode) break; else if(f1<2 || f1==5) continue;}
 			if(f0==7 && (!webman_config->netd0 || f1>6 || !cobra_mode)) break; //net0
 			if(f0==8 && (!webman_config->netd1 || f1>6 || !cobra_mode)) break; //net1
@@ -5427,16 +5450,6 @@ static bool update_mygames_xml(u64 conn_s_p)
 #endif
 
 			if(is_net && (ns<0)) break;
-
-			if(!webman_config->usb0 && (f0==1)) continue;
-			if(!webman_config->usb1 && (f0==2)) continue;
-			if(!webman_config->usb2 && (f0==3)) continue;
-			if(!webman_config->usb3 && (f0==4)) continue;
-			if(!webman_config->usb6 && (f0==5)) continue;
-			if(!webman_config->usb7 && (f0==6)) continue;
-
-			if( f0==NTFS && (!webman_config->usb0 && !webman_config->usb1 && !webman_config->usb2 &&
-							 !webman_config->usb3 && !webman_config->usb6 && !webman_config->usb7)) break;
 
 //
 			char param[MAX_PATH_LEN];
@@ -5554,7 +5567,7 @@ read_folder_xml:
 
 /////////////////////////////////////////
 						subfolder=0;
-						if(IS_ISO_FOLDER && (f0<7))
+						if(IS_ISO_FOLDER && (f0<7 || f0>NTFS))
 						{
 							sprintf(subpath, "%s/%s", param, entry.d_name);
 							if(isDir(subpath) && cellFsOpendir(subpath, &fd2) == CELL_FS_SUCCEEDED)
@@ -5603,10 +5616,10 @@ next_xml_entry:
 									if((uprofile==0 && flen>17)) {for(u8 u=1;u<5;u++) if(strstr(entry.d_name + flen - 17, SUFIX3(u))) continue;}
 								}
 
-								if((strstr(param, "/PS3ISO") && f0<NTFS) || (f0==NTFS && f1==2 && !extcmp(entry.d_name, ".ntfs[PS3ISO]", 13)))
+								if((strstr(param, "/PS3ISO") && f0!=NTFS) || (f0==NTFS && f1==2 && !extcmp(entry.d_name, ".ntfs[PS3ISO]", 13)))
 								{
 									get_name(templn, entry.d_name, 1); strcat(templn, ".SFO\0");
-									if(f0<NTFS && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
+									if(f0!=NTFS && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
 									{
 										get_name(tempstr, entry.d_name, 0);
 										sprintf(templn, "%s/%s.SFO", param, tempstr);
@@ -5631,7 +5644,7 @@ next_xml_entry:
 									get_name(templn, entry.d_name, 0);
 								}
 
-								if(f0<NTFS && tempID[0]==0 && strstr(param, "/PS3ISO"))
+								if(f0!=NTFS && tempID[0]==0 && strstr(param, "/PS3ISO"))
 								{   // get title ID from ISO
 									sprintf(icon, "%s/%s", param, entry.d_name);
 									if(cellFsOpen(icon, CELL_FS_O_RDONLY, &fs, NULL, 0) == CELL_FS_SUCCEEDED)
@@ -6248,6 +6261,10 @@ static void setup_parse_settings(char *param)
 	if(strstr(param, "u6=1")) webman_config->usb6=1;
 	if(strstr(param, "u7=1")) webman_config->usb7=1;
 
+	if(strstr(param, "x0=1")) webman_config->dev_sd=1;
+	if(strstr(param, "x1=1")) webman_config->dev_ms=1;
+	if(strstr(param, "x2=1")) webman_config->dev_cf=1;
+
 	if(strstr(param, "lp=1")) webman_config->lastp=1;
 	if(strstr(param, "ab=1")) webman_config->autob=1;
 	if(strstr(param, "dy=1")) webman_config->delay=1;
@@ -6408,7 +6425,7 @@ static void setup_parse_settings(char *param)
 		fan_control(webman_config->temp0, 0);
 	}
 	else
-		restore_fan(0);
+		restore_fan(0); //restore syscon fan control mode
 
 	webman_config->warn=0;
 	if(strstr(param, "warn=1")) webman_config->warn=1;
@@ -6555,6 +6572,8 @@ static void setup_parse_settings(char *param)
 
 static void setup_form(char *buffer, char *templn)
 {
+	struct CellFsStat buf;
+
 	sprintf(templn, "<form action=\"/setup.ps3\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
 					"<table width=\"820\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
 					"<tr><td width=\"250\"><u>%s:</u><br>", STR_SCAN1); strcat(buffer, templn);
@@ -6566,6 +6585,10 @@ static void setup_form(char *buffer, char *templn)
 	add_check_box("u3", "1", drives[4], NULL, (webman_config->usb3), buffer);
 	add_check_box("u6", "1", drives[5], NULL, (webman_config->usb6), buffer);
 	add_check_box("u7", "1", drives[6], NULL, (webman_config->usb7), buffer);
+
+	if(cellFsStat(drives[11], &buf)==CELL_FS_SUCCEEDED) add_check_box("x0", "1", drives[11], NULL, (webman_config->dev_sd), buffer);
+	if(cellFsStat(drives[12], &buf)==CELL_FS_SUCCEEDED) add_check_box("x1", "1", drives[12], NULL, (webman_config->dev_ms), buffer);
+	if(cellFsStat(drives[13], &buf)==CELL_FS_SUCCEEDED) add_check_box("x2", "1", drives[13], NULL, (webman_config->dev_cf), buffer);
 
 	//Scan for content
 	sprintf(templn, "<td nowrap valign=top><u>%s:</u><br>", STR_SCAN2); strcat(buffer, templn);
@@ -7330,7 +7353,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #ifdef COBRA_ONLY
 		if(strstr(param, "ntfs")) {filter0=NTFS; b0=1;} else
 #endif
-		for(u8 f0=0; f0<11; f0++) if(strstr(param, drives[f0])) {filter0=f0; b0=1; break;}
+		for(u8 f0=0; f0<14; f0++) if(strstr(param, drives[f0])) {filter0=f0; b0=1; break;}
 		for(u8 f1=0; f1<11; f1++) if(strstr(param, paths [f1])) {filter1=f1; b1=1; break;}
 		if(!b0 && strstr(param, "hdd" ))  {filter0=0; b0=1;}
 		if(!b0 && strstr(param, "usb" ))  {filter0=1; b0=2;}
@@ -7343,8 +7366,24 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #endif
 		if(b0==0 && b1==0 && strstr(param, "?")!=NULL && strstr(param, "?html")==NULL && strstr(param, "mobile")==NULL) strcpy(filter_name, strstr(param, "?")+1);
 
-		for(u8 f0=filter0; f0<11; f0++)  // drives: 0="/dev_hdd0", 1="/dev_usb000", 2="/dev_usb001", 3="/dev_usb002", 4="/dev_usb003", 5="/dev_usb006", 6="/dev_usb007", 7="/net0", 8="/net1", 9="/net2", 10="/ext"
+		for(u8 f0=filter0; f0<14; f0++)  // drives: 0="/dev_hdd0", 1="/dev_usb000", 2="/dev_usb001", 3="/dev_usb002", 4="/dev_usb003", 5="/dev_usb006", 6="/dev_usb007", 7="/net0", 8="/net1", 9="/net2", 10="/ext", 11="/dev_sd", 12="/dev_ms", 13="/dev_cf"
 		{
+
+			if(!webman_config->usb0 && (f0==1)) continue;
+			if(!webman_config->usb1 && (f0==2)) continue;
+			if(!webman_config->usb2 && (f0==3)) continue;
+			if(!webman_config->usb3 && (f0==4)) continue;
+			if(!webman_config->usb6 && (f0==5)) continue;
+			if(!webman_config->usb7 && (f0==6)) continue;
+
+			if(!webman_config->dev_sd && (f0==11)) continue;
+			if(!webman_config->dev_ms && (f0==12)) continue;
+			if(!webman_config->dev_cf && (f0==13)) continue;
+
+			if( f0==NTFS && (!webman_config->usb0 && !webman_config->usb1 && !webman_config->usb2 &&
+							 !webman_config->usb3 && !webman_config->usb6 && !webman_config->usb7)) continue;
+
+//
 			int ns=-2; u8 uprofile=profile;
 			for(u8 f1=filter1; f1<11; f1++) // paths: 0="GAMES", 1="GAMEZ", 2="PS3ISO", 3="BDISO", 4="DVDISO", 5="PS2ISO", 6="PSXISO", 7="PSXGAMES", 8="PSPISO", 9="ISO", 10="video"
 			{
@@ -7357,13 +7396,13 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 				cellRtcGetCurrentTick(&pTick);
 
 				if(IS_PS2_FOLDER && f0>0)  continue; // PS2ISO is supported only from /dev_hdd0
-				if(f1>=10) {if(f0<7) strcpy(paths[10], f0==0 ? "video" : "GAMES_DUP"); else break;}
+				if(f1>=10) {if(f0<7 || f0>NTFS) strcpy(paths[10], f0==0 ? "video" : "GAMES_DUP"); else continue;}
 				if(f0==NTFS) {if(f1>6 || !cobra_mode) break; else if(f1<2 || f1==5) continue;}
 				if(f0==7 && (!webman_config->netd0 || f1>6 || !cobra_mode)) break;
 				if(f0==8 && (!webman_config->netd1 || f1>6 || !cobra_mode)) break;
 				if(f0==9 && (!webman_config->netd2 || f1>6 || !cobra_mode)) break;
 
-				if(b0) {if(b0==2 && f0<7); else if(b0==3 && f0<NTFS); else if(filter0!=f0) continue;}
+				if(b0) {if(b0==2 && f0<7); else if(b0==3 && f0!=NTFS); else if(filter0!=f0) continue;}
 				if(b1) {if(b1>=2 && (f1<b1 || f1>=10) && filter1<3); else if(filter1!=f1) continue;}
 				else
 				{
@@ -7383,16 +7422,6 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #endif
 				if(is_net && (ns<0)) break;
 
-				if(!webman_config->usb0 && (f0==1)) continue;
-				if(!webman_config->usb1 && (f0==2)) continue;
-				if(!webman_config->usb2 && (f0==3)) continue;
-				if(!webman_config->usb3 && (f0==4)) continue;
-				if(!webman_config->usb6 && (f0==5)) continue;
-				if(!webman_config->usb7 && (f0==6)) continue;
-
-				if( f0==NTFS && (!webman_config->usb0 && !webman_config->usb1 && !webman_config->usb2 &&
-								 !webman_config->usb3 && !webman_config->usb6 && !webman_config->usb7)) break;
-//
 				u8 subfolder;
 				subfolder = 0; uprofile = profile;
 		read_folder_html:
@@ -7533,11 +7562,11 @@ next_html_entry:
 									if((uprofile==0 && flen>17)) {for(u8 u=1;u<5;u++) if(strstr(entry.d_name + flen - 17, SUFIX3(u))) continue;}
 								}
 
-								if((strstr(tmp_param, "/PS3ISO") && f0<NTFS) || (f0==NTFS && f1==2 && !extcmp(entry.d_name, ".ntfs[PS3ISO]", 13)))
+								if((strstr(tmp_param, "/PS3ISO") && f0!=NTFS) || (f0==NTFS && f1==2 && !extcmp(entry.d_name, ".ntfs[PS3ISO]", 13)))
 								{
 									int fs=0;
 									get_name(templn, entry.d_name, 1); strcat(templn, ".SFO\0");
-									if(f0<NTFS && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
+									if(f0!=NTFS && cellFsStat(templn, &buf)!=CELL_FS_SUCCEEDED)
 									{
 										get_name(tempstr, entry.d_name, 0);
 										sprintf(templn, "%s/%s.SFO", param, tempstr);
@@ -7545,7 +7574,7 @@ next_html_entry:
 
 									if(get_title_and_id_from_sfo(templn, tempID, entry.d_name, icon, tempstr)==1)
 									{
-										if( f0<NTFS ) //get title id from ISO
+										if( f0!=NTFS ) //get title id from ISO
 										{
 											sprintf(icon, "%s/%s", param, entry.d_name);
 											if(cellFsOpen(icon, CELL_FS_O_RDONLY, &fs, NULL, 0) == CELL_FS_SUCCEEDED)
@@ -9082,7 +9111,7 @@ again3:
 			{
 				http_response(conn_s, header, param, 200, param);
 quit:
-				restore_fan(1);
+				restore_fan(0); //restore syscon fan control mode
 				show_msg((char*)STR_WMUNL);
 				working=0;
 				sclose(&conn_s);
@@ -11437,7 +11466,7 @@ static void poll_thread(uint64_t poll)
 						}
 						else if(!(webman_config->combo & UNLOAD_WM) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3) ) // L3+R3+R2 (quit webMAN)
 						{
-							restore_fan(1);
+							restore_fan(0); //restore syscon fan control mode
 							show_msg((char*)STR_WMUNL);
 							working=0;
 							#ifdef PS3MAPI
@@ -11468,7 +11497,7 @@ static void poll_thread(uint64_t poll)
 							}
 							else
 							{
-								restore_fan(0);
+								restore_fan(0); //syscon
 								sprintf((char*)msg, "%s %s", STR_FANCTRL3, STR_DISABLED);
 							}
 							save_settings();
@@ -11828,7 +11857,7 @@ reboot:
 	sys_ppu_thread_exit(0);
 }
 
-static void restore_fan(u8 settemp)
+static void restore_fan(u8 set_ps2_temp)
 {
 	if(backup[0]==1 && (get_fan_policy_offset>0))
 	{
@@ -11836,9 +11865,12 @@ static void restore_fan(u8 settemp)
 		//pokeq(backup[0] + (u64) (138 * 8), backup[2]);
 		//pokeq(backup[0] + (u64) (379 * 8), backup[3]);
 
-		if(webman_config->ps2temp<20) webman_config->ps2temp=20;
-		sys_sm_set_fan_policy(0, 1, ((webman_config->ps2temp*255)/100));
-		if(settemp) sys_sm_set_fan_policy(0, 2, ((webman_config->ps2temp*255)/100));
+		if(set_ps2_temp)
+		{
+			webman_config->ps2temp=RANGE(webman_config->ps2temp, 20, 99); //%
+			sys_sm_set_fan_policy(0, 2, ((webman_config->ps2temp*255)/100));
+		}
+		else sys_sm_set_fan_policy(0, 1, 0x0); //syscon
 
 		pokeq(set_fan_policy_offset, backup[4]);  // sys 389 set_fan_policy
 		pokeq(get_fan_policy_offset, backup[5]);  // sys 409 get_fan_policy  4.55/4.60/4.65
@@ -11914,6 +11946,10 @@ static void reset_settings()
 	//webman_config->usb3=0;
 	webman_config->usb6=1;
 	//webman_config->usb7=0;
+
+	//webman_config->dev_sd=0;
+	//webman_config->dev_ms=0;
+	//webman_config->dev_cf=0;
 
 	//webman_config->lastp=0;      //disable last play
 	//webman_config->autob=0;      //disable check for AUTOBOOT.ISO
@@ -12962,7 +12998,7 @@ int wwwd_start(uint64_t arg)
 
 static void wwwd_stop_thread(uint64_t arg)
 {
-	restore_fan(0);
+	restore_fan(1); //restore & set static fan speed for ps2
 
 	uint64_t exit_code;
 	working = 0;
@@ -14231,7 +14267,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 					tracks[0].lba = 0;
 					tracks[0].is_audio = 0;
 					cobra_mount_ps2_disc_image(cobra_iso_list, 1, tracks, 1);
-					if(webman_config->fanc) fan_control( ((webman_config->ps2temp*255)/100), 0);
+					if(webman_config->fanc) restore_fan(1); //fan_control( ((webman_config->ps2temp*255)/100), 0);
 
 					// create "wm_noscan" to avoid re-scan of XML returning to XMB from PS2
 					savefile((char*)WMNOSCAN, NULL, 0);
