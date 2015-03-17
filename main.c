@@ -428,6 +428,7 @@ static u8 init_running=0;
 static u8 fan_speed=0x33;
 static u8 old_fan=0x33;
 static u32 max_temp=MY_TEMP;
+static bool fan_ps2_mode=false; // temporary disable dynamic fan control
 
 #define MAX_LAST_GAMES (5)
 typedef struct
@@ -11876,6 +11877,7 @@ static void restore_fan(u8 set_ps2_temp)
 		{
 			webman_config->ps2temp=RANGE(webman_config->ps2temp, 20, 99); //%
 			sys_sm_set_fan_policy(0, 2, ((webman_config->ps2temp*255)/100));
+			fan_ps2_mode=true;
 		}
 		else sys_sm_set_fan_policy(0, 1, 0x0); //syscon
 
@@ -11888,6 +11890,8 @@ static void restore_fan(u8 set_ps2_temp)
 
 static void fan_control(u8 temp0, u8 initial)
 {
+	if(fan_ps2_mode) return; //do not change fan settings while PS2 game is mounted
+
 	if(get_fan_policy_offset)
 	{
 		if(!initial)
@@ -13127,6 +13131,8 @@ static void do_umount(bool clean)
 {
 	if(clean) cellFsUnlink((char*)WMTMP "/last_game.txt");
 
+	fan_ps2_mode=false;
+
 #ifdef COBRA_ONLY
 	//if(cobra_mode)
 	{
@@ -13231,6 +13237,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 	if(is_mounting) return false;
 
 	bool ret=true;
+	fan_ps2_mode=false;
 
 	is_mounting=true;
 
@@ -13942,6 +13949,8 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 					filecopy(temp, (char*)PS2_CLASSIC_ISO_ICON, COPY_WHOLE_FILE);
 				else
 					filecopy((char*)(PS2_CLASSIC_ISO_ICON ".bak"), (char*)PS2_CLASSIC_ISO_ICON, COPY_WHOLE_FILE);
+
+				if(webman_config->fanc) restore_fan(1); //fan_control( ((webman_config->ps2temp*255)/100), 0);
 
 				// create "wm_noscan" to avoid re-scan of XML returning to XMB from PS2
 				savefile((char*)WMNOSCAN, NULL, 0);
