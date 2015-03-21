@@ -106,9 +106,9 @@ SYS_MODULE_STOP(wwwd_stop);
 
 #ifdef WEB_CHAT
  #define WMCHATFILE			"/dev_hdd0/tmp/wmtmp/wmchat.htm"
- #define DELETE_TURNOFF		{cellFsUnlink((char*)"/dev_hdd0/tmp/turnoff"); cellFsUnlink((char*)WMCHATFILE);}
+ #define DELETE_TURNOFF		{do_umount(false); cellFsUnlink((char*)"/dev_hdd0/tmp/turnoff"); cellFsUnlink((char*)WMCHATFILE);}
 #else
- #define DELETE_TURNOFF		{cellFsUnlink((char*)"/dev_hdd0/tmp/turnoff");}
+ #define DELETE_TURNOFF		{do_umount(false); cellFsUnlink((char*)"/dev_hdd0/tmp/turnoff");}
 #endif
 
 #define THREAD_NAME 		"wwwdt"
@@ -156,6 +156,7 @@ SYS_MODULE_STOP(wwwd_stop);
 
 #define SC_GET_FREE_MEM 				(352)
 #define SC_SYS_CONTROL_LED				(386)
+#define SC_GET_PLATFORM_INFO			(387)
 #define SC_RING_BUZZER  				(392)
 
 #define SC_SET_FAN_POLICY				(389)
@@ -170,6 +171,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define SC_FS_UMOUNT 					(838)
 #define SC_GET_IDPS 					(870)
 #define SC_GET_PSID 					(872)
+#define SC_GET_CONSOLE_TYPE				(985)
 
 #define SC_GET_PRX_MODULE_BY_ADDRESS	(461)
 #define SC_STOP_PRX_MODULE 				(482)
@@ -394,7 +396,7 @@ typedef struct {
 	uint32_t avail;
 } _meminfo;
 
-static bool is_rebug = false;
+//static bool is_rebug = false;
 static u8 profile = 0;
 
 #ifdef EXT_GDATA
@@ -450,7 +452,7 @@ static u8 max_mapped=0;
 static float c_firmware=0.0f;
 static u8 dex_mode=0;
 
-static u64 SYSCALL_TABLE = SYSCALL_TABLE_465;
+static u64 SYSCALL_TABLE = 0;
 
 #ifndef COBRA_ONLY
  static bool save_libfs_new=true;
@@ -1273,6 +1275,12 @@ static int sysLv2FsLink(const char *oldpath,const char *newpath)
 {
 	system_call_2(SC_FS_LINK,(u64)oldpath,(u64)newpath);
 	return_to_user_prog(int);
+}
+
+s32 lv2_get_platform_info(struct platform_info *info)
+{
+	system_call_1(SC_GET_PLATFORM_INFO, (uint64_t) info);
+	return_to_user_prog(s32);
 }
 
 /*
@@ -3449,40 +3457,50 @@ static void detect_firmware()
 {
 	if(c_firmware>3.40f) return;
 
-	u64 CEX=0x4345580000000000ULL;
-	u64 DEX=0x4445580000000000ULL;
+    uint8_t platform_info[0x18];
+    lv2_get_platform_info(platform_info);  // OS Version, Revision, System Software Version
+    c_firmware = (float)(platform_info[0]) + (((float)(platform_info[1]))/10.0f) + (((float)(platform_info[2]>>4))/100.0f);
 
-	dex_mode=0;
+    system_call_3(SC_GET_CONSOLE_TYPE, (u64) &dex_mode, 0, 0); // dex_mode: 1=CEX, 2=DEX, 3=TOOL
 
-	if(peekq(0x80000000002ED778ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_470;  c_firmware=4.70f;}				else
-	if(peekq(0x800000000030F240ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_470D; c_firmware=4.70f; dex_mode=2;}	else
-	if(peekq(0x80000000002ED860ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_465;  c_firmware=(peekq(0x80000000002FC938ULL)==0x323031342F31312FULL)?4.66f:4.65f;} else
-	if(peekq(0x800000000030F1A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_465D; c_firmware=(peekq(0x800000000031EBA8ULL)==0x323031342F31312FULL)?4.66f:4.65f; dex_mode=2;}	else
-	if(peekq(0x80000000002ED850ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_460;  c_firmware=4.60f;}				else
-	if(peekq(0x80000000002EC5E0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_455;  c_firmware=4.55f;}				else
-	if(peekq(0x80000000002E9D70ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_453;  c_firmware=4.53f;}				else
-	if(peekq(0x800000000030AEA8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_453D; c_firmware=4.53f; dex_mode=2;}	else
-	if(peekq(0x80000000002E9BE0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_450;  c_firmware=4.50f;}				else
-	if(peekq(0x80000000002EA9B8ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_446;  c_firmware=4.46f;}				else
-	if(peekq(0x8000000000305410ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_446D; c_firmware=4.46f; dex_mode=2;}	else
-	if(peekq(0x80000000002E8610ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_421;  c_firmware=4.21f;}				else
-	if(peekq(0x8000000000302D88ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_421D; c_firmware=4.21f; dex_mode=2;}	else
-	if(peekq(0x80000000002D83D0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_355;  c_firmware=3.55f;}				else
-	if(peekq(0x80000000002EFE20ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_355D; c_firmware=3.55f; dex_mode=2;}	else
-//No cobra cfw but as mamba compatibility
-	if(peekq(0x800000000030D6A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_455D; c_firmware=4.55f; dex_mode=2;}	else
-	if(peekq(0x8000000000309698ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_450D; c_firmware=4.50f; dex_mode=2;}	else
-	if(peekq(0x8000000000304EF0ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_441D; c_firmware=4.41f; dex_mode=2;}	else
-	if(peekq(0x80000000002EA498ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_441;  c_firmware=4.41f;}				else
-	if(peekq(0x80000000002EA488ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_440;  c_firmware=4.40f;}				else
-	if(peekq(0x80000000002E9F18ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_431;  c_firmware=4.31f;}				else
-	if(peekq(0x8000000000304630ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_430D; c_firmware=4.30f; dex_mode=2;}	else
-	if(peekq(0x80000000002E9F08ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_430;  c_firmware=4.30f;}				else
-#ifndef COBRA_ONLY
-	if(peekq(0x80000000002CFF98ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_341;  c_firmware=3.41f;}				else
-  //if(peekq(0x80000000002E79C8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_341D; c_firmware=3.41f; dex_mode=2;}	else
-#endif
-	{c_firmware=0.00f; return;}
+    if(dex_mode==2)
+    {   // DEX
+        if(c_firmware==4.70f) SYSCALL_TABLE = SYSCALL_TABLE_470D;
+        if(c_firmware==4.66f) SYSCALL_TABLE = SYSCALL_TABLE_465D;
+        if(c_firmware==4.65f) SYSCALL_TABLE = SYSCALL_TABLE_465D;
+        //if(c_firmware==4.60f) SYSCALL_TABLE = SYSCALL_TABLE_460D;
+        if(c_firmware==4.55f) SYSCALL_TABLE = SYSCALL_TABLE_455D;
+        if(c_firmware==4.53f) SYSCALL_TABLE = SYSCALL_TABLE_453D;
+        if(c_firmware==4.50f) SYSCALL_TABLE = SYSCALL_TABLE_450D;
+        if(c_firmware==4.46f) SYSCALL_TABLE = SYSCALL_TABLE_446D;
+        if(c_firmware==4.41f) SYSCALL_TABLE = SYSCALL_TABLE_441D;
+        //if(c_firmware==4.40f) SYSCALL_TABLE = SYSCALL_TABLE_440D;
+        //if(c_firmware==4.31f) SYSCALL_TABLE = SYSCALL_TABLE_431D;
+        if(c_firmware==4.30f) SYSCALL_TABLE = SYSCALL_TABLE_430D;
+        if(c_firmware==4.21f) SYSCALL_TABLE = SYSCALL_TABLE_421D;
+        if(c_firmware==3.55f) SYSCALL_TABLE = SYSCALL_TABLE_355D;
+    }
+    else
+    {   // CEX
+        dex_mode=0;
+        if(c_firmware==4.70f) SYSCALL_TABLE = SYSCALL_TABLE_470;
+        if(c_firmware==4.66f) SYSCALL_TABLE = SYSCALL_TABLE_465;
+        if(c_firmware==4.65f) SYSCALL_TABLE = SYSCALL_TABLE_465;
+        if(c_firmware==4.60f) SYSCALL_TABLE = SYSCALL_TABLE_460;
+        if(c_firmware==4.55f) SYSCALL_TABLE = SYSCALL_TABLE_455;
+        if(c_firmware==4.53f) SYSCALL_TABLE = SYSCALL_TABLE_453;
+        if(c_firmware==4.50f) SYSCALL_TABLE = SYSCALL_TABLE_450;
+        if(c_firmware==4.46f) SYSCALL_TABLE = SYSCALL_TABLE_446;
+        if(c_firmware==4.41f) SYSCALL_TABLE = SYSCALL_TABLE_441;
+        if(c_firmware==4.40f) SYSCALL_TABLE = SYSCALL_TABLE_440;
+        if(c_firmware==4.31f) SYSCALL_TABLE = SYSCALL_TABLE_431;
+        if(c_firmware==4.30f) SYSCALL_TABLE = SYSCALL_TABLE_430;
+        if(c_firmware==4.21f) SYSCALL_TABLE = SYSCALL_TABLE_421;
+        if(c_firmware==3.55f) SYSCALL_TABLE = SYSCALL_TABLE_355;
+        if(c_firmware==3.41f) SYSCALL_TABLE = SYSCALL_TABLE_341;
+    }
+
+    if(!SYSCALL_TABLE) {c_firmware=0.00f; return;}
 
 #ifndef COBRA_ONLY
 	if(!dex_mode)
@@ -4200,11 +4218,17 @@ static void fix_game(char *path)
 					cellFsLseek(fdw, 0xC, CELL_FS_SEEK_SET, &msiz);
 					cellFsRead(fdw, (void *)&ps3_sys_version, 4, &msiz);
 
-					offset=ps3_sys_version[0]<<32 + ps3_sys_version[1]<<16 + ps3_sys_version[2]<<8 + ps3_sys_version[3];
-					offset-=0x78; if(offset < 0x90 || offset > 0x800) offset=!extcasecmp(dir.d_name, ".sprx", 5)?0x258:0x428;
+					offset=ps3_sys_version[0]<<32 + ps3_sys_version[1]<<16 + ps3_sys_version[2]<<8 + ps3_sys_version[3]; offset-=0x78;
 
+					retry_offset:
+					if(offset < 0x90 || offset > 0x800) offset=!extcasecmp(dir.d_name, ".sprx", 5)?0x258:0x428;
 					cellFsLseek(fdw, offset, CELL_FS_SEEK_SET, &msiz);
 					cellFsRead(fdw, (void *)&ps3_sys_version, 8, &msiz);
+
+					if(offset!=0x258 && offset!=0x428 && (ps3_sys_version[0] | ps3_sys_version[1] | ps3_sys_version[2] | ps3_sys_version[3] | ps3_sys_version[4] | ps3_sys_version[5])!=0)
+					{
+						offset=0; goto retry_offset;
+					}
 
 					if((ps3_sys_version[0]+ps3_sys_version[1]+ps3_sys_version[2]+ps3_sys_version[3]+ps3_sys_version[4]+ps3_sys_version[5])==0 && (ps3_sys_version[6] & 0xFF)>0xA4)
 					{
@@ -4326,8 +4350,8 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 						cellFsLseek(fd, lba, CELL_FS_SEEK_SET, &msiz2);
 						cellFsRead(fd, (void *)&chunk, chunk_size, &msiz1); if(msiz1<=0) break;
 
-    					offset=chunk[0xC]<<32 + chunk[0xD]<<16 + chunk[0xE]<<8 + chunk[0xF];
-	    				offset-=0x78; if(offset < 0x90 || offset > 0x800) offset=(t>2)?0x258:0x428;
+    					offset=chunk[0xC]<<32 + chunk[0xD]<<16 + chunk[0xE]<<8 + chunk[0xF]; offset-=0x78;
+	    				if(offset < 0x90 || offset > 0x800 || (chunk[offset] | chunk[offset+1] | chunk[offset+2] | chunk[offset+3] | chunk[offset+4] | chunk[offset+5])) offset=(t>2)?0x258:0x428;
 
 						for(u8 i=0;i<8;i++) ps3_sys_version[i]=chunk[offset+i];
 
@@ -4427,14 +4451,14 @@ static bool get_cover(char *icon, char *titleid)
 
 	if(covers_exist[4])
 	{
-		sprintf(icon, "%s/%s.JPG", "/dev_hdd0/GAMES/covers", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
-		sprintf(icon, "%s/%s.PNG", "/dev_hdd0/GAMES/covers", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
+		sprintf(icon, "%s/covers/%s.JPG", "/dev_hdd0/GAMES", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
+		sprintf(icon, "%s/covers/%s.PNG", "/dev_hdd0/GAMES", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
 	}
 
 	if(covers_exist[5])
 	{
-		sprintf(icon, "%s/%s.JPG", "/dev_hdd0/GAMEZ/covers", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
-		sprintf(icon, "%s/%s.PNG", "/dev_hdd0/GAMEZ/covers", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
+		sprintf(icon, "%s/covers/%s.JPG", "/dev_hdd0/GAMEZ", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
+		sprintf(icon, "%s/covers/%s.PNG", "/dev_hdd0/GAMEZ", titleid); if(cellFsStat(icon, &s)==CELL_FS_SUCCEEDED) return true;
 	}
 
 	if(covers_exist[6])
@@ -4692,16 +4716,13 @@ static void make_fb_xml(char *myxml)
 static void waitfor(char *path, uint8_t timeout)
 {
 	struct CellFsStat s;
-	uint8_t n=0;
-	while(n<(timeout*2))
+	for(uint8_t n=0; n < (timeout*2); n++)
 	{
 		if(path[0]!=NULL && cellFsStat(path, &s)==CELL_FS_SUCCEEDED) break;
 		sys_timer_usleep(500000);
-		n++;
 	}
 }
 
-#ifdef REX_ONLY
 static void enable_classic_ps2_mode()
 {
 	int fd;
@@ -4736,7 +4757,6 @@ static void disable_classic_ps2_mode()
 	}
 */
 }
-#endif
 
 #ifdef COBRA_ONLY
 #ifndef LITE_EDITION
@@ -6108,6 +6128,8 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 
 	MAC = peek_lv1(0x800000000007C1B0ULL);
 
+	if(MAC & 0xffff000000000000ULL) MAC = peek_lv1(0x800000000007C812ULL); //7C812 on some models
+
 	uint32_t blockSize;
 	uint64_t freeSize;
 	cellFsGetFreeSize((char*)"/dev_hdd0", &blockSize, &freeSize);
@@ -6197,15 +6219,14 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	sprintf( templn, "<label title=\"Startup\">&#8986;</label> %id %02d:%02d:%02d", dd, hh, mm, ss); strcat(buffer, templn);
 	///////////////////////
 
-
 	sprintf( templn, "<hr></font><h2><a class=\"s\" href=\"/setup.ps3\">"
 						"PSID LV2 : %016llX%016llX<hr>"
 						"IDPS EID0: %016llX%016llX<br>"
 						"IDPS LV2 : %016llX%016llX<br>"
-						"MAC Addr : %012llX</h2></a></b>",
+						"MAC Addr : %012llX</h2></a></b><br>",
 					PSID[0], PSID[1],
 					eid0_idps[0], eid0_idps[1],
-					IDPS[0], IDPS[1], MAC); strcat(buffer, templn);
+					IDPS[0], IDPS[6], MAC); strcat(buffer, templn);
 }
 
 static void setup_parse_settings(char *param)
@@ -6840,7 +6861,7 @@ static void setup_form(char *buffer, char *templn)
 	add_check_box("pr1", "1", STR_RBGNORM, 	" : <b>L3+L2+O</b><br>"            , !(webman_config->combo2 & NORMAMODE), buffer);
 	add_check_box("pr2", "1", STR_RBGMENU, 	" : <b>L3+L2+X</b><br>"            , !(webman_config->combo2 & DEBUGMENU), buffer);
 
-	if(is_rebug && (c_firmware>=4.65f))
+	if(c_firmware>=4.65f)
 	add_check_box("p2c", "1", "PS2 CLASSIC",  " : <b>SELECT+L2+&#8710;</b><br>", !(webman_config->combo2 & PS2TOGGLE), buffer);
 #endif
 
@@ -11094,28 +11115,27 @@ static void poll_thread(uint64_t poll)
 							goto reboot;
 						}
 #ifdef COBRA_ONLY
- #ifdef REX_ONLY
 						else
 						if( !(webman_config->combo2 & PS2TOGGLE)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_L2)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE) // SELECT+L2+TRIANGLE
-							&& is_rebug && (c_firmware>=4.65f) )
+							&& (c_firmware>=4.65f) )
 						{
-							if(cellFsStat((char*)PS2_CLASSIC_TOGGLER, &s)==CELL_FS_SUCCEEDED)
+							bool classic_ps2_enabled = (cellFsStat((char*)PS2_CLASSIC_TOGGLER, &s)==CELL_FS_SUCCEEDED);
+
+							if(classic_ps2_enabled)
 							{
 								disable_classic_ps2_mode();
-								sprintf(msg, "PS2 Classic %s", STR_DISABLED);
 							}
 							else
 							{
 								enable_classic_ps2_mode();
-								sprintf(msg, "PS2 Classic %s", STR_ENABLED);
 							}
 
+							sprintf(msg, "PS2 Classic %s", classic_ps2_enabled ? STR_DISABLED : STR_ENABLED);
 							show_msg((char*)msg);
 							sys_timer_sleep(3);
 						}
- #endif //#ifdef REX_ONLY
 						else
 						if( !(webman_config->combo2 & PS2SWITCH)
 							&& (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_L2) // Clone ps2emu habib's switcher
@@ -12842,7 +12862,7 @@ static void wwwd_thread(uint64_t arg)
 	reset_settings();
 
 
-	{struct CellFsStat buf; from_reboot = (cellFsStat((char*)WMNOSCAN, &buf)==CELL_FS_SUCCEEDED); is_rebug=isDir("/dev_flash/rebug");}
+	{struct CellFsStat buf; from_reboot = (cellFsStat((char*)WMNOSCAN, &buf)==CELL_FS_SUCCEEDED);} //is_rebug=isDir("/dev_flash/rebug");
 
 	if(webman_config->blind) enable_dev_blind(NULL);
 
@@ -12967,7 +12987,17 @@ static void wwwd_stop_thread(uint64_t arg)
 
 	uint64_t exit_code;
 	working = 0;
+/*
+	sys_ppu_thread_t t;
+ #ifndef LITE_EDITION
+	sys_ppu_thread_create(&t, netiso_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
+	sys_ppu_thread_join(t, &exit_code);
+ #endif
+	sys_ppu_thread_create(&t, rawseciso_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
+	sys_ppu_thread_join(t, &exit_code);
 
+	while(netiso_loaded || rawseciso_loaded) {sys_timer_usleep(100000);}
+*/
 	//if(thread_id != (sys_ppu_thread_t)-1)
 		sys_ppu_thread_join(thread_id, &exit_code);
 
@@ -13882,13 +13912,12 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			copy_in_progress=true;
 			show_msg(temp);
 
-#ifdef REX_ONLY
-			if(is_rebug && (c_firmware>=4.65f))
+			if(c_firmware>=4.65f)
 			{   // Auto create "classic_ps2 flag" for PS2 Classic (.BIN.ENC) on rebug 4.65.2
 				do_umount(false);
 				enable_classic_ps2_mode();
 			}
-#endif
+
 			cellFsUnlink(PS2_CLASSIC_ISO_PATH);
 			if(filecopy(_path, (char*)PS2_CLASSIC_ISO_PATH, COPY_WHOLE_FILE) == 0)
 			{
@@ -13927,12 +13956,10 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 		goto patch;
 	}
 
-#ifdef REX_ONLY
-		if(is_rebug && (c_firmware>=4.65f) && strstr(_path, "/PS2ISO/")!=NULL)
-		{   // Auto remove "classic_ps2" flag for PS2 ISOs on rebug 4.65.2
-			disable_classic_ps2_mode();
-		}
-#endif
+	if((c_firmware>=4.65f) && strstr(_path, "/PS2ISO/")!=NULL)
+	{   // Auto remove "classic_ps2" flag for PS2 ISOs on rebug 4.65.2
+		disable_classic_ps2_mode();
+	}
 
 #ifdef COBRA_ONLY
 	//if(cobra_mode)
