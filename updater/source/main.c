@@ -91,22 +91,6 @@ int sys_get_version(u32 *version)
 	return_to_user_prog(int);
 }
 
-bool is_cobra(void)
-{
-	sysFSStat stat;
-	if(sysLv2FsStat("/dev_flash/sys/stage2.bin", &stat) == SUCCESS) return true;
-	if(sysLv2FsStat("/dev_hdd0/boot_plugins.txt", &stat) == SUCCESS) return true;
-	if(sysLv2FsStat("/dev_flash/rebug/cobra", &stat) == SUCCESS) return true;
-
-	if (is_mamba())         return false;
-	
-	u32 version = 0x99999999;
-	if (sys_get_version(&version) < 0) return false;
-	if (version != 0x99999999)         return true;
-
-	return false;
-}
-
 int sys_get_mamba(void)
 {
 	lv2syscall1(8, 0x7FFF);
@@ -115,9 +99,28 @@ int sys_get_mamba(void)
 
 bool is_mamba(void)
 {
+	sysFSStat stat;
 	if(sysLv2FsStat("/dev_hdd0/mamba_plugins.txt", &stat) == SUCCESS) return true;
+
+    u32 version = 0x99999999;
 	if (sys_get_version(&version) < 0) return false;
 	if (sys_get_mamba() == 0x666) return true;
+	return false;
+}
+
+bool is_cobra(void)
+{
+	sysFSStat stat;
+	if(sysLv2FsStat("/dev_flash/sys/stage2.bin", &stat) == SUCCESS) return true;
+	if(sysLv2FsStat("/dev_hdd0/boot_plugins.txt", &stat) == SUCCESS) return true;
+	if(sysLv2FsStat("/dev_flash/rebug/cobra", &stat) == SUCCESS) return true;
+
+	if (is_mamba())         return false;
+
+	u32 version = 0x99999999;
+	if (sys_get_version(&version) < 0) return false;
+	if (version != 0x99999999)         return true;
+
 	return false;
 }
 
@@ -492,7 +495,7 @@ int main()
 
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_noncobra.sprx","/dev_hdd0/game/PRXLOADER/USRDIR/webftp_server_noncobra.sprx");
 	}
-	
+
 cont:
 
 	// update dev_flash (rebug)
@@ -622,7 +625,7 @@ cont:
 
 		sysLv2FsChmod("/dev_hdd0/webftp_server_ps3mapi.sprx", 0777);
 		sysLv2FsUnlink("/dev_hdd0/webftp_server_ps3mapi.sprx");
-		
+
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
 	}
 	// update prx_plugins.txt
