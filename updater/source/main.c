@@ -91,7 +91,6 @@ int sys_get_version(u32 *version)
 	return_to_user_prog(int);
 }
 
-
 bool is_cobra(void)
 {
 	sysFSStat stat;
@@ -99,10 +98,26 @@ bool is_cobra(void)
 	if(sysLv2FsStat("/dev_hdd0/boot_plugins.txt", &stat) == SUCCESS) return true;
 	if(sysLv2FsStat("/dev_flash/rebug/cobra", &stat) == SUCCESS) return true;
 
+	if (is_mamba())         return false;
+	
 	u32 version = 0x99999999;
 	if (sys_get_version(&version) < 0) return false;
 	if (version != 0x99999999)         return true;
 
+	return false;
+}
+
+int sys_get_mamba(void)
+{
+	lv2syscall1(8, 0x7FFF);
+    return_to_user_prog(int);
+}
+
+bool is_mamba(void)
+{
+	if(sysLv2FsStat("/dev_hdd0/mamba_plugins.txt", &stat) == SUCCESS) return true;
+	if (sys_get_version(&version) < 0) return false;
+	if (sys_get_mamba() == 0x666) return true;
 	return false;
 }
 
@@ -477,7 +492,7 @@ int main()
 
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_noncobra.sprx","/dev_hdd0/game/PRXLOADER/USRDIR/webftp_server_noncobra.sprx");
 	}
-
+	
 cont:
 
 	// update dev_flash (rebug)
@@ -580,7 +595,62 @@ cont:
 				CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server.sprx", "/dev_hdd0/webftp_server.sprx");
 		}
 	}
+	// update mamba_plugins.txt
+	if(is_mamba())
+	{
+		if(sysLv2FsStat("/dev_hdd0/mamba_plugins.txt", &stat) == SUCCESS)
+		{
+			f=fopen("/dev_hdd0/mamba_plugins.txt", "r");
+			while(fgets(ligne, 255, f) != NULL)
+			{
+				if(strstr(ligne,"webftp_server_ps3mapi.sprx") != NULL)
+				{
+					fclose(f);
+					strtok(ligne, "\r\n");
+					sysLv2FsChmod(ligne, 0777);
+					sysLv2FsUnlink(ligne);
+					CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", ligne);
+					goto exit;
+				}
+			}
+			fclose(f);
+		}
 
+		f=fopen("/dev_hdd0/mamba_plugins.txt", "a");
+		fputs("\r\n/dev_hdd0/webftp_server_ps3mapi.sprx", f);
+		fclose(f);
+
+		sysLv2FsChmod("/dev_hdd0/webftp_server_ps3mapi.sprx", 0777);
+		sysLv2FsUnlink("/dev_hdd0/webftp_server_ps3mapi.sprx");
+		
+		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
+	}
+	// update prx_plugins.txt
+	if(sysLv2FsStat("/dev_hdd0/prx_plugins.txt", &stat) == SUCCESS)
+	{
+		f=fopen("/dev_hdd0/prx_plugins.txt", "r");
+		while(fgets(ligne, 255, f) != NULL)
+		{
+			if(strstr(ligne,"webftp_server") != NULL)
+			{
+				fclose(f);
+				strtok(ligne, "\r\n");
+				sysLv2FsUnlink(ligne);
+				CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_noncobra.sprx",ligne);
+				goto cont;
+			}
+		}
+		fclose(f);
+		f=fopen("/dev_hdd0/prx_plugins.txt", "a");
+		fputs("\r\n/dev_hdd0/webftp_server_noncobra.sprx", f);
+		fclose(f);
+
+		sysLv2FsChmod("/dev_hdd0/webftp_server_noncobra.sprx", 0777);
+		sysLv2FsUnlink("/dev_hdd0/webftp_server_noncobra.sprx");
+
+		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_noncobra.sprx","/dev_hdd0/webftp_server_noncobra.sprx");
+	}
+	// exit
 exit:
 
 	// update category_game.xml (add fb.xml)
