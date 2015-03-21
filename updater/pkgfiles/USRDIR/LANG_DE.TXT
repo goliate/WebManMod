@@ -8,7 +8,7 @@ STR_EJECT       [Disk auswerfen]
 STR_INSERT      [Disk einziehen]
 STR_UNMOUNT     [Spiel auswerfen]
 STR_COPY        [Copy-Verzeichnis]
-STR_REFRESH     [Aktualisieren]
+STR_REFRESH     [Aktualisiere]
 STR_SHUTDOWN    [Ausschalten]
 STR_RESTART     [Neustarten]
 

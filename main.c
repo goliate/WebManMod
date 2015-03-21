@@ -183,6 +183,9 @@ SYS_MODULE_STOP(wwwd_stop);
 #define SYS_REBOOT						0x8201
 #define SYS_SHUTDOWN					0x1100
 
+#define SYS_NET_EURUS_POST_COMMAND		(726)
+#define CMD_GET_MAC_ADDRESS				0x103f
+
 
 #ifdef PS3MAPI
 
@@ -6108,7 +6111,7 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 		pokeq(get_fan_policy_offset, backup[5]);
 	}
 
-	uint64_t eid0_idps[2], buffr[0x40], start_sector, MAC;
+	uint64_t eid0_idps[2], buffr[0x40], start_sector;
 	uint32_t read;
 	sys_device_handle_t source;
 	if(sys_storage_open(0x100000000000004ULL, 0, &source, 0)!=0)
@@ -6125,10 +6128,6 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	eid0_idps[1]=buffr[0x0F];
 
 	get_idps_psid();
-
-	MAC = peek_lv1(0x800000000007C1B0ULL);
-
-	if(MAC & 0xffff000000000000ULL) MAC = peek_lv1(0x800000000007C812ULL); //7C812 on some models
 
 	uint32_t blockSize;
 	uint64_t freeSize;
@@ -6219,14 +6218,19 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	sprintf( templn, "<label title=\"Startup\">&#8986;</label> %id %02d:%02d:%02d", dd, hh, mm, ss); strcat(buffer, templn);
 	///////////////////////
 
+	// Get mac address [0xD-0x12]
+	u8 mac_address[0x13];
+	{system_call_3(SYS_NET_EURUS_POST_COMMAND, CMD_GET_MAC_ADDRESS, mac_address, 0x13);}
+
 	sprintf( templn, "<hr></font><h2><a class=\"s\" href=\"/setup.ps3\">"
 						"PSID LV2 : %016llX%016llX<hr>"
 						"IDPS EID0: %016llX%016llX<br>"
 						"IDPS LV2 : %016llX%016llX<br>"
-						"MAC Addr : %012llX</h2></a></b><br>",
+						"MAC Addr : %02X:%02X:%02X:%02X:%02X:%02X</h2></a></b>",
 					PSID[0], PSID[1],
 					eid0_idps[0], eid0_idps[1],
-					IDPS[0], IDPS[6], MAC); strcat(buffer, templn);
+					IDPS[0], IDPS[6],
+					mac_address[13], mac_address[14], mac_address[15], mac_address[16], mac_address[17], mac_address[18]); strcat(buffer, templn);
 }
 
 static void setup_parse_settings(char *param)
