@@ -422,7 +422,7 @@
 			<Table key="webman_gamedata">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/gamedata.png</String></Pair>
 				<Pair key="title"><String>토글 외부 gameDATA</String></Pair>
-				<Pair key="info"><String></String>USB 장치에서 게임 데이터의 온 / 오프 설치를 켜</Pair>
+				<Pair key="info"><String>USB 장치에서 게임 데이터의 온 / 오프 설치를 켜</String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/extgd.ps3</String></Pair>
 			</Table>

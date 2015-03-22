@@ -424,7 +424,7 @@
 			<Table key="webman_gamedata">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/gamedata.png</String></Pair>
 				<Pair key="title"><String>Włącz/Wyłącz zawnętrzne gameDATA</String></Pair>
-				<Pair key="info"><String></String>Turn on/off installation of game data on USB device</Pair>
+				<Pair key="info"><String>Turn on/off installation of game data on USB device</String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/extgd.ps3</String></Pair>
 			</Table>
