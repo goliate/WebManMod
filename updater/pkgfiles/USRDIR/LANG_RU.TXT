@@ -1,4 +1,4 @@
-﻿STR_TRADBY			[- Русский перевод от andy_awe (ps-club.org/forum)</a><br/>]
+﻿STR_TRADBY			[- Русский перевод от andy_awe и Danzel87 (ps-club.org/forum)</a><br/>]
 
 STR_FILES			[Файлы]
 STR_GAMES			[Игры]
@@ -84,7 +84,7 @@ STR_ERROR			[Ошибка!]
 
 STR_MYGAMES			[Мои Игры]
 STR_LOADGAMES		[Загрузить игру с помощью webMAN]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Исправление %s]
 
 STR_WMSETUP			[webMAN Настройки]
 STR_WMSETUP2		[Настройки опций webMAN]
