@@ -415,6 +415,7 @@ int main()
 	if(sysLv2FsStat("/dev_hdd0/tmp/wm_lang/LANG_XX.TXT", &stat))
 		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/LANG_XX.TXT","/dev_hdd0/tmp/wm_lang/LANG_XX.TXT");
 
+	CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/libfs.sprx","/dev_hdd0/tmp/libfs.sprx");
 
 	// copy raw_iso.sprx to dev_flash
 	if(sysLv2FsStat("/dev_flash/vsh/module/raw_iso.sprx", &stat) != SUCCESS)
