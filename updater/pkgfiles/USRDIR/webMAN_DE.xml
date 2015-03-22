@@ -166,7 +166,7 @@
 		<Attributes>
 			<Table key="webman_refresh_xml">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/pkgmanager.png</String></Pair>
-				<Pair key="title"><String>Aktualisiere Meine Spiele(XML) </String></Pair>
+				<Pair key="title"><String>Aktualisiere meine Spiele (XML) </String></Pair>
 				<Pair key="info"><String>Aktualisiere die Spieleliste im XMB</String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/refresh.ps3</String></Pair>
@@ -180,7 +180,7 @@
 		<Attributes>
 			<Table key="webman_refresh_html">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/pkgmanager.png</String></Pair>
-				<Pair key="title"><String>Aktualisiere Meine Spiele (HTML) </String></Pair>
+				<Pair key="title"><String>Aktualisiere meine Spiele (HTML) </String></Pair>
 				<Pair key="info"><String>Aktualisiere die Spieleliste im Browser Mode</String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/index.ps3?html</String></Pair>
@@ -559,8 +559,8 @@
 		<Attributes>
 			<Table key="webman_gamedata">
 				<Pair key="icon"><String>/dev_hdd0/game/XMBMANPLS/USRDIR/IMAGES/gamedata.png</String></Pair>
-				<Pair key="title"><String>Externe Spiel installation Ein/Aus</String></Pair>
-				<Pair key="info"><String></String>Externe Spieldaten Installation via USB Ein/Aus schalten</Pair>
+				<Pair key="title"><String>Externe Spieldaten Installation Ein/Aus</String></Pair>
+				<Pair key="info"><String>Externe Spieldaten Installation via USB Ein/Aus schalten</String></Pair>
 				<Pair key="module_name"><String>webbrowser_plugin</String></Pair>
 				<Pair key="module_action"><String>http://localhost/extgd.ps3</String></Pair>
 			</Table>
