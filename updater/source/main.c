@@ -561,7 +561,7 @@ cont:
 			f=fopen("/dev_hdd0/boot_plugins.txt", "r");
 			while(fgets(ligne, 255, f) != NULL)
 			{
-				if(strstr(ligne,"webftp_server.sprx") != NULL)
+				if(strstr(ligne,"webftp_server") != NULL)
 				{
 					fclose(f);
 					strtok(ligne, "\r\n");
@@ -583,7 +583,10 @@ cont:
 		}
 
 		f=fopen("/dev_hdd0/boot_plugins.txt", "a");
-		fputs("\r\n/dev_hdd0/webftp_server.sprx", f);
+		if(is_ps3mapi())
+				fputs("\r\n/dev_hdd0/webftp_server_ps3mapi.sprx", f);
+			else
+				fputs("\r\n/dev_hdd0/webftp_server.sprx", f);
 		fclose(f);
 
 		sysLv2FsChmod("/dev_hdd0/webftp_server.sprx", 0777);
@@ -594,7 +597,12 @@ cont:
 		else
 		{
 			if(is_ps3mapi())
-				CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", "/dev_hdd0/webftp_server.sprx");
+			{
+				if((sysLv2FsStat("/dev_flash/rebug", &stat) == SUCCESS))
+					CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_rebug_cobra_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
+				else
+					CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
+			}
 			else
 				CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server.sprx", "/dev_hdd0/webftp_server.sprx");
 		}
@@ -607,7 +615,7 @@ cont:
 			f=fopen("/dev_hdd0/mamba_plugins.txt", "r");
 			while(fgets(ligne, 255, f) != NULL)
 			{
-				if(strstr(ligne,"webftp_server_ps3mapi.sprx") != NULL)
+				if(strstr(ligne,"webftp_server") != NULL)
 				{
 					fclose(f);
 					strtok(ligne, "\r\n");
@@ -627,7 +635,10 @@ cont:
 		sysLv2FsChmod("/dev_hdd0/webftp_server_ps3mapi.sprx", 0777);
 		sysLv2FsUnlink("/dev_hdd0/webftp_server_ps3mapi.sprx");
 
-		CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
+			if((sysLv2FsStat("/dev_flash/rebug", &stat) == SUCCESS))
+					CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_rebug_cobra_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
+				else
+					CopyFile("/dev_hdd0/game/UPDWEBMOD/USRDIR/webftp_server_ps3mapi.sprx", "/dev_hdd0/webftp_server_ps3mapi.sprx");
 	}
 	// update prx_plugins.txt
 	if(sysLv2FsStat("/dev_hdd0/prx_plugins.txt", &stat) == SUCCESS)
