@@ -96,7 +96,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.33 MOD"						// webMAN version
+#define WM_VERSION			"1.41.34 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -4313,7 +4313,7 @@ uint64_t getlba(const char *s1, u16 n1, const char *s2, u16 n2, u16 start)
 }
 
 
-void fix_iso(char *iso_file, uint64_t maxbytes)
+void fix_iso(char *iso_file, uint64_t maxbytes, bool patch_update)
 {
 	struct CellFsStat buf;
 
@@ -4328,7 +4328,7 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 		uint64_t chunk_size=_4KB_; char chunk[_4KB_], ps3_sys_version[8];
 		uint64_t msiz1 = 0, msiz2 = 0, lba = 0, pos=0xA000ULL;
 
-		bool fix_sfo=true, fix_eboot=true;
+		bool fix_sfo=true, fix_eboot=true, fix_ver=false, fix_update=false; char update_path[64];
 
 		uint64_t size = buf.st_size; char titleID[10];
 		if(maxbytes>0 && size>maxbytes) size=maxbytes;
@@ -4351,7 +4351,15 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 					cellFsLseek(fd, lba, CELL_FS_SEEK_SET, &msiz2);
 					cellFsRead(fd, (void *)&chunk, chunk_size, &msiz1); if(msiz1<=0) break;
 
-					if(fix_param_sfo((unsigned char *)chunk, titleID, 0))
+					fix_ver = fix_param_sfo((unsigned char *)chunk, titleID, 0);
+
+					if(patch_update)
+					{
+						sprintf(update_path, "/dev_hdd0/game/%s/USRDIR/EBOOT.BIN", titleID); // has update on hdd0?
+						if(cellFsStat(iso_file, &buf)==CELL_FS_SUCCEEDED) {fix_update=true; fix_ver=false;}
+					}
+
+					if(fix_ver)
 					{
 						cellFsLseek(fd, lba, CELL_FS_SEEK_SET, &msiz2);
 						cellFsWrite(fd, chunk, msiz1, &msiz2);
@@ -4425,6 +4433,8 @@ void fix_iso(char *iso_file, uint64_t maxbytes)
 		}
 exit_fix:
 		cellFsClose(fd);
+
+		if(fix_update) {sprintf(update_path, "/dev_hdd0/game/%s/USRDIR", titleID); fix_game(update_path);}
 	}
 }
 #endif //#ifdef COBRA_ONLY
@@ -10121,7 +10131,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 								fix_in_progress=true; fix_aborted = false;
 
 								if(strcasestr(filename, ".iso"))
-									fix_iso(param, 0x100000UL);
+									fix_iso(param, 0x100000UL, false);
 								else
 									fix_game(param);
 
@@ -14263,7 +14273,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 					if(webman_config->fixgame!=FIX_GAME_DISABLED)
 					{
 						fix_in_progress=true; fix_aborted = false;
-						fix_iso(_path, 0x100000UL);
+						fix_iso(_path, 0x100000UL, true);
 						fix_in_progress=false;
 					}
  #endif //#ifdef FIX_GAME
@@ -14495,7 +14505,14 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 
 					// fix game folder
 					fix_in_progress=true; fix_aborted=false;
-					sprintf(filename, "%s/PS3_GAME/USRDIR", _path);
+
+					sprintf(filename, "/dev_hdd0/game/%s/USRDIR/EBOOT.BIN", titleID); // has update on hdd0?
+
+					if(cellFsStat(filename, &s)==CELL_FS_SUCCEEDED)
+						sprintf(filename, "/dev_hdd0/game/%s/USRDIR", titleID);
+					else
+						sprintf(filename, "%s/PS3_GAME/USRDIR", _path);
+
 					fix_game(filename);
 					fix_in_progress=false;
 
@@ -14770,7 +14787,14 @@ patch:
 
 			// fix game folder
 			fix_in_progress=true; fix_aborted=false;
-			sprintf(filename, "%s/PS3_GAME/USRDIR", _path);
+
+			sprintf(filename, "/dev_hdd0/game/%s/USRDIR/EBOOT.BIN", titleID); // has update on hdd0?
+
+			if(cellFsStat(filename, &s)==CELL_FS_SUCCEEDED)
+				sprintf(filename, "/dev_hdd0/game/%s/USRDIR", titleID);
+			else
+				sprintf(filename, "%s/PS3_GAME/USRDIR", _path);
+
 			fix_game(filename);
 			fix_in_progress=false;
 
