@@ -3779,31 +3779,36 @@ static void remove_cfw_syscalls()
     u64 sc_null = peekq(SYSCALL_TABLE);
 
 	get_idps_psid();
-
+	#ifndef COBRA_ONLY
 	pokeq(SYSCALL_PTR( 8), sc_null);
+	pokeq(SYSCALL_PTR(35), sc_null);
+	#endif
 	pokeq(SYSCALL_PTR( 9), sc_null);
 	pokeq(SYSCALL_PTR(10), sc_null);
 	pokeq(SYSCALL_PTR(11), sc_null);
-	pokeq(SYSCALL_PTR(35), sc_null);
 	pokeq(SYSCALL_PTR(36), sc_null);
 	pokeq(SYSCALL_PTR( 6), sc_null);
 	pokeq(SYSCALL_PTR( 7), sc_null);
 
 	u64 sc_not_impl_pt = peekq(sc_null);
+	#ifndef COBRA_ONLY
+	u64 sc8  = peekq(SYSCALL_PTR( 8));
+	u64 sc35 = peekq(SYSCALL_PTR(35));
+	#endif
 	u64 sc6  = peekq(SYSCALL_PTR( 6));
 	u64 sc7  = peekq(SYSCALL_PTR( 7));
-  //u64 sc8  = peekq(SYSCALL_PTR( 8));
 	u64 sc9  = peekq(SYSCALL_PTR( 9));
 	u64 sc10 = peekq(SYSCALL_PTR(10));
 	u64 sc11 = peekq(SYSCALL_PTR(11));
-  //u64 sc35 = peekq(SYSCALL_PTR(35));
 	u64 sc36 = peekq(SYSCALL_PTR(36));
 
-  //if(sc8 !=sc_null) pokeq(sc8,  sc_not_impl_pt);
+	#ifndef COBRA_ONLY
+	if(sc8 !=sc_null) pokeq(sc8,  sc_not_impl_pt);
+	if(sc35!=sc_null) pokeq(sc35, sc_not_impl_pt);
+	#endif
 	if(sc9 !=sc_null) pokeq(sc9,  sc_not_impl_pt);
 	if(sc10!=sc_null) pokeq(sc10, sc_not_impl_pt);
 	if(sc11!=sc_null) pokeq(sc11, sc_not_impl_pt);
-  //if(sc35!=sc_null) pokeq(sc35, sc_not_impl_pt);
 	if(sc36!=sc_null) pokeq(sc36, sc_not_impl_pt);
 	if(sc6 !=sc_null) pokeq(sc6,  sc_not_impl_pt);
 	if(sc7 !=sc_null) pokeq(sc7,  sc_not_impl_pt);
@@ -9140,7 +9145,7 @@ quit:
 				sclose(&conn_s);
 				if(sysmem) sys_memory_free(sysmem);
 				loading_html=0;
-/*
+
 				#ifdef PS3MAPI
 				int version = 0;
 				{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
@@ -9149,9 +9154,11 @@ quit:
 					char tmp_name[30];
 					sprintf(tmp_name, "%s", "WWWD");
 					{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)tmp_name); }
+					sys_ppu_thread_exit(0);
+					break;
 				}
 				#endif
-*/
+
 				wwwd_stop();
 				sys_ppu_thread_exit(0);
 				break;
@@ -11493,7 +11500,7 @@ static void poll_thread(uint64_t poll)
 							restore_fan(0); //restore syscon fan control mode
 							show_msg((char*)STR_WMUNL);
 							working=0;
-/*
+
 							#ifdef PS3MAPI
 							int version = 0;
 							{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
@@ -11502,9 +11509,11 @@ static void poll_thread(uint64_t poll)
 								char tmp_name[30];
 								sprintf(tmp_name, "%s", "WWWD");
 								{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)tmp_name); }
+								sys_ppu_thread_exit(0);
+								break;
 							}
 							#endif
-*/
+
 							wwwd_stop();
 							sys_ppu_thread_exit(0);
 							break;
@@ -13080,7 +13089,13 @@ int wwwd_stop(void)
 	sys_ppu_thread_create(&t, wwwd_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
 	sys_ppu_thread_join(t, &exit_code);
 
+	#ifdef PS3MAPI
+	int version = 0;
+	{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
+	if (version < 0x0120 ) finalize_module();
+	#else
 	finalize_module();
+	#endif
 	_sys_ppu_thread_exit(0);
 	return SYS_PRX_STOP_OK;
 }
