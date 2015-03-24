@@ -96,7 +96,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.34 MOD"						// webMAN version
+#define WM_VERSION			"1.41.35 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -1902,7 +1902,6 @@ static int process_read_cd_2048_cmd(uint8_t *buf, uint32_t start_sector, uint32_
 
 	memset(&cmd, 0, sizeof(cmd));
 	cmd.opcode = NETISO_CMD_READ_CD_2048_CRITICAL;
-	cmd.pad = CD_SECTOR_SIZE_2048;
 	cmd.start_sector = start_sector;
 	cmd.sector_count = sector_count;
 
@@ -2106,16 +2105,6 @@ static void netiso_thread(uint64_t arg)
 	{
 		num_tracks = args->num_tracks;
 		tracks = &args->tracks[0];
-
-		if(num_tracks > 100)
-		{
-			CD_SECTOR_SIZE_2352 = (num_tracks & 0xffff00)>>4;
-			if(CD_SECTOR_SIZE_2352 != 2352 && CD_SECTOR_SIZE_2352 != 2048 && CD_SECTOR_SIZE_2352 != 2336 && CD_SECTOR_SIZE_2352 != 2448) CD_SECTOR_SIZE_2352 = 2352;
-			num_tracks &= 0xff;
-		}
-
-		if(CD_SECTOR_SIZE_2352 != 2352) cd_sector_size_param = CD_SECTOR_SIZE_2352<<4;
-
 		is_cd2352 = 1;
 	}
 	else
@@ -3343,7 +3332,7 @@ static void get_idps_psid()
 	}
 	else if(peekq(0x8000000000003000ULL)==SYSCALLS_UNAVAILABLE)
 		return; // do not update IDPS/PSID if syscalls are removed
-	else if(idps_offset2 + psid_offset)
+	else if(idps_offset2 | psid_offset)
 	{
 			IDPS[0] = peekq(idps_offset2  );
 			IDPS[1] = peekq(idps_offset2+8);
@@ -3461,15 +3450,18 @@ static int set_gamedata_status(u8 status, bool do_mount)
 static void detect_firmware()
 {
 	if(c_firmware>3.40f) return;
-/*
+
     uint8_t platform_info[0x18];
     lv2_get_platform_info(platform_info);  // OS Version, Revision, System Software Version
     c_firmware = (float)(platform_info[0]) + (((float)(platform_info[1]))/10.0f) + (((float)(platform_info[2]>>4))/100.0f);
 
-    system_call_3(SC_GET_CONSOLE_TYPE, (u64) &dex_mode, 0, 0); // dex_mode: 1=CEX, 2=DEX, 3=TOOL
+    u64 console_type=0;
 
-    if(dex_mode==2)
+    system_call_1(SC_GET_CONSOLE_TYPE, &console_type); // dex_mode: 1=CEX, 2=DEX, 3=TOOL
+
+    if(console_type==2)
     {   // DEX
+        dex_mode=2;
         if(c_firmware==4.70f) SYSCALL_TABLE = SYSCALL_TABLE_470D;
         if(c_firmware==4.66f) SYSCALL_TABLE = SYSCALL_TABLE_465D;
         if(c_firmware==4.65f) SYSCALL_TABLE = SYSCALL_TABLE_465D;
@@ -3504,7 +3496,7 @@ static void detect_firmware()
         if(c_firmware==3.55f) SYSCALL_TABLE = SYSCALL_TABLE_355;
         if(c_firmware==3.41f) SYSCALL_TABLE = SYSCALL_TABLE_341;
     }
-*/
+/*
 
 	u64 CEX=0x4345580000000000ULL;
 	u64 DEX=0x4445580000000000ULL;
@@ -3540,7 +3532,7 @@ static void detect_firmware()
 	//if(peekq(0x80000000002E79C8ULL)==DEX) {c_firmware=3.41f; dex_mode=2;}	else
 #endif
 	{c_firmware=0.00f; return;}
-
+*/
     if(!SYSCALL_TABLE) {c_firmware=0.00f; return;}
 
 #ifndef COBRA_ONLY
@@ -3755,7 +3747,7 @@ static void spoof_idps_psid()
 					}
 				}
 			}
-			else if(idps_offset1 + idps_offset2)
+			else if(idps_offset1 | idps_offset2)
 			{
 				pokeq(idps_offset1  , newIDPS[0]);
 				pokeq(idps_offset1+8, newIDPS[1]);
@@ -14200,26 +14192,6 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 						mynet_iso->emu_mode=EMU_PSX;
 						mynet_iso->num_tracks=1;
 
-/*
-						int ns, abort_connection;
-						//detect sector size
-						if(strstr(_path, "[2048]")) mynet_iso->num_tracks|=0x8000; else
-						if(strstr(_path, "[2448]")) mynet_iso->num_tracks|=0x9900; else
-						if(strstr(_path, "[2336]")) mynet_iso->num_tracks|=0x9200; else
-						{
-							ns=connect_to_remote_server(_path[4]-'0');
-							if(ns>=0 && open_remote_file_2(ns, (char*)_path+5, &abort_connection)>0 && !abort_connection)
-							{
-								int bytes_read; char buffer[0x10];
-								bytes_read = read_remote_file(ns, (char*)buffer, 0x9320LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x9300; else {
-								bytes_read = read_remote_file(ns, (char*)buffer, 0x8020LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x8000; else {
-								bytes_read = read_remote_file(ns, (char*)buffer, 0x9920LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x9900; else {
-								bytes_read = read_remote_file(ns, (char*)buffer, 0x9220LL, 0xD, &abort_connection); if(memcmp(buffer, "PLAYSTATION ", 0xC)==0) mynet_iso->num_tracks|=0x9200; }}}
-
-								open_remote_file_2(ns, (char*)"/CLOSEFILE", &abort_connection);
-							}
-						}
-*/
 						memcpy(mynet_iso->tracks, tracks, sizeof(TrackDef));
 					}
 					else if(strstr(_path, "/GAMES/") || strstr(_path, "/GAMEZ/"))
