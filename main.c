@@ -654,7 +654,7 @@ int lang_pos, fh;
 
 #ifdef ENGLISH_ONLY
 
-static char STR_HOME[8]				= "Home";
+static char STR_HOME[8] = "Home";
 
 #define STR_TRADBY	"<br>"
 
@@ -9110,13 +9110,17 @@ again3:
 			{
 				http_response(conn_s, header, param, 200, param);
 quit:
-				restore_fan(0); //restore syscon fan control mode
+				if(!webman_config->fanc || strstr(param, "?0") || webman_config->ps2temp<33)
+					restore_fan(0); //restore syscon fan control mode
+				else
+					restore_fan(1); //set ps2 fan control mode
+
 				show_msg((char*)STR_WMUNL);
 				working=0;
 				sclose(&conn_s);
 				if(sysmem) sys_memory_free(sysmem);
 				loading_html=0;
-
+/*
 				#ifdef PS3MAPI
 				int version = 0;
 				{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
@@ -9129,7 +9133,7 @@ quit:
 					break;
 				}
 				#endif
-
+*/
 				wwwd_stop();
 				sys_ppu_thread_exit(0);
 				break;
@@ -11468,10 +11472,14 @@ static void poll_thread(uint64_t poll)
 						}
 						else if(!(webman_config->combo & UNLOAD_WM) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3) ) // L3+R3+R2 (quit webMAN)
 						{
-							restore_fan(0); //restore syscon fan control mode
+							if(!webman_config->fanc || webman_config->ps2temp<33)
+								restore_fan(0); //restore syscon fan control mode
+							else
+								restore_fan(1); //set ps2 fan control mode
+
 							show_msg((char*)STR_WMUNL);
 							working=0;
-
+/*
 							#ifdef PS3MAPI
 							int version = 0;
 							{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
@@ -11484,14 +11492,15 @@ static void poll_thread(uint64_t poll)
 								break;
 							}
 							#endif
-
+*/
 							wwwd_stop();
 							sys_ppu_thread_exit(0);
 							break;
 						}
 						else if(!(webman_config->combo & DISABLEFC) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_START) ) // L3+R2+START (enable/disable fancontrol)
 						{
-							if(webman_config->fanc) webman_config->fanc=0; else webman_config->fanc=1;
+							webman_config->fanc = (webman_config->fanc ? 0 : 1);
+
 							max_temp=0;
 							if(webman_config->fanc)
 							{
@@ -13214,13 +13223,7 @@ static bool mount_ps2disc(char *path)
 	u64 map_data  = (MAP_BASE);
 	u64 map_paths = (MAP_BASE) + (max_mapped+1) * 0x20;
 
-	for(u8 n=0; n<0x20; n++)
-	{
-		pokeq(map_data + (n * 0x20) + 0x00, 0);
-		pokeq(map_data + (n * 0x20) + 0x08, 0);
-		pokeq(map_data + (n * 0x20) + 0x10, 0);
-		pokeq(map_data + (n * 0x20) + 0x18, 0);
-	}
+	for(u16 n=0; n<0x400; n+=8) pokeq(map_data + n, 0);
 
 	for(u8 n=0; n<max_mapped; n++)
 	{
@@ -14402,7 +14405,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 				sys_timer_usleep(100000);
 			}
 
-			if(pad_data.len > 0 && (pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_SELECT)) {special_mode=true; break;} //mount also app_home / eject disc
+			if(pad_data.len > 0 && (pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_SELECT)) special_mode=true; //mount also app_home / eject disc
 			sys_timer_usleep(10000);
 
 			if(special_mode) eject_insert(1, 0);

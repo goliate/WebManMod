@@ -7,7 +7,7 @@ set PS3DEV=%PS3SDK%/ps3dev
 
 make pkg
 
-del webMAN_MOD_1.41.xx_Updater.pkg>nul
+if exist webMAN_MOD_1.41.xx_Updater.pkg del webMAN_MOD_1.41.xx_Updater.pkg>nul
 ren updater.pkg webMAN_MOD_1.41.xx_Updater.pkg
 del updater.elf
 del updater.self
