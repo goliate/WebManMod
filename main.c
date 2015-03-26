@@ -13112,6 +13112,8 @@ int wwwd_stop(void)
 	sys_ppu_thread_create(&t, wwwd_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
 	sys_ppu_thread_join(t, &exit_code);
 
+	sys_timer_usleep(500000);
+
 	finalize_module();
 
 	_sys_ppu_thread_exit(0);
