@@ -392,9 +392,9 @@ static void build_blank_iso(char *title_id)
 	memcpy(buf+0x80be, "PS3VOLUME", 9);
 	memset(buf+0x80C7, ' ', 0x266);
 	strcpy((char *)buf+0x832d, "2013111105051300");
-	strcpy((char *)buf+0x833e, "0000000000000000");
-	strcpy((char *)buf+0x834f, "0000000000000000");
-	strcpy((char *)buf+0x8360, "0000000000000000");
+	memset(buf+0x833e, '0', 0x10);
+	memset(buf+0x834f, '0', 0x10);
+	memset(buf+0x8360, '0', 0x10);
 	buf[0x8371] = 1;
 	buf[0x8800] = 2;
 	strcpy((char *)buf+0x8801, "CD001");
@@ -425,20 +425,11 @@ static void build_blank_iso(char *title_id)
 	buf[0x88B2] = 0x2B;
 	buf[0x88B3] = buf[0x88B5] = 2;
 	buf[0x88B8] = buf[0x88BB] = buf[0x88BC] = 1;
-	buf[0x88BF] = 'P';
-	buf[0x88C1] = 'S';
-	buf[0x88C3] = '3';
-	buf[0x88C5] = 'V';
-	buf[0x88C7] = 'O';
-	buf[0x88C9] = 'L';
-	buf[0x88CB] = 'U';
-	buf[0x88CD] = 'M';
-	buf[0x88CF] = 'E';
-
+	memcpy(buf+0x88BF, buf+0x8829, 17); // 'P S 3 V O L U M E'
 	strcpy((char *)buf+0x8B2D, "2013111105051300");
-	strcpy((char *)buf+0x8B3E, "0000000000000000");
-	strcpy((char *)buf+0x8B4F, "0000000000000000");
-	strcpy((char *)buf+0x8b60, "0000000000000000");
+	memset(buf+0x8B3E, '0', 0x10);
+	memset(buf+0x8B4F, '0', 0x10);
+	memset(buf+0x8B60, '0', 0x10);
 	buf[0x8B71] = 1;
 	buf[0x9000] = 0xFF;
 	strcpy((char *)buf+0x9001, "CD001");
@@ -506,7 +497,6 @@ static void build_blank_iso(char *title_id)
 
 static int copy_file(char *src, char *dst)
 {
-
 	int ret;
 	int fd_s, fd_d;
 	const uint32_t buf_size = _16KB_;
