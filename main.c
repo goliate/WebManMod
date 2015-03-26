@@ -408,9 +408,9 @@ static u8 profile = 0;
  static u8 extgd = 0;       //external gameDATA
 #endif
 
-static u8 loading_html=0;
-static u8 loading_games=0;
-static u8 init_running=0;
+static u8 loading_html = 0;
+static u8 loading_games = 0;
+static u8 init_running = 0;
 
 #ifdef COBRA_ONLY
  #ifndef LITE_EDITION
@@ -4734,7 +4734,7 @@ static void waitfor(char *path, uint8_t timeout)
 	for(uint8_t n=0; n < (timeout*2); n++)
 	{
 		if(path[0]!=NULL && cellFsStat(path, &s)==CELL_FS_SUCCEEDED) break;
-		sys_timer_usleep(500000);
+		sys_timer_usleep(500000); if(!working) break;
 	}
 }
 
@@ -4970,6 +4970,10 @@ static void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn
 			sprintf(fsize, "<a href=\"%s\">%s</a>", templn, HTML_DIR);
 		else if(flen == 9 && !strcmp(name, "dev_blind"))
 			sprintf(fsize, "<a href=\"%s?0\">%s</a>", templn, HTML_DIR);
+#ifdef FIX_GAME
+		else if(flen == 9 && strstr(templn, "/dev_hdd0/game/"))
+			sprintf(fsize, "<a href=\"/fixgame.ps3%s\">%s</a>", templn, HTML_DIR);
+#endif //#ifdef FIX_GAME
 		else
 #ifdef PS2_DISC
 			sprintf(fsize, "<a href=\"/mount%s%s\">%s</a>", strstr(name, "[PS2")?".ps2":".ps3", templn, HTML_DIR);
@@ -7045,7 +7049,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 								poke_lv1(lv2_offset + 0x08, 0x7973302F7379732FULL);
 								poke_lv1(lv2_offset + 0x10, 0x6C76325F73656C66ULL);
 
-								working=0;
+								working = 0;
 								{DELETE_TURNOFF}
 								savefile((char*)WMNOSCAN, NULL, 0);
 								{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
@@ -7287,9 +7291,9 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 
 	c_len = 0; while(loading_games && working && c_len < 500) {sys_timer_usleep(200000); c_len++;}
 
-	u32 buf_len=strlen(buffer);
+	if(c_len >= 500 || !working) {strcat(buffer, "503 Server is busy"); return true;}
 
-	if(c_len >= 500) {strcat(buffer, "503 Server is busy"); return true;}
+	u32 buf_len=strlen(buffer);
 
 /*
 	CellRtcTick pTick, pTick2;
@@ -7308,7 +7312,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 
 	if(strstr(param, "/index.ps3?") || ((pTick.tick-pTick2.tick)/1000000)>43200) {DELETE_CACHED_GAMES}
 */
-	loading_games=1;
+	loading_games = 1;
 	if(mobile_mode) {cellFsUnlink((char*)GAMELIST_JS); buffer[0]=0; buf_len=0;}
 	else
 	{
@@ -7321,7 +7325,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 			{
 				cellFsRead(fdu, (char*)(buffer+buf_len), buf.st_size, NULL);
 				cellFsClose(fdu);
-				loading_games=0;
+				loading_games = 0;
 			}
 		}
 	}
@@ -7727,7 +7731,7 @@ next_html_entry:
 		}
 
 		//if(sysmem_html) sys_memory_free(sysmem_html);
-		loading_games=0;
+		loading_games = 0;
 
 		if(mobile_mode)
 		{
@@ -8887,7 +8891,7 @@ static void handleclient(u64 conn_s_p)
 			{DELETE_CACHED_GAMES} // refresh XML will force "refresh HTML" to rebuild the cache file
 		}
 
-		init_running=1;
+		init_running = 1;
 
 		cellFsMkdir((char*)WMTMP, MODE);
 
@@ -8976,7 +8980,7 @@ static void handleclient(u64 conn_s_p)
 
 		if(update_mygames_xml(conn_s_p)) mount_autoboot();
 
-		init_running=0;
+		init_running = 0;
 		sys_ppu_thread_exit(0);
 	}
 
@@ -9015,7 +9019,7 @@ again3:
 		retries++;
 		sys_timer_sleep(1);
 		if(retries<5) goto again3;
-		init_running=0;
+		init_running = 0;
 		sclose(&conn_s);
 		loading_html--;
 		sys_ppu_thread_exit(0);
@@ -9116,7 +9120,7 @@ quit:
 					restore_fan(1); //set ps2 fan control mode
 
 				show_msg((char*)STR_WMUNL);
-				working=0;
+				working = 0;
 				sclose(&conn_s);
 				if(sysmem) sys_memory_free(sysmem);
 				loading_html=0;
@@ -9141,7 +9145,7 @@ quit:
 			if(strstr(param, "shutdown.ps3"))
 			{
 				http_response(conn_s, header, param, 200, param);
-				working=0;
+				working = 0;
 				{DELETE_TURNOFF}
 				{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
 				sys_ppu_thread_exit(0);
@@ -9171,7 +9175,7 @@ quit:
 			{
 				http_response(conn_s, header, param, 200, param);
 restart:
-				working=0;
+				working = 0;
 				{DELETE_TURNOFF}
 				if(strstr(param,"?0")==NULL) savefile((char*)WMNOSCAN, NULL, 0);
 				{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
@@ -9182,12 +9186,34 @@ restart:
 			{
 				http_response(conn_s, header, param, 200, param);
 reboot:
-				working=0;
+				working = 0;
 				{DELETE_TURNOFF}
 				{system_call_3(SC_SYS_POWER, SYS_HARD_REBOOT, NULL, 0);}
 				sys_ppu_thread_exit(0);
 				break;
 			}
+
+#ifdef FIX_GAME
+			if(strstr(param, "/fixgame.ps3"))
+			{
+				// fix game folder
+                char *game_path = param + 12;
+				if(cellFsStat((char*)game_path, &buf)==CELL_FS_SUCCEEDED)
+				{
+					fix_in_progress=true; fix_aborted=false;
+#ifdef COBRA_ONLY
+					if(strcasestr(game_path, ".iso"))
+						fix_iso(game_path, 0x100000UL, false);
+					else
+#endif //#ifdef COBRA_ONLY
+						fix_game(game_path);
+					fix_in_progress=false;
+
+					is_popup=1; is_binary=0;
+					goto html_response;
+				}
+			}
+#endif
 
 			if(strstr(param, "/games.ps3"))
 			{
@@ -9468,6 +9494,17 @@ html_response:
 					}
 					else
 #endif
+#ifdef FIX_GAME
+					if(strstr(param, "/fixgame.ps3"))
+					{
+						char *game_path = param + 12;
+						sprintf(templn, "Fixed: %s", game_path);
+						templn[211]=0; //limit message to 200 characters
+						show_msg((char*)templn);
+						sprintf(templn, "Fixed: <a href=\"%s\">%s</a>", game_path, game_path); strcat(buffer, templn);
+					}
+					else
+#endif
 					{
 						param[211]=0; //limit message to 200 characters
 						show_msg((char*)(param+11));
@@ -9492,7 +9529,7 @@ html_response:
 
 					if(strstr(param, "refresh.ps3") && init_running==0)
 					{
-						init_running=1;
+						init_running = 1;
 						refresh_xml(templn);
 						sprintf(templn,  "<br>%s", STR_XMLRF); strcat(buffer, templn);
 					}
@@ -10017,7 +10054,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 						{
 							ssend(conn_s_ftp, FTP_OK_221);
 
-							working=0;
+							working = 0;
 							{DELETE_TURNOFF}
 							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
@@ -10027,7 +10064,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 						{
 							ssend(conn_s_ftp, FTP_OK_221);
 
-							working=0;
+							working = 0;
 							{DELETE_TURNOFF}
 							if(strcasecmp(cmd, "REBOOT")) savefile((char*)WMNOSCAN, NULL, 0);
 							{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
@@ -10082,7 +10119,8 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 								mount_with_mm(cwd, 1);
 							}
 						}
-  #ifdef FIX_GAME
+ #endif //#ifdef COBRA_ONLY
+ #ifdef FIX_GAME
 						else
 						if(strcasecmp(cmd, "FIX") == 0)
 						{
@@ -10095,16 +10133,17 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 
 								fix_in_progress=true; fix_aborted = false;
 
+  #ifdef COBRA_ONLY
 								if(strcasestr(filename, ".iso"))
 									fix_iso(param, 0x100000UL, false);
 								else
+  #endif //#ifdef COBRA_ONLY
 									fix_game(param);
 
 								fix_in_progress=false;
 							}
 						}
-  #endif //#ifdef FIX_GAME
- #endif //#ifdef COBRA_ONLY
+ #endif //#ifdef FIX_GAME
 						else
 						if(strcasecmp(cmd, "CHMOD") == 0)
 						{
@@ -10866,7 +10905,7 @@ static void refresh_xml(char *msg)
 
 	sprintf(msg, "%s XML%s: %s", STR_REFRESH, SUFIX2(profile), STR_SCAN2);
 	show_msg((char*)msg);
-	init_running=1;
+	init_running = 1;
 	sys_ppu_thread_t id3;
 	sys_ppu_thread_create(&id3, handleclient, (u64)REFRESH_CONTENT, -0x1d8, 0x20000, 0, "wwwd2");
 	while(init_running && working) sys_timer_usleep(300000);
@@ -11460,7 +11499,7 @@ static void poll_thread(uint64_t poll)
 						if(!(webman_config->combo & SHUT_DOWN) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CROSS) ) // L3+R2+X (shutdown)
 						{
 							// power off
-							working=0;
+							working = 0;
 							{DELETE_TURNOFF}
 							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
@@ -11478,7 +11517,7 @@ static void poll_thread(uint64_t poll)
 								restore_fan(1); //set ps2 fan control mode
 
 							show_msg((char*)STR_WMUNL);
-							working=0;
+							working = 0;
 /*
 							#ifdef PS3MAPI
 							int version = 0;
@@ -11525,7 +11564,7 @@ static void poll_thread(uint64_t poll)
 						if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CIRCLE) // L3+R1+O (soft restart)
 						{
 							// soft reboot
-							working=0;
+							working = 0;
 							{DELETE_TURNOFF}
 							{system_call_4(SC_SYS_POWER,SYS_SOFT_REBOOT, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
@@ -11806,7 +11845,7 @@ static void poll_thread(uint64_t poll)
 					{system_call_3(SC_FS_UMOUNT, (u64)(char*)"/dev_blind", 0, 1);}
 					{system_call_3(SC_RING_BUZZER, 0x1004, 0x4, 0x6);}
 reboot:
-					working=0;
+					working = 0;
 					{DELETE_TURNOFF}
 					savefile((char*)WMNOSCAN, NULL, 0);
 					{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
@@ -12901,7 +12940,7 @@ static void wwwd_thread(uint64_t arg)
 
 	set_buffer_sizes(webman_config->foot);
 
-	init_running=1;
+	init_running = 1;
 
 	sys_ppu_thread_t id2;
 	sys_ppu_thread_create(&id2, handleclient, (u64)START_DAEMON, -0x1d8, 0x20000, 0, "wwwd2");
@@ -12975,6 +13014,7 @@ relisten:
 #endif
 				sys_timer_usleep(300000);
 			}
+			if(!working) break;
 			int conn_s;
 			if((conn_s = accept(list_s, NULL, NULL)) > 0)
 			{
@@ -13016,8 +13056,11 @@ static void wwwd_stop_thread(uint64_t arg)
 {
 	restore_fan(1); //restore & set static fan speed for ps2
 
-	uint64_t exit_code;
 	working = 0;
+	sys_timer_usleep(500000);
+
+	uint64_t exit_code;
+
 /*
 	sys_ppu_thread_t t;
  #ifndef LITE_EDITION
@@ -13069,13 +13112,8 @@ int wwwd_stop(void)
 	sys_ppu_thread_create(&t, wwwd_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
 	sys_ppu_thread_join(t, &exit_code);
 
-	#ifdef PS3MAPI
-	int version = 0;
-	{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
-	if (version < 0x0120 ) finalize_module();
-	#else
 	finalize_module();
-	#endif
+
 	_sys_ppu_thread_exit(0);
 	return SYS_PRX_STOP_OK;
 }
