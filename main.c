@@ -6230,10 +6230,12 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	{system_call_3(SYS_NET_EURUS_POST_COMMAND, CMD_GET_MAC_ADDRESS, mac_address, 0x13);}
 
 	sprintf( templn, "<hr></font><h2><a class=\"s\" href=\"/setup.ps3\">"
+						"Firmware : %i.%02i %s<br>"
 						"PSID LV2 : %016llX%016llX<hr>"
 						"IDPS EID0: %016llX%016llX<br>"
 						"IDPS LV2 : %016llX%016llX<br>"
 						"MAC Addr : %02X:%02X:%02X:%02X:%02X:%02X</h2></a></b>",
+					(int)c_firmware, (int)(c_firmware*100.0f) % 100, dex_mode ? "DEX" : "CEX",
 					PSID[0], PSID[1],
 					eid0_idps[0], eid0_idps[1],
 					IDPS[0], IDPS[1],
@@ -11373,8 +11375,10 @@ static void poll_thread(uint64_t poll)
 								////////////////////////
 
 								sprintf((char*)tmp, "CPU: %i°C  RSX: %i°C  FAN: %i%%   \r\n"
+													"Firmware : %i.%02i %s\r\n"
 													"%s: %id %02d:%02d:%02d",
 													t1>>24, t2>>24, (int)(((int)speed*100)/255),
+													(int)c_firmware, (int)(c_firmware*100.0f) % 100, dex_mode ? "DEX" : "CEX",
 													bb?"Play":"Startup", dd, hh, mm, ss);
 
 								sprintf((char*)msg, "%s\r\n%s: %i %s\r\n"
