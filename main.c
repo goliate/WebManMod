@@ -650,6 +650,7 @@ uint64_t convertH(char *val);
 
 uint64_t IDPS[2] = {0, 0};
 uint64_t PSID[2] = {0, 0};
+
 int lang_pos, fh;
 
 #ifdef ENGLISH_ONLY
@@ -3662,7 +3663,7 @@ static void spoof_idps_psid()
 		newPSID[0] = convertH(webman_config->vPSID1);
 		newPSID[1] = convertH(webman_config->vPSID2);
 
-		if(newPSID[0] != 0 && newPSID[1] != 0)
+		//if(newPSID[0] != 0 && newPSID[1] != 0)
 		{
 			if(c_firmware<=4.53f)
 			{
@@ -6713,11 +6714,13 @@ static void setup_form(char *buffer, char *templn)
 
 	add_check_box("id1", "1", "IDPS", " : ", (webman_config->sidps), buffer);
 	sprintf(templn, HTML_INPUT("vID1", "%s", "16", "22")       , webman_config->vIDPS1); strcat(buffer, templn);
-	sprintf(templn, HTML_INPUT("vID2", "%s", "16", "22") "<br>", webman_config->vIDPS2); strcat(buffer, templn);
+	sprintf(templn, HTML_INPUT("vID2", "%s", "16", "22"), webman_config->vIDPS2); strcat(buffer, templn);
+    sprintf(templn, HTML_BUTTON_FMT "<br>", HTML_BUTTON, " ", "onclick=\"vID2.value=", "1000000000000000"); strcat(buffer, templn);
 
 	add_check_box("id2", "1", "PSID", " : ", (webman_config->spsid), buffer);
 	sprintf(templn, HTML_INPUT("vPS1", "%s", "16", "22")       , webman_config->vPSID1); strcat(buffer, templn);
-	sprintf(templn, HTML_INPUT("vPS2", "%s", "16", "22") "<br><br>", webman_config->vPSID2); strcat(buffer, templn);
+	sprintf(templn, HTML_INPUT("vPS2", "%s", "16", "22"), webman_config->vPSID2); strcat(buffer, templn);
+    sprintf(templn, HTML_BUTTON_FMT "<br><br>", HTML_BUTTON, " ", "onclick=\"vPS1.value=vPS2.value=", "0000000000000000"); strcat(buffer, templn);
 #else
 	strcat(buffer, "<hr color=\"#0099FF\"/>");
 #endif
