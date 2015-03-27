@@ -11385,7 +11385,7 @@ static void poll_thread(uint64_t poll)
 								////////////////////////
 
 								sprintf((char*)tmp, "CPU: %i°C  RSX: %i°C  FAN: %i%%   \r\n"
-													"%s: %id %02d:%02d:%02d"
+													"%s: %id %02d:%02d:%02d\r\n"
 													"Firmware : %i.%02i %s\r\n",
 													t1>>24, t2>>24, (int)(((int)speed*100)/255),
 													bb?"Play":"Startup", dd, hh, mm, ss,
