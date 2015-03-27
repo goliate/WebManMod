@@ -449,7 +449,7 @@ typedef struct
  static int debug_s=-1;
  static char debug[256];
 #endif
-
+static volatile u8 wm_unload_combo = 0;
 static volatile u8 working = 1;
 static u8 cobra_mode=0;
 static u8 max_mapped=0;
@@ -9878,7 +9878,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 
 	strcpy(cwd, "/");
 
-	while(connactive == 1 && working)
+	while((connactive == 1) && working)
 	{
 
 		if(recv(conn_s_ftp, buffer, FTP_RECV_SIZE, 0) > 0)
@@ -10786,9 +10786,10 @@ static void ftpd_thread(uint64_t arg)
 {
 	int list_s=FAILED;
 relisten:
-	list_s = slisten(FTPPORT, 4);
+	if(working) list_s = slisten(FTPPORT, 4);
+	else goto end;
 
-	if(list_s<0)
+	if(working && (list_s<0))
 	{
 		sys_timer_sleep(3);
 		goto relisten;
@@ -10800,23 +10801,25 @@ relisten:
 		{
 			sys_timer_usleep(1668);
 			int conn_s_ftp;
+			if(!working) break;
+			else
 			if((conn_s_ftp = accept(list_s, NULL, NULL)) > 0)
 			{
 				sys_ppu_thread_t id;
-				sys_ppu_thread_create(&id, handleclient_ftp, (u64)conn_s_ftp, -0x1d8, 0x10000, 0, "ftpd");
+				if(working) sys_ppu_thread_create(&id, handleclient_ftp, (u64)conn_s_ftp, -0x1d8, 0x10000, 0, "ftpd");
+				else {sclose(&conn_s_ftp); goto end;}
 			}
 			else
-			if(sys_net_errno==SYS_NET_EBADF || sys_net_errno==SYS_NET_ENETDOWN)
+			if((sys_net_errno==SYS_NET_EBADF) || (sys_net_errno==SYS_NET_ENETDOWN))
 			{
 				sclose(&list_s);
 				list_s=FAILED;
 				goto relisten;
 			}
 		}
-
-		sclose(&list_s);
 	}
-
+end:	
+	sclose(&list_s);
 	sys_ppu_thread_exit(0);
 }
 
@@ -11518,6 +11521,7 @@ static void poll_thread(uint64_t poll)
 
 							show_msg((char*)STR_WMUNL);
 							working = 0;
+							wm_unload_combo = 1;
 /*
 							#ifdef PS3MAPI
 							int version = 0;
@@ -12861,35 +12865,41 @@ static void ps3mapi_thread(u64 arg)
 	{
 		int list_s = FAILED;
 	relisten:
-		list_s = slisten(PS3MAPIPORT, 4);
+		if(working) list_s = slisten(PS3MAPIPORT, 4);
+		else goto end;
 
-		if(list_s<0)
+		if(working && (list_s<0))
 		{
 			sys_timer_sleep(3);
 			goto relisten;
 		}
 
-		if(list_s >= 0)
+		//if(working && (list_s >= 0))
 		{
 			while(working)
 			{
 				sys_timer_usleep(1668);
 				int conn_s_ps3mapi;
+				if (!working) goto end;
+				else
 				if((conn_s_ps3mapi = accept(list_s, NULL, NULL)) > 0)
 				{
 					sys_ppu_thread_t id;
-					sys_ppu_thread_create(&id, handleclient_ps3mapi, (u64)conn_s_ps3mapi, -0x1d8, 0x10000, 0, THREAD02_NAME_PS3MAPI);
+					if(working) sys_ppu_thread_create(&id, handleclient_ps3mapi, (u64)conn_s_ps3mapi, -0x1d8, 0x10000, 0, THREAD02_NAME_PS3MAPI);
+					else {sclose(&conn_s_ps3mapi); goto end;}
 				}
 				else
-				if(sys_net_errno == SYS_NET_EBADF || sys_net_errno == SYS_NET_ENETDOWN)
+				if((sys_net_errno == SYS_NET_EBADF) || (sys_net_errno == SYS_NET_ENETDOWN))
 				{
 					sclose(&list_s);
 					list_s = FAILED;
 					goto relisten;
 				}
 			}
-			sclose(&list_s);
 		}
+end:	
+		sclose(&list_s);
+		sys_ppu_thread_exit(0);
 	}
 	else show_msg((char *)"PS3MAPI Server not loaded!");
 
@@ -12975,7 +12985,7 @@ again_debug:
 		fan_control(webman_config->temp0, 0);
 	}
 
-    sys_ppu_thread_create(&thread_id_poll, poll_thread, (u64)webman_config->poll, -0x1d8, 0x20000, 0, "poll_thread");
+    sys_ppu_thread_create(&thread_id_poll, poll_thread, (u64)webman_config->poll, -0x1d8, 0x20000, SYS_PPU_THREAD_CREATE_JOINABLE, "poll_thread");
 
 	while(init_running && working) sys_timer_usleep(100000);
 
@@ -12989,15 +12999,16 @@ relisten:
 #ifdef USE_DEBUG
 	ssend(debug_s, "Listening on port 80...");
 #endif
-	list_s = slisten(WWWPORT, 8);
+	if(working) list_s = slisten(WWWPORT, 4);
+	else goto end;
 
-	if(list_s<0 && working)
+	if((list_s<0) && working)
 	{
 		sys_timer_sleep(2);
 		goto relisten;
 	}
 
-	if(list_s >= 0)
+	if((list_s >= 0) && working)
 	{
 #ifdef USE_DEBUG
 		ssend(debug_s, " OK!\r\n");
@@ -13014,8 +13025,9 @@ relisten:
 #endif
 				sys_timer_usleep(300000);
 			}
-			if(!working) break;
 			int conn_s;
+			if(!working) goto end;
+			else
 			if((conn_s = accept(list_s, NULL, NULL)) > 0)
 			{
 				loading_html++;
@@ -13023,20 +13035,21 @@ relisten:
 				ssend(debug_s, "*** Incoming connection... ");
 				#endif
 				sys_ppu_thread_t id;
-				sys_ppu_thread_create(&id, handleclient, (u64)conn_s, -0x1d8, 0x20000, 0, "wwwd");
+				if(working) sys_ppu_thread_create(&id, handleclient, (u64)conn_s, -0x1d8, 0x20000, 0, "wwwd");
+				else {sclose(&conn_s); goto end;}
 			}
 			else
-				if(sys_net_errno==SYS_NET_EBADF || sys_net_errno==SYS_NET_ENETDOWN)
-				{
-					sclose(&list_s);
-					list_s=FAILED;
-					goto relisten;
-				}
+			if((sys_net_errno==SYS_NET_EBADF) || (sys_net_errno==SYS_NET_ENETDOWN))
+			{
+				sclose(&list_s);
+				list_s=FAILED;
+				goto relisten;
+			}
 		}
 
-		sclose(&list_s);
 	}
-
+end:
+	sclose(&list_s);
 	sys_ppu_thread_exit(0);
 }
 
@@ -13054,10 +13067,12 @@ int wwwd_start(uint64_t arg)
 
 static void wwwd_stop_thread(uint64_t arg)
 {
+	while(init_running) sys_timer_usleep(100000);
+	
 	restore_fan(1); //restore & set static fan speed for ps2
 
 	working = 0;
-	sys_timer_usleep(500000);
+	sys_timer_usleep(1000000);
 
 	uint64_t exit_code;
 
@@ -13085,8 +13100,11 @@ static void wwwd_stop_thread(uint64_t arg)
 	///////////// PS3MAPI END //////////////
 #endif
 
-	//if(thread_id_poll != (sys_ppu_thread_t)-1)
-		sys_ppu_thread_join(thread_id_poll, &exit_code);
+	if(wm_unload_combo !=1)
+	{
+		if(thread_id_poll != (sys_ppu_thread_t)-1)
+			sys_ppu_thread_join(thread_id_poll, &exit_code);
+	}
 
 	sys_ppu_thread_exit(0);
 }
@@ -13101,7 +13119,7 @@ static void finalize_module(void)
 	meminfo[1] = 2;
 	meminfo[3] = 0;
 
-	system_call_3(SC_STOP_PRX_MODULE, prx, 0, (uint64_t)(uint32_t)meminfo);
+	{system_call_3(SC_STOP_PRX_MODULE, prx, 0, (uint64_t)(uint32_t)meminfo);}
 }
 
 int wwwd_stop(void)
