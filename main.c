@@ -180,9 +180,9 @@ SYS_MODULE_STOP(wwwd_stop);
 #define SC_PPU_THREAD_EXIT				(41)
 
 #define SC_SYS_POWER 					(379)
-#define SYS_SOFT_REBOOT 				0x200
+#define SYS_SOFT_REBOOT 				0x0200
 #define SYS_HARD_REBOOT					0x1200
-#define SYS_REBOOT						0x8201
+#define SYS_REBOOT						0x8201 /*load LPAR id 1*/
 #define SYS_SHUTDOWN					0x1100
 
 #define SYS_NET_EURUS_POST_COMMAND		(726)
@@ -455,7 +455,6 @@ static u8 cobra_mode=0;
 static u8 max_mapped=0;
 
 static float c_firmware=0.0f;
-static u8 c_version=0;
 static u8 dex_mode=0;
 
 static u64 SYSCALL_TABLE = 0;
@@ -3460,32 +3459,32 @@ static void detect_firmware()
 
 	dex_mode=0;
 
-	if(peekq(0x80000000002ED778ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_470;  c_version=70;c_firmware=4.70f;}				else
-	if(peekq(0x800000000030F240ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_470D; c_version=70;c_firmware=4.70f; dex_mode=2;}	else
-	if(peekq(0x80000000002ED860ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_465;  c_version=(peekq(0x80000000002FC938ULL)==0x323031342F31312FULL)?66:65;c_firmware=(peekq(0x80000000002FC938ULL)==0x323031342F31312FULL)?4.66f:4.65f;} else
-	if(peekq(0x800000000030F1A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_465D; c_version=(peekq(0x800000000031EBA8ULL)==0x323031342F31312FULL)?66:65;c_firmware=(peekq(0x800000000031EBA8ULL)==0x323031342F31312FULL)?4.66f:4.65f; dex_mode=2;}	else
-	if(peekq(0x80000000002ED850ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_460;  c_version=60;c_firmware=4.60f;}				else
-	if(peekq(0x80000000002EC5E0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_455;  c_version=55;c_firmware=4.55f;}				else
-	if(peekq(0x80000000002E9D70ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_453;  c_version=53;c_firmware=4.53f;}				else
-	if(peekq(0x800000000030AEA8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_453D; c_version=53;c_firmware=4.53f; dex_mode=2;}	else
-	if(peekq(0x80000000002E9BE0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_450;  c_version=50;c_firmware=4.50f;}				else
-	if(peekq(0x80000000002EA9B8ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_446;  c_version=46;c_firmware=4.46f;}				else
-	if(peekq(0x8000000000305410ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_446D; c_version=46;c_firmware=4.46f; dex_mode=2;}	else
-	if(peekq(0x80000000002E8610ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_421;  c_version=21;c_firmware=4.21f;}				else
-	if(peekq(0x8000000000302D88ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_421D; c_version=21;c_firmware=4.21f; dex_mode=2;}	else
-	if(peekq(0x80000000002D83D0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_355;  c_version=55;c_firmware=3.55f;}				else
-	if(peekq(0x80000000002EFE20ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_355D; c_version=55;c_firmware=3.55f; dex_mode=2;}	else
+	if(peekq(0x80000000002ED778ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_470;  c_firmware=4.70f;}				else
+	if(peekq(0x800000000030F240ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_470D; c_firmware=4.70f; dex_mode=2;}	else
+	if(peekq(0x80000000002ED860ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_465;  c_firmware=(peekq(0x80000000002FC938ULL)==0x323031342F31312FULL)?4.66f:4.65f;} else
+	if(peekq(0x800000000030F1A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_465D; c_firmware=(peekq(0x800000000031EBA8ULL)==0x323031342F31312FULL)?4.66f:4.65f; dex_mode=2;}	else
+	if(peekq(0x80000000002ED850ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_460;  c_firmware=4.60f;}				else
+	if(peekq(0x80000000002EC5E0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_455;  c_firmware=4.55f;}				else
+	if(peekq(0x80000000002E9D70ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_453;  c_firmware=4.53f;}				else
+	if(peekq(0x800000000030AEA8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_453D; c_firmware=4.53f; dex_mode=2;}	else
+	if(peekq(0x80000000002E9BE0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_450;  c_firmware=4.50f;}				else
+	if(peekq(0x80000000002EA9B8ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_446;  c_firmware=4.46f;}				else
+	if(peekq(0x8000000000305410ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_446D; c_firmware=4.46f; dex_mode=2;}	else
+	if(peekq(0x80000000002E8610ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_421;  c_firmware=4.21f;}				else
+	if(peekq(0x8000000000302D88ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_421D; c_firmware=4.21f; dex_mode=2;}	else
+	if(peekq(0x80000000002D83D0ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_355;  c_firmware=3.55f;}				else
+	if(peekq(0x80000000002EFE20ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_355D; c_firmware=3.55f; dex_mode=2;}	else
 //No cobra cfw but as mamba compatibility
-	if(peekq(0x800000000030D6A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_455D; c_version=55;c_firmware=4.55f; dex_mode=2;}	else
-	if(peekq(0x8000000000309698ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_450D; c_version=50;c_firmware=4.50f; dex_mode=2;}	else
-	if(peekq(0x8000000000304EF0ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_441D; c_version=41;c_firmware=4.41f; dex_mode=2;}	else
-	if(peekq(0x80000000002EA498ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_441;  c_version=41;c_firmware=4.41f;}				else
-	if(peekq(0x80000000002EA488ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_440;  c_version=40;c_firmware=4.40f;}				else
-	if(peekq(0x80000000002E9F18ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_431;  c_version=31;c_firmware=4.31f;}				else
-	if(peekq(0x8000000000304630ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_430D; c_version=30;c_firmware=4.30f; dex_mode=2;}	else
-	if(peekq(0x80000000002E9F08ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_430;  c_version=30;c_firmware=4.30f;}				else
+	if(peekq(0x800000000030D6A8ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_455D; c_firmware=4.55f; dex_mode=2;}	else
+	if(peekq(0x8000000000309698ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_450D; c_firmware=4.50f; dex_mode=2;}	else
+	if(peekq(0x8000000000304EF0ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_441D; c_firmware=4.41f; dex_mode=2;}	else
+	if(peekq(0x80000000002EA498ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_441;  c_firmware=4.41f;}				else
+	if(peekq(0x80000000002EA488ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_440;  c_firmware=4.40f;}				else
+	if(peekq(0x80000000002E9F18ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_431;  c_firmware=4.31f;}				else
+	if(peekq(0x8000000000304630ULL)==DEX) {SYSCALL_TABLE = SYSCALL_TABLE_430D; c_firmware=4.30f; dex_mode=2;}	else
+	if(peekq(0x80000000002E9F08ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_430;  c_firmware=4.30f;}				else
 #ifndef COBRA_ONLY
-	if(peekq(0x80000000002CFF98ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_341;  c_version=41;c_firmware=3.41f;}				else
+	if(peekq(0x80000000002CFF98ULL)==CEX) {SYSCALL_TABLE = SYSCALL_TABLE_341;  c_firmware=3.41f;}				else
 	//if(peekq(0x80000000002E79C8ULL)==DEX) {c_firmware=3.41f; dex_mode=2;}	else
 #endif
 	{c_firmware=0.00f; return;}
@@ -6230,13 +6229,23 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	u8 mac_address[0x13];
 	{system_call_3(SYS_NET_EURUS_POST_COMMAND, CMD_GET_MAC_ADDRESS, mac_address, 0x13);}
 
+#ifdef COBRA_ONLY
+    #define SYSCALL8_OPCODE_GET_MAMBA           0x7FFFULL
+    bool is_mamba; {system_call_1(8, SYSCALL8_OPCODE_GET_MAMBA); is_mamba = ((int)p1 ==0x666);}
+
+    uint16_t cobra_version; sys_get_version2(&cobra_version);
+    sprintf(param, "%s %s: %X.%X", dex_mode ? "DEX" : "CEX", is_mamba ? "Mamba" : "Cobra", cobra_version>>8, (cobra_version & 0xF) ? (cobra_version & 0xFF) : ((cobra_version>>4) & 0xF));
+#else
+    sprintf(param, "%s", dex_mode ? "DEX" : "CEX");
+#endif
+
 	sprintf( templn, "<hr></font><h2><a class=\"s\" href=\"/setup.ps3\">"
 						"Firmware : %i.%02i %s<br>"
 						"PSID LV2 : %016llX%016llX<hr>"
 						"IDPS EID0: %016llX%016llX<br>"
 						"IDPS LV2 : %016llX%016llX<br>"
 						"MAC Addr : %02X:%02X:%02X:%02X:%02X:%02X</h2></a></b>",
-					(int)c_firmware, c_version, dex_mode ? "DEX" : "CEX",
+					(int)c_firmware, ((u32)(c_firmware * 1000.0f) % 1000) / 10, param,
 					PSID[0], PSID[1],
 					eid0_idps[0], eid0_idps[1],
 					IDPS[0], IDPS[1],
@@ -11380,7 +11389,7 @@ static void poll_thread(uint64_t poll)
 													"Firmware : %i.%02i %s\r\n",
 													t1>>24, t2>>24, (int)(((int)speed*100)/255),
 													bb?"Play":"Startup", dd, hh, mm, ss,
-													(int)c_firmware, c_version, dex_mode ? "DEX" : "CEX");
+													(int)c_firmware, ((u32)(c_firmware * 1000.0f) % 1000) / 10, dex_mode ? "DEX" : "CEX");
 
 								sprintf((char*)msg, "%s\r\n%s: %i %s\r\n"
 													"%s: %i %s", tmp,
