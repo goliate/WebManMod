@@ -11375,11 +11375,11 @@ static void poll_thread(uint64_t poll)
 								////////////////////////
 
 								sprintf((char*)tmp, "CPU: %i°C  RSX: %i°C  FAN: %i%%   \r\n"
-													"Firmware : %i.%02i %s\r\n"
-													"%s: %id %02d:%02d:%02d",
+													"%s: %id %02d:%02d:%02d"
+													"Firmware : %i.%02i %s\r\n",
 													t1>>24, t2>>24, (int)(((int)speed*100)/255),
-													(int)c_firmware, (int)(c_firmware*100.0f) % 100, dex_mode ? "DEX" : "CEX",
-													bb?"Play":"Startup", dd, hh, mm, ss);
+													bb?"Play":"Startup", dd, hh, mm, ss,
+													(int)c_firmware, (int)(c_firmware*100.0f) % 100, dex_mode ? "DEX" : "CEX");
 
 								sprintf((char*)msg, "%s\r\n%s: %i %s\r\n"
 													"%s: %i %s", tmp,
