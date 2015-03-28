@@ -7488,7 +7488,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 						if(mobile_mode)
 						{
 							if(strstr(enc_dir_name, "'")) continue; // ignore: cause syntax error in javascript
-							for(size_t c=0; templn[c]!=0; c++) if(templn[c]==39) templn[c]=96;
+							for(size_t c=0; templn[c]!=0; c++) {if(templn[c]==39) templn[c]=96; else if(templn[c]<=31) templn[c]=32;} // replace invalid chars
 
 							int w=260, h=300; if(strstr(icon, "ICON0.PNG")) {w=320; h=176;} else if(strstr(icon, "icon_wm_")) {w=280; h=280;}
 
@@ -7660,7 +7660,7 @@ next_html_entry:
 							if(mobile_mode)
 							{
 								if(strstr(enc_dir_name, "'")) continue; // ignore: cause syntax error in javascript
-								for(size_t c=0; templn[c]!=0; c++) if(templn[c]==39) templn[c]=96; // replace single quote
+								for(size_t c=0; templn[c]!=0; c++) {if(templn[c]==39) templn[c]=96; else if(templn[c]<=31) templn[c]=32;} // replace invalid chars
 
 								int w=260, h=300; if(strstr(icon, "ICON0.PNG")) {w=320; h=176;} else if(strstr(icon, "icon_wm_")) {w=280; h=280;}
 
