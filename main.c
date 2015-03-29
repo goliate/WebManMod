@@ -177,6 +177,7 @@ SYS_MODULE_STOP(wwwd_stop);
 
 #define SC_GET_PRX_MODULE_BY_ADDRESS	(461)
 #define SC_STOP_PRX_MODULE 				(482)
+#define SC_UNLOAD_PRX_MODULE 			(483)
 #define SC_PPU_THREAD_EXIT				(41)
 
 #define SC_SYS_POWER 					(379)
@@ -991,6 +992,8 @@ static char COVERS_PATH[100]		= "";
 
 int wwwd_start(uint64_t arg);
 int wwwd_stop(void);
+static void stop_prx_module(void);
+static void unload_prx_module(void);
 
 #ifdef COBRA_ONLY
 static int remote_stat(int s, char *path, int *is_directory, int64_t *file_size, uint64_t *mtime, uint64_t *ctime, uint64_t *atime, int *abort_connection);
@@ -9111,26 +9114,12 @@ quit:
 				else
 					restore_fan(1); //set ps2 fan control mode
 
-				show_msg((char*)STR_WMUNL);
 				working = 0;
 				sclose(&conn_s);
 				if(sysmem) sys_memory_free(sysmem);
 				loading_html=0;
-/*
-				#ifdef PS3MAPI
-				int version = 0;
-				{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
-				if (version >= 0x0120 )
-				{
-					char tmp_name[30];
-					sprintf(tmp_name, "%s", "WWWD");
-					{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)tmp_name); }
-					sys_ppu_thread_exit(0);
-					break;
-				}
-				#endif
-*/
-				wwwd_stop();
+
+				stop_prx_module();
 				sys_ppu_thread_exit(0);
 				break;
 			}
@@ -9873,14 +9862,14 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 	while((connactive == 1) && working)
 	{
 
-		if(recv(conn_s_ftp, buffer, FTP_RECV_SIZE, 0) > 0)
+		if(working && (recv(conn_s_ftp, buffer, FTP_RECV_SIZE, 0) > 0))
 		{
 			buffer[strcspn(buffer, "\n")] = '\0';
 			buffer[strcspn(buffer, "\r")] = '\0';
 
 			int split = ssplit(buffer, cmd, 15, param, MAX_PATH_LEN-1);
 
-			if(loggedin == 1)
+			if(working && loggedin == 1)
 			{
 				if(strcasecmp(cmd, "CWD") == 0)
 				{
@@ -10701,7 +10690,7 @@ pasv_again:
 					rest = 0;
 				}
 			}
-			else
+			else if (working)
 			{
 				// available commands when not logged in
 				if(strcasecmp(cmd, "USER") == 0)
@@ -10756,10 +10745,18 @@ pasv_again:
 					ssend(conn_s_ftp, "530 Error\r\n"); // Not logged in.
 				}
 			}
+			else
+			{
+				connactive = 0;
+				loggedin = 0;
+				break;
+			}
+		
 		}
 		else
 		{
 			connactive = 0;
+			loggedin = 0;
 			break;
 		}
 
@@ -10784,7 +10781,8 @@ relisten:
 	if(working && (list_s<0))
 	{
 		sys_timer_sleep(3);
-		goto relisten;
+		if(working) goto relisten;
+		else goto end;
 	}
 
 	//if(list_s >= 0)
@@ -10795,18 +10793,19 @@ relisten:
 			int conn_s_ftp;
 			if(!working) break;
 			else
-			if((conn_s_ftp = accept(list_s, NULL, NULL)) > 0)
+			if(working &&(conn_s_ftp = accept(list_s, NULL, NULL)) > 0)
 			{
 				sys_ppu_thread_t id;
 				if(working) sys_ppu_thread_create(&id, handleclient_ftp, (u64)conn_s_ftp, -0x1d8, 0x10000, 0, "ftpd");
-				else {sclose(&conn_s_ftp); goto end;}
+				else {sclose(&conn_s_ftp); break;}
 			}
 			else
 			if((sys_net_errno==SYS_NET_EBADF) || (sys_net_errno==SYS_NET_ENETDOWN))
 			{
 				sclose(&list_s);
 				list_s=FAILED;
-				goto relisten;
+				if(working) goto relisten;
+				else break;
 			}
 		}
 	}
@@ -11513,24 +11512,10 @@ static void poll_thread(uint64_t poll)
 							else
 								restore_fan(1); //set ps2 fan control mode
 
-							show_msg((char*)STR_WMUNL);
 							working = 0;
 							wm_unload_combo = 1;
-/*
-							#ifdef PS3MAPI
-							int version = 0;
-							{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_CORE_VERSION); version = (int)(p1); }
-							if (version >= 0x0120 )
-							{
-								char tmp_name[30];
-								sprintf(tmp_name, "%s", "WWWD");
-								{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)tmp_name); }
-								sys_ppu_thread_exit(0);
-								break;
-							}
-							#endif
-*/
-							wwwd_stop();
+
+							stop_prx_module();
 							sys_ppu_thread_exit(0);
 							break;
 						}
@@ -12236,7 +12221,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 	while(connactive == 1 && working)
 	{
 
-		if(recv(conn_s_ps3mapi, buffer, PS3MAPI_RECV_SIZE, 0) > 0)
+		if(working && (recv(conn_s_ps3mapi, buffer, PS3MAPI_RECV_SIZE, 0) > 0))
 		{
 			buffer[strcspn(buffer, "\n")] = '\0';
 			buffer[strcspn(buffer, "\r")] = '\0';
@@ -12845,7 +12830,8 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 		sys_timer_usleep(1668);
 	}
 
-	sprintf(buffer, PS3MAPI_DISCONNECT_NOTIF, inet_ntoa(conn_info.remote_adr)); show_msg(buffer);
+	sprintf(buffer, PS3MAPI_DISCONNECT_NOTIF, inet_ntoa(conn_info.remote_adr));
+	show_msg(buffer);
 	sclose(&conn_s_ps3mapi);
 	sclose(&data_s);
 	sys_ppu_thread_exit(0);
@@ -12865,7 +12851,8 @@ static void ps3mapi_thread(u64 arg)
 		if(working && (list_s<0))
 		{
 			sys_timer_sleep(3);
-			goto relisten;
+			if(working) goto relisten;
+			else goto end;
 		}
 
 		//if(working && (list_s >= 0))
@@ -12876,18 +12863,19 @@ static void ps3mapi_thread(u64 arg)
 				int conn_s_ps3mapi;
 				if (!working) goto end;
 				else
-				if((conn_s_ps3mapi = accept(list_s, NULL, NULL)) > 0)
+				if(working && (conn_s_ps3mapi = accept(list_s, NULL, NULL)) > 0)
 				{
 					sys_ppu_thread_t id;
 					if(working) sys_ppu_thread_create(&id, handleclient_ps3mapi, (u64)conn_s_ps3mapi, -0x1d8, 0x10000, 0, THREAD02_NAME_PS3MAPI);
-					else {sclose(&conn_s_ps3mapi); goto end;}
+					else {sclose(&conn_s_ps3mapi); break;}
 				}
 				else
 				if((sys_net_errno == SYS_NET_EBADF) || (sys_net_errno == SYS_NET_ENETDOWN))
 				{
 					sclose(&list_s);
 					list_s = FAILED;
-					goto relisten;
+					if(working) goto relisten;
+					else break;
 				}
 			}
 		}
@@ -12987,7 +12975,7 @@ again_debug:
 
 //	{DELETE_TURNOFF}
 
-	int list_s;
+	int list_s = FAILED;
 
 relisten:
 #ifdef USE_DEBUG
@@ -12999,7 +12987,8 @@ relisten:
 	if((list_s<0) && working)
 	{
 		sys_timer_sleep(2);
-		goto relisten;
+		if(working) goto relisten;
+		else goto end;
 	}
 
 	if((list_s >= 0) && working)
@@ -13022,7 +13011,7 @@ relisten:
 			int conn_s;
 			if(!working) goto end;
 			else
-			if((conn_s = accept(list_s, NULL, NULL)) > 0)
+			if(working && (conn_s = accept(list_s, NULL, NULL)) > 0)
 			{
 				loading_html++;
 				#ifdef USE_DEBUG
@@ -13030,14 +13019,15 @@ relisten:
 				#endif
 				sys_ppu_thread_t id;
 				if(working) sys_ppu_thread_create(&id, handleclient, (u64)conn_s, -0x1d8, 0x20000, 0, "wwwd");
-				else {sclose(&conn_s); goto end;}
+				else {sclose(&conn_s); break;}
 			}
 			else
 			if((sys_net_errno==SYS_NET_EBADF) || (sys_net_errno==SYS_NET_ENETDOWN))
 			{
 				sclose(&list_s);
 				list_s=FAILED;
-				goto relisten;
+				if(working) goto relisten;
+				else break;
 			}
 		}
 
@@ -13061,12 +13051,12 @@ int wwwd_start(uint64_t arg)
 
 static void wwwd_stop_thread(uint64_t arg)
 {
-	while(init_running) sys_timer_usleep(100000);
+	while(init_running) sys_timer_usleep(500000); //Prevent unload too fast
 	
 	restore_fan(1); //restore & set static fan speed for ps2
 
 	working = 0;
-	sys_timer_usleep(1000000);
+	sys_timer_usleep(500000);
 
 	uint64_t exit_code;
 
@@ -13103,17 +13093,24 @@ static void wwwd_stop_thread(uint64_t arg)
 	sys_ppu_thread_exit(0);
 }
 
-static void finalize_module(void)
+static void stop_prx_module(void)
 {
-	uint64_t meminfo[5];
+	show_msg((char*)STR_WMUNL);
+	
+	sys_prx_id_t prx = prx_get_module_id_by_address(stop_prx_module);
+	int *result;
+	
+	{system_call_6(SC_STOP_PRX_MODULE, (u64)prx, 0, NULL, (u64)result, 0, NULL);}
+	
+}
 
-	sys_prx_id_t prx = prx_get_module_id_by_address(finalize_module);
+static void unload_prx_module(void)
+{
 
-	meminfo[0] = 0x28;
-	meminfo[1] = 2;
-	meminfo[3] = 0;
+	sys_prx_id_t prx = prx_get_module_id_by_address(unload_prx_module);
 
-	{system_call_3(SC_STOP_PRX_MODULE, prx, 0, (uint64_t)(uint32_t)meminfo);}
+	{system_call_3(SC_UNLOAD_PRX_MODULE, (u64)prx, 0, NULL);}
+	
 }
 
 int wwwd_stop(void)
@@ -13121,14 +13118,17 @@ int wwwd_stop(void)
 	sys_ppu_thread_t t;
 	uint64_t exit_code;
 
-	sys_ppu_thread_create(&t, wwwd_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
-	sys_ppu_thread_join(t, &exit_code);
+	int ret = sys_ppu_thread_create(&t, wwwd_stop_thread, 0, 0, 0x2000, SYS_PPU_THREAD_CREATE_JOINABLE, STOP_THREAD_NAME);
+	if (ret == 0) sys_ppu_thread_join(t, &exit_code);
 
 	sys_timer_usleep(500000);
 
-	finalize_module();
+	unload_prx_module();
+	
+//#ifndef CCAPI
+	_sys_ppu_thread_exit(0); // remove for ccapi compatibility ???
+//#endif
 
-	_sys_ppu_thread_exit(0);
 	return SYS_PRX_STOP_OK;
 }
 
