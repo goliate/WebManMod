@@ -2218,6 +2218,12 @@ int cobra_build_netiso_params(void *param_buf, char *server, uint16_t port, char
 	return 0;
 }
 */
+int sys_get_version2(uint16_t *version)
+{
+	system_call_2(8, SYSCALL8_OPCODE_GET_VERSION2, (uint64_t)(uint32_t)version);
+	return (int)p1;
+}
+
 int cobra_load_vsh_plugin(unsigned int slot, char *path, void *arg, uint32_t arg_size)
 {
 	system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, slot, (uint64_t)(uint32_t)path, (uint64_t)(uint32_t)arg, arg_size);
