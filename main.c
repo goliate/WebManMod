@@ -96,7 +96,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.35 MOD"						// webMAN version
+#define WM_VERSION			"1.41.36 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -10763,7 +10763,7 @@ pasv_again:
 				loggedin = 0;
 				break;
 			}
-		
+
 		}
 		else
 		{
@@ -10821,7 +10821,7 @@ relisten:
 			}
 		}
 	}
-end:	
+end:
 	sclose(&list_s);
 	sys_ppu_thread_exit(0);
 }
@@ -12891,7 +12891,7 @@ static void ps3mapi_thread(u64 arg)
 				}
 			}
 		}
-end:	
+end:
 		sclose(&list_s);
 		sys_ppu_thread_exit(0);
 	}
@@ -13064,7 +13064,7 @@ int wwwd_start(uint64_t arg)
 static void wwwd_stop_thread(uint64_t arg)
 {
 	while(init_running) sys_timer_usleep(500000); //Prevent unload too fast
-	
+
 	restore_fan(1); //restore & set static fan speed for ps2
 
 	working = 0;
@@ -13108,12 +13108,12 @@ static void wwwd_stop_thread(uint64_t arg)
 static void stop_prx_module(void)
 {
 	show_msg((char*)STR_WMUNL);
-	
+
 	sys_prx_id_t prx = prx_get_module_id_by_address(stop_prx_module);
 	int *result;
-	
+
 	{system_call_6(SC_STOP_PRX_MODULE, (u64)prx, 0, NULL, (u64)result, 0, NULL);}
-	
+
 }
 
 static void unload_prx_module(void)
@@ -13122,7 +13122,7 @@ static void unload_prx_module(void)
 	sys_prx_id_t prx = prx_get_module_id_by_address(unload_prx_module);
 
 	{system_call_3(SC_UNLOAD_PRX_MODULE, (u64)prx, 0, NULL);}
-	
+
 }
 
 int wwwd_stop(void)
@@ -13136,7 +13136,7 @@ int wwwd_stop(void)
 	sys_timer_usleep(500000);
 
 	unload_prx_module();
-	
+
 //#ifndef CCAPI
 	_sys_ppu_thread_exit(0); // remove for ccapi compatibility ???
 //#endif
@@ -14952,8 +14952,8 @@ exit_mount:
 
 #ifdef COBRA_ONLY
 	{
-		if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
-			sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd");
+		//if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
+			sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
 	}
 #endif
 
