@@ -11392,12 +11392,22 @@ static void poll_thread(uint64_t poll)
 								ss = ss % 86400; hh = (u32)(ss / 3600); ss = ss % 3600; mm = (u32)(ss / 60); ss = ss % 60;
 								////////////////////////
 
+								char cfw_info[20];
+#ifdef COBRA_ONLY
+								#define SYSCALL8_OPCODE_GET_MAMBA           0x7FFFULL
+								bool is_mamba; {system_call_1(8, SYSCALL8_OPCODE_GET_MAMBA); is_mamba = ((int)p1 ==0x666);}
+
+								uint16_t cobra_version; sys_get_version2(&cobra_version);
+								sprintf(cfw_info, "%s %s: %X.%X", dex_mode ? "DEX" : "CEX", is_mamba ? "Mamba" : "Cobra", cobra_version>>8, (cobra_version & 0xF) ? (cobra_version & 0xFF) : ((cobra_version>>4) & 0xF));
+#else
+								sprintf(cfw_info, "%s", dex_mode ? "DEX" : "CEX");
+#endif
 								sprintf((char*)tmp, "CPU: %i°C  RSX: %i°C  FAN: %i%%   \r\n"
 													"%s: %id %02d:%02d:%02d\r\n"
 													"Firmware : %i.%02i %s\r\n",
 													t1>>24, t2>>24, (int)(((int)speed*100)/255),
 													bb?"Play":"Startup", dd, hh, mm, ss,
-													(int)c_firmware, ((u32)(c_firmware * 1000.0f) % 1000) / 10, dex_mode ? "DEX" : "CEX");
+													(int)c_firmware, ((u32)(c_firmware * 1000.0f) % 1000) / 10, cfw_info);
 
 								sprintf((char*)msg, "%s\r\n%s: %i %s\r\n"
 													"%s: %i %s", tmp,
