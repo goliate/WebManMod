@@ -4396,7 +4396,10 @@ exit_fix:
 static void get_name(char *name, char *filename, u8 cache)
 {
 	if(cache)
-		sprintf(name, "%s/%s", WMTMP, filename);
+	{
+		int pos=strlen(filename); while(pos>0 && filename[pos]!='/') pos--;
+		sprintf(name, "%s/%s", WMTMP, filename+pos);
+	}
 	else
 		sprintf(name, "%s", filename);
 
