@@ -96,7 +96,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.37 MOD"						// webMAN version
+#define WM_VERSION			"1.41.38 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -14967,9 +14967,9 @@ exit_mount:
 #ifdef COBRA_ONLY
 	{
 		if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
-			sys_map_path((char*)"/dev_bdvd/PS3/UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
+			sys_map_path((char*)"/dev_bdvd/PS3/UPDATE", (char*)"/dev_bdvd"); //redirect root of bdvd to /dev_bdvd/PS3/UPDATE
 
-			sys_map_path((char*)"/dev_bdvd", (char*)"/dev_bdvd/PS3_UPDATE"); //redirect firmware update to root of bdvd
+		sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
 	}
 #endif
 
