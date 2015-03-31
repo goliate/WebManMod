@@ -96,7 +96,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.36 MOD"						// webMAN version
+#define WM_VERSION			"1.41.37 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -4395,19 +4395,20 @@ exit_fix:
 
 static void get_name(char *name, char *filename, u8 cache)
 {
+	int pos = 0;
+	if(cache) {pos=strlen(filename); while(pos>0 && filename[pos-1]!='/') pos--;}
+	if(cache==2) cache=0;
+
 	if(cache)
-	{
-		int pos=strlen(filename); while(pos>0 && filename[pos]!='/') pos--;
 		sprintf(name, "%s/%s", WMTMP, filename+pos);
-	}
 	else
-		sprintf(name, "%s", filename);
+		sprintf(name, "%s", filename+pos);
 
 	int flen=strlen(name);
 	if(flen>2 && name[flen-2]=='.' ) {name[flen-2]=0; flen-=2;}
 	if(flen>4 && name[flen-4]=='.' )  name[flen-4]=0;
 	else
-	if(strstr(filename, ".ntfs["))
+	if(strstr(filename+pos, ".ntfs["))
 	{
 		while(name[flen]!='.') flen--; name[flen]=0;
 		if(flen>4 && name[flen-4]=='.' && (strcasestr(ISO_EXTENSIONS, &name[flen-4]))) name[flen-4]=0; else
@@ -4697,11 +4698,11 @@ static int get_title_and_id_from_sfo(char *templn, char *tempID, char *entry_nam
 			parse_param_sfo(mem, tempID, templn);
 			if(!webman_config->nocov) get_cover(icon, tempID);
 		}
-        if(templn[0]==0) get_name(templn, entry_name, 0); //use file name as title
+        if(templn[0]==0) get_name(templn, entry_name, 2); //use file name as title
 		return 0;
 	}
 	else
-		{get_name(templn, entry_name, 0); utf8enc(data, templn);} //use file name as title
+		{get_name(templn, entry_name, 2); utf8enc(data, templn);} //use file name as title
 
 		return 1;
 }
@@ -14965,8 +14966,10 @@ exit_mount:
 
 #ifdef COBRA_ONLY
 	{
-		//if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
-			sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
+		if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
+			sys_map_path((char*)"/dev_bdvd/PS3/UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
+
+			sys_map_path((char*)"/dev_bdvd", (char*)"/dev_bdvd/PS3_UPDATE"); //redirect firmware update to root of bdvd
 	}
 #endif
 
