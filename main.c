@@ -85,6 +85,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define VSH_ETC_PATH		"/dev_blind/vsh/etc/"
 #define PS2_EMU_PATH		"/dev_blind/ps2emu/"
 #define REBUG_COBRA_PATH	"/dev_blind/rebug/cobra/"
+#define HABIB_COBRA_PATH	"/dev_blind/habib/cobra/"
 #define SYS_COBRA_PATH		"/dev_blind/sys/"
 #define PS2_CLASSIC_TOGGLER "/dev_hdd0/classic_ps2"
 #define REBUG_TOOLBOX		"/dev_hdd0/game/RBGTLBOX2/USRDIR/"
@@ -96,7 +97,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.38 MOD"						// webMAN version
+#define WM_VERSION			"1.41.39 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -543,6 +544,7 @@ typedef struct
 	uint8_t dev_sd;
 	uint8_t dev_ms;
 	uint8_t dev_cf;
+	uint8_t ps1emu;
 } __attribute__((packed)) WebmanCfg;
 
 //combo
@@ -596,11 +598,14 @@ static CellRtcTick rTick, gTick;
 
 static int set_gamedata_status(u8 status, bool do_mount);
 static void set_buffer_sizes(int footprint);
-static void get_idps_psid();
+static void get_idps_psid(void);
 static void enable_dev_blind(char *msg);
 
 #ifdef NOSINGSTAR
-static void no_singstar_icon();
+static void no_singstar_icon(void);
+#endif
+#ifdef COBRA_ONLY
+static void select_ps1emu(void);
 #endif
 
 static void refresh_xml(char *msg);
@@ -3330,7 +3335,7 @@ uint64_t find_syscall_table()
 }
 */
 
-static void get_idps_psid()
+static void get_idps_psid(void)
 {
 	if(c_firmware<=4.53f)
 	{
@@ -6315,6 +6320,7 @@ static void setup_parse_settings(char *param)
 	if(strstr(param, "psl=1")) webman_config->pspl=1;
 	if(strstr(param, "p2l=1")) webman_config->ps2l=1;
 	if(strstr(param, "rxv=1")) webman_config->rxvid=1;
+	if(strstr(param, "pse=1")) webman_config->ps1emu=1;
 
 	webman_config->combo=webman_config->combo2=0;
 	if(!strstr(param, "pfs=1")) webman_config->combo|=FAIL_SAFE;
@@ -6607,7 +6613,9 @@ static void setup_form(char *buffer, char *templn)
 	add_check_box("ps2", "1", "PLAYSTATION\xC2\xAE\x32"    , " ("     , !(webman_config->cmask & PS2), buffer);
 	add_check_box("p2l", "1", STR_PS2L                     , ")<br>"  ,  (webman_config->ps2l)       , buffer);
 #ifdef COBRA_ONLY
-	add_check_box("ps1", "1", "PLAYSTATION\xC2\xAE"        , NULL     , !(webman_config->cmask & PS1), buffer);
+	add_check_box("ps1", "1", "PLAYSTATION\xC2\xAE&nbsp;"  , " ("     , !(webman_config->cmask & PS1), buffer);
+	add_check_box("pse", "1", "ps1_netemu"                 , ")<br>"  ,  (webman_config->ps1emu)     , buffer);
+
     add_check_box("psp", "1", "PLAYSTATION\xC2\xAEPORTABLE", " ("     , !(webman_config->cmask & PSP), buffer);
     add_check_box("psl", "1", STR_PSPL                     , ")<br>"  ,  (webman_config->pspl)       , buffer);
 	add_check_box("blu", "1", "Blu-ray\xE2\x84\xA2"        , " ("     , !(webman_config->cmask & BLU), buffer);
@@ -8865,11 +8873,14 @@ static void http_response(int conn_s, char *header, char *param, int code, char 
 					"Content-Length: %i\r\n\r\n"
 					"<body bgcolor=\"#101010\" text=\"#c0c0c0\">"
 					"<font face=\"Courier New\">"
-                    "webMAN MOD " WM_VERSION "<hr><h2>%s</h2>"
-                    "</font></body>",
+					"webMAN MOD " WM_VERSION "<hr><h2>%s</h2>"
+					"</font></body>",
 					 code, param, 113+strlen(text), text);
+
 	ssend(conn_s, header);
 	sclose(&conn_s);
+
+	if(msg[0]=='/') {show_msg((char*)text); sys_timer_sleep(1); }
 }
 
 static void handleclient(u64 conn_s_p)
@@ -10886,7 +10897,7 @@ static void dump_mem(char *file, uint64_t start, uint32_t size_mb)
 #endif
 
 #ifdef NOSINGSTAR
-static void no_singstar_icon()
+static void no_singstar_icon(void)
 {
 	int fd;
 
@@ -11691,6 +11702,24 @@ static void poll_thread(uint64_t poll)
 								reboot=true;
 							}
  #else
+
+							if(cellFsStat((char*)HABIB_COBRA_PATH "stage2.cex", &s)==CELL_FS_SUCCEEDED)
+							{
+								show_msg((char*)"COBRA is active!\r\nDeactivating COBRA...");
+
+								cellFsRename(HABIB_COBRA_PATH "stage2.cex", HABIB_COBRA_PATH "stage2_disabled.cex");
+
+								reboot=true;
+							}
+							else if(cellFsStat((char*)HABIB_COBRA_PATH "stage2_disabled.cex", &s)==CELL_FS_SUCCEEDED)
+							{
+								show_msg((char*)"COBRA is inactive!\r\nActivating COBRA...");
+
+								cellFsRename(HABIB_COBRA_PATH "stage2_disabled.cex", HABIB_COBRA_PATH "stage2.cex");
+
+								reboot=true;
+							}
+
 							if(cellFsStat((char*)SYS_COBRA_PATH "stage2.bin", &s)==CELL_FS_SUCCEEDED)
 							{
 								show_msg((char*)"COBRA is active!\r\nDeactivating COBRA...");
@@ -13158,6 +13187,49 @@ int wwwd_stop(void)
 	return SYS_PRX_STOP_OK;
 }
 
+#ifdef COBRA_ONLY
+static void select_ps1emu(void)
+{
+	CellPadData pad_data;
+	pad_data.len=0;
+
+	for(u8 n=0;n<10;n++)
+	{
+		if(cellPadGetData(0, &pad_data) != CELL_PAD_OK)
+			if(cellPadGetData(1, &pad_data) != CELL_PAD_OK)
+					cellPadGetData(2, &pad_data);
+
+		if(pad_data.len > 0) break;
+		sys_timer_usleep(100000);
+	}
+
+	if(pad_data.len>0)
+    {
+		if(pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2) {webman_config->ps1emu=1; save_settings();} else
+		if(pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_L2) {webman_config->ps1emu=0; save_settings();}
+    }
+
+	char msg[100];
+
+	if(webman_config->ps1emu)
+	{
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_netemu.self", (char*)"//dev_flash/ps1emu/ps1_emu.self");
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_emu.self"   , (char*)"//dev_flash/ps1emu/ps1_netemu.self");
+
+		sprintf(msg, "ps1_netemu.self %s", STR_ENABLED);
+	}
+	else
+	{
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_netemu.self", (char*)"//dev_flash/ps1emu/ps1_netemu.self");
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_emu.self"   , (char*)"//dev_flash/ps1emu/ps1_emu.self");
+
+		sprintf(msg, "ps1_emu.self %s",    STR_ENABLED);
+	}
+
+	show_msg((char*)msg);
+}
+#endif
+
 static void eject_insert(u8 eject, u8 insert)
 {
 	u8 atapi_cmnd2[56];
@@ -14119,6 +14191,8 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			strstr(_path, "/PSXISO/") || strstr(_path, "/PSXGAMES/") || strstr(_path, "/PSPISO/") || strstr(_path, "/ISO/")    ||
 			strstr(_path,"/net0/")    || strstr(_path,"/net1/")      || strstr(_path, "/net2/")   || strstr(_path, ".ntfs[") )
 		{
+			if( strstr(_path, "/PSXISO/") || strstr(_path, "/PSXGAMES/") ) select_ps1emu();
+
 			if(_next || _prev)
 				sys_timer_sleep(1);
 			else
