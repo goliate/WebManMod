@@ -839,8 +839,7 @@ int cobra_mount_dvd_disc_image(char *files[], unsigned int num)
 
 int cobra_mount_bd_disc_image(char *files[], unsigned int num)
 {
-	if (!files)
-		return EINVAL;
+	if (!files) return EINVAL;
 
 	return sys_storage_ext_mount_bd_discfile(num, files);
 }
@@ -849,8 +848,7 @@ int cobra_mount_psx_disc_image_iso(char *file, TrackDef *tracks, unsigned int nu
 {
 	ScsiTrackDescriptor scsi_tracks[1];
 
-	if (!file || num_tracks > 1)
-		return EINVAL;
+	if (!file || num_tracks > 1) return EINVAL;
 
 	memset(scsi_tracks, 0, sizeof(scsi_tracks));
 
