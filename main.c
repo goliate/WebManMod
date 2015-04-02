@@ -97,7 +97,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.39 MOD"						// webMAN version
+#define WM_VERSION			"1.41.40 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -4879,6 +4879,7 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 
 	icon[0]=tempID[0]=0;
 
+
 	if(IS_PS3_FOLDER) //PS3 games only
 	{
 		if(data[v3_entry].is_directory)
@@ -4916,9 +4917,11 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 		get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
 	}
 	else
-		{get_name(templn, data[v3_entry].name, 0);}
+		{get_name(enc_dir_name, data[v3_entry].name, 0); utf8enc(templn, enc_dir_name);}
 
-	if(!(IS_PS3_FOLDER)) utf8enc(tempstr, templn);
+	struct CellFsStat buf;
+
+	{get_name(enc_dir_name, data[v3_entry].name, 1); strcat(enc_dir_name, ".PNG"); if((icon[0]==0 || webman_config->nocov) && cellFsStat((char*)enc_dir_name, &buf)==CELL_FS_SUCCEEDED) strcpy(icon, enc_dir_name);}
 
 	if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 	{
@@ -5453,14 +5456,17 @@ static bool update_mygames_xml(u64 conn_s_p)
 //
 			char param[MAX_PATH_LEN];
 
-			u8 subfolder;
+			char ll[4]; bool ls=false; u8 li=0, subfolder=0;
+
+		subfolder_letter_xml:
 			subfolder = 0; uprofile = profile;
 read_folder_xml:
 //
 #ifndef LITE_EDITION
 			if(is_net)
 			{
-				sprintf(param, "/%s%s",    paths[f1], SUFIX(uprofile));
+				if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
+				sprintf(param, "/%s%s%s",    paths[f1], SUFIX(uprofile), ll);
 			}
 			else
 #endif
@@ -5543,6 +5549,8 @@ read_folder_xml:
  #ifndef LITE_EDITION
 					if(is_net)
 					{
+						if(!ls && li==0 && f1>1 && data[v3_entry].is_directory && strlen(data[v3_entry].name)==1) ls=true;
+
 						if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1, 0)==FAILED) {v3_entry++; continue;}
 
 						sprintf(tempstr, "<Table key=\"%04i\">"
@@ -5661,6 +5669,8 @@ next_xml_entry:
 								}
 							}
 		//title_foundx:
+							if(!is_iso && f1<2 && (icon[0]==0 || webman_config->nocov)) sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
+
 							get_cover_from_name(icon, entry.d_name, tempID);
 
 							if(is_iso)
@@ -5740,6 +5750,7 @@ next_xml_entry:
 continue_reading_folder_xml:
 
 			if((uprofile>0) && (f1<9)) {subfolder=uprofile=0; goto read_folder_xml;}
+			if(is_net && ls && li<27) {li++; goto subfolder_letter_xml;}
 //
 		}
 		if(is_net && ns>=0) {shutdown(ns, SHUT_RDWR); socketclose(ns); ns=-2;}
@@ -6977,7 +6988,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 
 		if(!(plen==IS_COPY && !copy_in_progress))
 		{
-			for(int n=0; n<strlen(param)-9; n++)
+			for(int n=0; n<(strlen(param)-9); n++)
 				if(memcmp(param + n, "/PS3_GAME", 9)==0) {param[n]=0; break;}
 #ifdef PS2_DISC
 			if(!memcmp(param, "/mount.ps2", 10))
@@ -7442,14 +7453,17 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #endif
 				if(is_net && (ns<0)) break;
 
-				u8 subfolder;
+				char ll[4]; bool ls=false; u8 li=0, subfolder=0;
+
+		subfolder_letter_html:
 				subfolder = 0; uprofile = profile;
 		read_folder_html:
 //
 #ifndef LITE_EDITION
 				if(is_net)
 				{
-					sprintf(param, "/%s%s",    paths[f1], SUFIX(uprofile));
+					if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
+					sprintf(param, "/%s%s%s",    paths[f1], SUFIX(uprofile), ll);
 				}
 				else
 #endif
@@ -7494,11 +7508,15 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
  #ifndef LITE_EDITION
 					if(is_net)
 					{
+						if(!ls && li==0 && f1>1 && data[v3_entry].is_directory && strlen(data[v3_entry].name)==1) ls=true;
+
 						if(filter_name[0]>=' ' && strcasestr(param, filter_name)==NULL && strcasestr(data[v3_entry].name, filter_name)==NULL) {v3_entry++; continue;}
 
 						if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1, 1)==FAILED) {v3_entry++; continue;}
 
 						snprintf(ename, 6, "%s    ", templn);
+
+						strcpy(tempstr, icon); urlenc(icon, tempstr);
 
 						if(mobile_mode)
 						{
@@ -7633,9 +7651,9 @@ next_html_entry:
 								get_title_and_id_from_sfo(templn, tempID, entry.d_name, icon, tempstr);
 							}
 
-							get_cover_from_name(icon, entry.d_name, tempID);
+							if(!is_iso && f1<2 && (icon[0]==0 || webman_config->nocov)) sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
 
-							if(!is_iso && icon[0]==0) sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
+							get_cover_from_name(icon, entry.d_name, tempID);
 
 							if(icon[0]==0)
 							{
@@ -7671,6 +7689,8 @@ next_html_entry:
 							templn[64]=0; flen=strlen(templn);
 
 							snprintf(ename, 6, "%s    ", templn);
+
+							strcpy(tempstr, icon); urlenc(icon, tempstr);
 
 							if(mobile_mode)
 							{
@@ -7719,6 +7739,7 @@ next_html_entry:
 //
 	continue_reading_folder_html:
 				if((uprofile>0) && (f1<9)) {subfolder=uprofile=0; goto read_folder_html;}
+				if(is_net && ls && li<27) {li++; goto subfolder_letter_html;}
 //
 			}
 			if(is_net && ns>=0) {shutdown(ns, SHUT_RDWR); socketclose(ns); ns=-2;}
