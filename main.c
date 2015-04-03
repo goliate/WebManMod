@@ -1078,10 +1078,10 @@ static bool fix_in_progress = false;
 static bool fix_aborted = false;
 static bool is_busy = false;
 static bool is_mounting = false;
+static u32 copied_count = 0;
 
 #ifdef COPY_PS3
 static char current_file[MAX_PATH_LEN];
-static u32 copied_count = 0;
 #endif
 
 static char* game_name();
@@ -6295,6 +6295,7 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 					mac_address[13], mac_address[14], mac_address[15], mac_address[16], mac_address[17], mac_address[18]); strcat(buffer, templn);
 
 	/////////////////////////////
+#ifdef COPY_PS3
 	if(copy_in_progress)
 	{
 		sprintf( templn, "<hr>%s %s (%i %s)", STR_COPYING, current_file, copied_count, STR_FILES); strcat(buffer, templn);
@@ -6304,6 +6305,7 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	{
 		strcat(buffer, "<hr>"); sprintf( templn, STR_FIXING, current_file); strcat(buffer, templn);
 	}
+#endif
 	/////////////////////////////
 }
 
@@ -11519,6 +11521,7 @@ static void poll_thread(uint64_t poll)
 								sys_timer_sleep(2);
 
 								/////////////////////////////
+#ifdef COPY_PS3
 								if(copy_in_progress)
 								{
 									sprintf((char*)msg, "<hr>%s %s (%i %s)", STR_COPYING, current_file, copied_count, STR_FILES);
@@ -11532,6 +11535,7 @@ static void poll_thread(uint64_t poll)
 									show_msg(msg);
 									sys_timer_sleep(2);
 								}
+#endif
 								/////////////////////////////
 							}
 						}
@@ -12890,7 +12894,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							if(split == 1)
 							{
 								unsigned int slot = val(param1);
-								if ( slot !=0) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)param1, (u64)param2, NULL, 0); }}
+								if ( slot ) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)param1, (u64)param2, NULL, 0); }}
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
 						}
@@ -12901,7 +12905,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						if(split == 1)
 						{
 							unsigned int slot = val(param2);
-							if ( slot !=0) {{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }}
+							if ( slot ) {{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }}
 							ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
