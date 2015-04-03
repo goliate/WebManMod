@@ -194,11 +194,11 @@ SYS_MODULE_STOP(wwwd_stop);
 
 ///////////// PS3MAPI BEGIN //////////////
 
-#define PS3MAPI_SERVER_VERSION						0x0111
-#define PS3MAPI_SERVER_MINVERSION					0x0111
+#define PS3MAPI_SERVER_VERSION						0x0120
+#define PS3MAPI_SERVER_MINVERSION					0x0120
 
-#define PS3MAPI_WEBUI_VERSION						0x0120
-#define PS3MAPI_WEBUI_MINVERSION					0x0100
+#define PS3MAPI_WEBUI_VERSION						0x0121
+#define PS3MAPI_WEBUI_MINVERSION					0x0120
 
 #define PS3MAPI_CORE_MINVERSION						0x0111
 
@@ -8614,7 +8614,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			char uslot_str[3];
 			get_value(uslot_str, pos + 12, 2);
 			uslot = val(uslot_str);
-			{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)uslot);}
+			if ( uslot !=0){{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)uslot);}}
 		}
 		else
 		{
@@ -8631,7 +8631,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			{
 				char prx_path[256];
 				get_value(prx_path, pos + 4, 256);
-				{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}
+				if ( uslot !=0){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}}
 			}
 		}
 	}
@@ -8662,8 +8662,8 @@ loadvshplug_err_arg:
 								"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
 								"<td width=\"100\" style=\"text-align: right; float: right;\">"
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
-								"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" value=\" Unload \"/></form></td></tr>",
-								slot, tmp_name, tmp_filename, slot);
+								"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" %s/></form></td></tr>",
+								slot, tmp_name, tmp_filename, slot, (slot == 0) ?  "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"");
 				strcat(buffer, templn);
 			}
 			else
@@ -8672,7 +8672,8 @@ loadvshplug_err_arg:
 								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
 								HTML_INPUT("prx", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
-								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" value=\" Load \"/></td></form></tr>", slot, "NULL", slot, slot);
+								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" %s/></td></form></tr>", slot, "NULL", slot,
+								slot, (slot == 0) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
 				strcat(buffer, templn);
 			}
 	}
@@ -12462,8 +12463,8 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							split = ssplit(param2, param1, 383, param2, 383);
 							if(split == 1)
 							{
-								u64 part1 = val(param1);
-								u64 part2 = val(param2);
+								u64 part1 = convertH(param1);
+								u64 part2 = convertH(param2);
 								{ system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_IDPS, (u64)part1, (u64)part2);}
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
@@ -12485,8 +12486,8 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							split = ssplit(param2, param1, 383, param2, 383);
 							if(split == 1)
 							{
-								u64 part1 = val(param1);
-								u64 part2 = val(param2);
+								u64 part1 = convertH(param1);
+								u64 part2 = convertH(param2);
 								{ system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PSID, (u64)part1, (u64)part2);}
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
@@ -12556,7 +12557,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 									split = ssplit(param2, param1, 383, param2, 383);
 									if(split == 1)
 									{
-										u64 offset = val(param1);
+										u64 offset = convertH(param1);
 										int size = val(param2);
 										int rr = -4;
 										sys_addr_t sysmem = 0;
@@ -12614,7 +12615,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 								if(split == 1)
 								{
 									u32 attached_pid = val(param1);
-									u64 offset = val(param2);
+									u64 offset = convertH(param2);
 									int rr = -1;
 									sys_addr_t sysmem = 0;
 									if(sys_memory_allocate(BUFFER_SIZE_PS3MAPI, SYS_MEMORY_PAGE_SIZE_64K, &sysmem) == 0)
@@ -12743,11 +12744,21 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if(strcasecmp(cmd, "UNLOADVSHPLUG") == 0)
+					else if(strcasecmp(cmd, "UNLOADVSHPLUGS") == 0)
 					{
 						if(split == 1)
 						{
-							{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }
+							unsigned int slot = val(param2);
+							if ( slot !=0) {{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }}
+							ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
+						}
+						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
+					}
+					else if(strcasecmp(cmd, "UNLOADVSHPLUGN") == 0)
+					{
+						if(split == 1)
+						{
+							if ( strcasecmp(param2, "WWWD") != 0) {{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }}
 							ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
