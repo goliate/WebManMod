@@ -85,6 +85,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define VSH_ETC_PATH		"/dev_blind/vsh/etc/"
 #define PS2_EMU_PATH		"/dev_blind/ps2emu/"
 #define REBUG_COBRA_PATH	"/dev_blind/rebug/cobra/"
+#define HABIB_COBRA_PATH	"/dev_blind/habib/cobra/"
 #define SYS_COBRA_PATH		"/dev_blind/sys/"
 #define PS2_CLASSIC_TOGGLER "/dev_hdd0/classic_ps2"
 #define REBUG_TOOLBOX		"/dev_hdd0/game/RBGTLBOX2/USRDIR/"
@@ -96,7 +97,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.36 MOD"						// webMAN version
+#define WM_VERSION			"1.41.40 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -543,6 +544,7 @@ typedef struct
 	uint8_t dev_sd;
 	uint8_t dev_ms;
 	uint8_t dev_cf;
+	uint8_t ps1emu;
 } __attribute__((packed)) WebmanCfg;
 
 //combo
@@ -596,11 +598,14 @@ static CellRtcTick rTick, gTick;
 
 static int set_gamedata_status(u8 status, bool do_mount);
 static void set_buffer_sizes(int footprint);
-static void get_idps_psid();
+static void get_idps_psid(void);
 static void enable_dev_blind(char *msg);
 
 #ifdef NOSINGSTAR
-static void no_singstar_icon();
+static void no_singstar_icon(void);
+#endif
+#ifdef COBRA_ONLY
+static void select_ps1emu(void);
 #endif
 
 static void refresh_xml(char *msg);
@@ -3330,7 +3335,7 @@ uint64_t find_syscall_table()
 }
 */
 
-static void get_idps_psid()
+static void get_idps_psid(void)
 {
 	if(c_firmware<=4.53f)
 	{
@@ -4395,16 +4400,20 @@ exit_fix:
 
 static void get_name(char *name, char *filename, u8 cache)
 {
+	int pos = 0;
+	if(cache) {pos=strlen(filename); while(pos>0 && filename[pos-1]!='/') pos--;}
+	if(cache==2) cache=0;
+
 	if(cache)
-		sprintf(name, "%s/%s", WMTMP, filename);
+		sprintf(name, "%s/%s", WMTMP, filename+pos);
 	else
-		sprintf(name, "%s", filename);
+		sprintf(name, "%s", filename+pos);
 
 	int flen=strlen(name);
 	if(flen>2 && name[flen-2]=='.' ) {name[flen-2]=0; flen-=2;}
 	if(flen>4 && name[flen-4]=='.' )  name[flen-4]=0;
 	else
-	if(strstr(filename, ".ntfs["))
+	if(strstr(filename+pos, ".ntfs["))
 	{
 		while(name[flen]!='.') flen--; name[flen]=0;
 		if(flen>4 && name[flen-4]=='.' && (strcasestr(ISO_EXTENSIONS, &name[flen-4]))) name[flen-4]=0; else
@@ -4694,11 +4703,11 @@ static int get_title_and_id_from_sfo(char *templn, char *tempID, char *entry_nam
 			parse_param_sfo(mem, tempID, templn);
 			if(!webman_config->nocov) get_cover(icon, tempID);
 		}
-        if(templn[0]==0) get_name(templn, entry_name, 0); //use file name as title
+        if(templn[0]==0) get_name(templn, entry_name, 2); //use file name as title
 		return 0;
 	}
 	else
-		{get_name(templn, entry_name, 0); utf8enc(data, templn);} //use file name as title
+		{get_name(templn, entry_name, 2); utf8enc(data, templn);} //use file name as title
 
 		return 1;
 }
@@ -4870,6 +4879,7 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 
 	icon[0]=tempID[0]=0;
 
+
 	if(IS_PS3_FOLDER) //PS3 games only
 	{
 		if(data[v3_entry].is_directory)
@@ -4907,9 +4917,11 @@ static int add_net_game(int ns, netiso_read_dir_result_data *data, int v3_entry,
 		get_title_and_id_from_sfo(templn, tempID, data[v3_entry].name, icon, tempstr);
 	}
 	else
-		{get_name(templn, data[v3_entry].name, 0);}
+		{get_name(enc_dir_name, data[v3_entry].name, 0); utf8enc(templn, enc_dir_name);}
 
-	if(!(IS_PS3_FOLDER)) utf8enc(tempstr, templn);
+	struct CellFsStat buf;
+
+	{get_name(enc_dir_name, data[v3_entry].name, 1); strcat(enc_dir_name, ".PNG"); if((icon[0]==0 || webman_config->nocov) && cellFsStat((char*)enc_dir_name, &buf)==CELL_FS_SUCCEEDED) strcpy(icon, enc_dir_name);}
 
 	if(data[v3_entry].is_directory && IS_ISO_FOLDER)
 	{
@@ -5444,14 +5456,17 @@ static bool update_mygames_xml(u64 conn_s_p)
 //
 			char param[MAX_PATH_LEN];
 
-			u8 subfolder;
+			char ll[4]; bool ls=false; u8 li=0, subfolder=0;
+
+		subfolder_letter_xml:
 			subfolder = 0; uprofile = profile;
 read_folder_xml:
 //
 #ifndef LITE_EDITION
 			if(is_net)
 			{
-				sprintf(param, "/%s%s",    paths[f1], SUFIX(uprofile));
+				if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
+				sprintf(param, "/%s%s%s",    paths[f1], SUFIX(uprofile), ll);
 			}
 			else
 #endif
@@ -5534,6 +5549,8 @@ read_folder_xml:
  #ifndef LITE_EDITION
 					if(is_net)
 					{
+						if(!ls && li==0 && f1>1 && data[v3_entry].is_directory && strlen(data[v3_entry].name)==1) ls=true;
+
 						if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1, 0)==FAILED) {v3_entry++; continue;}
 
 						sprintf(tempstr, "<Table key=\"%04i\">"
@@ -5652,6 +5669,8 @@ next_xml_entry:
 								}
 							}
 		//title_foundx:
+							if(!is_iso && f1<2 && (icon[0]==0 || webman_config->nocov)) sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
+
 							get_cover_from_name(icon, entry.d_name, tempID);
 
 							if(is_iso)
@@ -5731,6 +5750,7 @@ next_xml_entry:
 continue_reading_folder_xml:
 
 			if((uprofile>0) && (f1<9)) {subfolder=uprofile=0; goto read_folder_xml;}
+			if(is_net && ls && li<27) {li++; goto subfolder_letter_xml;}
 //
 		}
 		if(is_net && ns>=0) {shutdown(ns, SHUT_RDWR); socketclose(ns); ns=-2;}
@@ -6311,6 +6331,7 @@ static void setup_parse_settings(char *param)
 	if(strstr(param, "psl=1")) webman_config->pspl=1;
 	if(strstr(param, "p2l=1")) webman_config->ps2l=1;
 	if(strstr(param, "rxv=1")) webman_config->rxvid=1;
+	if(strstr(param, "pse=1")) webman_config->ps1emu=1;
 
 	webman_config->combo=webman_config->combo2=0;
 	if(!strstr(param, "pfs=1")) webman_config->combo|=FAIL_SAFE;
@@ -6603,7 +6624,9 @@ static void setup_form(char *buffer, char *templn)
 	add_check_box("ps2", "1", "PLAYSTATION\xC2\xAE\x32"    , " ("     , !(webman_config->cmask & PS2), buffer);
 	add_check_box("p2l", "1", STR_PS2L                     , ")<br>"  ,  (webman_config->ps2l)       , buffer);
 #ifdef COBRA_ONLY
-	add_check_box("ps1", "1", "PLAYSTATION\xC2\xAE"        , NULL     , !(webman_config->cmask & PS1), buffer);
+	add_check_box("ps1", "1", "PLAYSTATION\xC2\xAE&nbsp;"  , " ("     , !(webman_config->cmask & PS1), buffer);
+	add_check_box("pse", "1", "ps1_netemu"                 , ")<br>"  ,  (webman_config->ps1emu)     , buffer);
+
     add_check_box("psp", "1", "PLAYSTATION\xC2\xAEPORTABLE", " ("     , !(webman_config->cmask & PSP), buffer);
     add_check_box("psl", "1", STR_PSPL                     , ")<br>"  ,  (webman_config->pspl)       , buffer);
 	add_check_box("blu", "1", "Blu-ray\xE2\x84\xA2"        , " ("     , !(webman_config->cmask & BLU), buffer);
@@ -6965,7 +6988,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 
 		if(!(plen==IS_COPY && !copy_in_progress))
 		{
-			for(int n=0; n<strlen(param)-9; n++)
+			for(int n=0; n<(strlen(param)-9); n++)
 				if(memcmp(param + n, "/PS3_GAME", 9)==0) {param[n]=0; break;}
 #ifdef PS2_DISC
 			if(!memcmp(param, "/mount.ps2", 10))
@@ -7430,14 +7453,17 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #endif
 				if(is_net && (ns<0)) break;
 
-				u8 subfolder;
+				char ll[4]; bool ls=false; u8 li=0, subfolder=0;
+
+		subfolder_letter_html:
 				subfolder = 0; uprofile = profile;
 		read_folder_html:
 //
 #ifndef LITE_EDITION
 				if(is_net)
 				{
-					sprintf(param, "/%s%s",    paths[f1], SUFIX(uprofile));
+					if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
+					sprintf(param, "/%s%s%s",    paths[f1], SUFIX(uprofile), ll);
 				}
 				else
 #endif
@@ -7482,11 +7508,15 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
  #ifndef LITE_EDITION
 					if(is_net)
 					{
+						if(!ls && li==0 && f1>1 && data[v3_entry].is_directory && strlen(data[v3_entry].name)==1) ls=true;
+
 						if(filter_name[0]>=' ' && strcasestr(param, filter_name)==NULL && strcasestr(data[v3_entry].name, filter_name)==NULL) {v3_entry++; continue;}
 
 						if(add_net_game(ns, data, v3_entry, neth, param, templn, tempstr, enc_dir_name, icon, tempID, f1, 1)==FAILED) {v3_entry++; continue;}
 
 						snprintf(ename, 6, "%s    ", templn);
+
+						strcpy(tempstr, icon); urlenc(icon, tempstr);
 
 						if(mobile_mode)
 						{
@@ -7621,9 +7651,9 @@ next_html_entry:
 								get_title_and_id_from_sfo(templn, tempID, entry.d_name, icon, tempstr);
 							}
 
-							get_cover_from_name(icon, entry.d_name, tempID);
+							if(!is_iso && f1<2 && (icon[0]==0 || webman_config->nocov)) sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
 
-							if(!is_iso && icon[0]==0) sprintf(icon, "%s/%s/PS3_GAME/ICON0.PNG", param, entry.d_name);
+							get_cover_from_name(icon, entry.d_name, tempID);
 
 							if(icon[0]==0)
 							{
@@ -7659,6 +7689,8 @@ next_html_entry:
 							templn[64]=0; flen=strlen(templn);
 
 							snprintf(ename, 6, "%s    ", templn);
+
+							strcpy(tempstr, icon); urlenc(icon, tempstr);
 
 							if(mobile_mode)
 							{
@@ -7707,6 +7739,7 @@ next_html_entry:
 //
 	continue_reading_folder_html:
 				if((uprofile>0) && (f1<9)) {subfolder=uprofile=0; goto read_folder_html;}
+				if(is_net && ls && li<27) {li++; goto subfolder_letter_html;}
 //
 			}
 			if(is_net && ns>=0) {shutdown(ns, SHUT_RDWR); socketclose(ns); ns=-2;}
@@ -8671,12 +8704,38 @@ loadvshplug_err_arg:
 				sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
 								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
-								HTML_INPUT("prx", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
-								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" %s/></td></form></tr>", slot, "NULL", slot,
-								slot, (slot == 0) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
+								HTML_INPUT("prx\" list=\"plugins", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
+								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" %s/></td></form></tr>",
+								slot, "NULL", slot, slot, (slot == 0) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
 				strcat(buffer, templn);
 			}
 	}
+
+
+	//add plugins list
+	{
+		strcat(buffer, "<datalist id=\"plugins\">");
+		int fd; char paths[3][20] = {"/dev_hdd0", "/dev_hdd0/plugins", "/dev_hdd0/tmp"};
+
+		for(u8 i = 0; i < 3; i++)
+		if(cellFsOpendir(paths[i], &fd) == CELL_FS_SUCCEEDED)
+		{
+			CellFsDirent dir; u64 read = sizeof(CellFsDirent);
+
+			while(!cellFsReaddir(fd, &dir, &read))
+			{
+				if(!read) break;
+				if(strstr(dir.d_name, ".sprx"))
+				{
+					sprintf(templn, "<option>%s/%s</option>", paths[i], dir.d_name); strcat(buffer, templn);
+				}
+			}
+			cellFsClosedir(fd);
+		}
+
+		strcat(buffer, "</datalist>");
+	}
+
 	sprintf(templn, "%s", "</table><br>");
 	if(!is_ps3mapi_home) strcat(templn, "<hr color=\"#FF0000\"/>");
 	strcat(buffer, templn);
@@ -8862,11 +8921,14 @@ static void http_response(int conn_s, char *header, char *param, int code, char 
 					"Content-Length: %i\r\n\r\n"
 					"<body bgcolor=\"#101010\" text=\"#c0c0c0\">"
 					"<font face=\"Courier New\">"
-                    "webMAN MOD " WM_VERSION "<hr><h2>%s</h2>"
-                    "</font></body>",
+					"webMAN MOD " WM_VERSION "<hr><h2>%s</h2>"
+					"</font></body>",
 					 code, param, 113+strlen(text), text);
+
 	ssend(conn_s, header);
 	sclose(&conn_s);
+
+	if(msg[0]=='/') {show_msg((char*)text); sys_timer_sleep(1); }
 }
 
 static void handleclient(u64 conn_s_p)
@@ -10883,7 +10945,7 @@ static void dump_mem(char *file, uint64_t start, uint32_t size_mb)
 #endif
 
 #ifdef NOSINGSTAR
-static void no_singstar_icon()
+static void no_singstar_icon(void)
 {
 	int fd;
 
@@ -11390,12 +11452,22 @@ static void poll_thread(uint64_t poll)
 								ss = ss % 86400; hh = (u32)(ss / 3600); ss = ss % 3600; mm = (u32)(ss / 60); ss = ss % 60;
 								////////////////////////
 
+								char cfw_info[20];
+#ifdef COBRA_ONLY
+								#define SYSCALL8_OPCODE_GET_MAMBA           0x7FFFULL
+								bool is_mamba; {system_call_1(8, SYSCALL8_OPCODE_GET_MAMBA); is_mamba = ((int)p1 ==0x666);}
+
+								uint16_t cobra_version; sys_get_version2(&cobra_version);
+								sprintf(cfw_info, "%s %s: %X.%X", dex_mode ? "DEX" : "CEX", is_mamba ? "Mamba" : "Cobra", cobra_version>>8, (cobra_version & 0xF) ? (cobra_version & 0xFF) : ((cobra_version>>4) & 0xF));
+#else
+								sprintf(cfw_info, "%s", dex_mode ? "DEX" : "CEX");
+#endif
 								sprintf((char*)tmp, "CPU: %i°C  RSX: %i°C  FAN: %i%%   \r\n"
 													"%s: %id %02d:%02d:%02d\r\n"
 													"Firmware : %i.%02i %s\r\n",
 													t1>>24, t2>>24, (int)(((int)speed*100)/255),
 													bb?"Play":"Startup", dd, hh, mm, ss,
-													(int)c_firmware, ((u32)(c_firmware * 1000.0f) % 1000) / 10, dex_mode ? "DEX" : "CEX");
+													(int)c_firmware, ((u32)(c_firmware * 1000.0f) % 1000) / 10, cfw_info);
 
 								sprintf((char*)msg, "%s\r\n%s: %i %s\r\n"
 													"%s: %i %s", tmp,
@@ -11678,6 +11750,24 @@ static void poll_thread(uint64_t poll)
 								reboot=true;
 							}
  #else
+
+							if(cellFsStat((char*)HABIB_COBRA_PATH "stage2.cex", &s)==CELL_FS_SUCCEEDED)
+							{
+								show_msg((char*)"COBRA is active!\r\nDeactivating COBRA...");
+
+								cellFsRename(HABIB_COBRA_PATH "stage2.cex", HABIB_COBRA_PATH "stage2_disabled.cex");
+
+								reboot=true;
+							}
+							else if(cellFsStat((char*)HABIB_COBRA_PATH "stage2_disabled.cex", &s)==CELL_FS_SUCCEEDED)
+							{
+								show_msg((char*)"COBRA is inactive!\r\nActivating COBRA...");
+
+								cellFsRename(HABIB_COBRA_PATH "stage2_disabled.cex", HABIB_COBRA_PATH "stage2.cex");
+
+								reboot=true;
+							}
+
 							if(cellFsStat((char*)SYS_COBRA_PATH "stage2.bin", &s)==CELL_FS_SUCCEEDED)
 							{
 								show_msg((char*)"COBRA is active!\r\nDeactivating COBRA...");
@@ -12754,15 +12844,6 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
-					else if(strcasecmp(cmd, "UNLOADVSHPLUGN") == 0)
-					{
-						if(split == 1)
-						{
-							if ( strcasecmp(param2, "WWWD") != 0) {{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }}
-							ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
-						}
-						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
-					}
 					else if(strcasecmp(cmd, "GETVSHPLUGINFO") == 0)
 					{
 						if(split == 1)
@@ -13154,6 +13235,49 @@ int wwwd_stop(void)
 
 	return SYS_PRX_STOP_OK;
 }
+
+#ifdef COBRA_ONLY
+static void select_ps1emu(void)
+{
+	CellPadData pad_data;
+	pad_data.len=0;
+
+	for(u8 n=0;n<10;n++)
+	{
+		if(cellPadGetData(0, &pad_data) != CELL_PAD_OK)
+			if(cellPadGetData(1, &pad_data) != CELL_PAD_OK)
+					cellPadGetData(2, &pad_data);
+
+		if(pad_data.len > 0) break;
+		sys_timer_usleep(100000);
+	}
+
+	if(pad_data.len>0)
+    {
+		if(pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2) {webman_config->ps1emu=1; save_settings();} else
+		if(pad_data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_L2) {webman_config->ps1emu=0; save_settings();}
+    }
+
+	char msg[100];
+
+	if(webman_config->ps1emu)
+	{
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_netemu.self", (char*)"//dev_flash/ps1emu/ps1_emu.self");
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_emu.self"   , (char*)"//dev_flash/ps1emu/ps1_netemu.self");
+
+		sprintf(msg, "ps1_netemu.self %s", STR_ENABLED);
+	}
+	else
+	{
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_netemu.self", (char*)"//dev_flash/ps1emu/ps1_netemu.self");
+		sys_map_path((char*)"/dev_flash/ps1emu/ps1_emu.self"   , (char*)"//dev_flash/ps1emu/ps1_emu.self");
+
+		sprintf(msg, "ps1_emu.self %s",    STR_ENABLED);
+	}
+
+	show_msg((char*)msg);
+}
+#endif
 
 static void eject_insert(u8 eject, u8 insert)
 {
@@ -14116,6 +14240,8 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 			strstr(_path, "/PSXISO/") || strstr(_path, "/PSXGAMES/") || strstr(_path, "/PSPISO/") || strstr(_path, "/ISO/")    ||
 			strstr(_path,"/net0/")    || strstr(_path,"/net1/")      || strstr(_path, "/net2/")   || strstr(_path, ".ntfs[") )
 		{
+			if( strstr(_path, "/PSXISO/") || strstr(_path, "/PSXGAMES/") ) select_ps1emu();
+
 			if(_next || _prev)
 				sys_timer_sleep(1);
 			else
@@ -14963,8 +15089,10 @@ exit_mount:
 
 #ifdef COBRA_ONLY
 	{
-		//if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
-			sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
+		if(ret && (strstr(_path, ".PUP.ntfs[BD") || cellFsStat((char*)"/dev_bdvd/PS3UPDAT.PUP", &s)==CELL_FS_SUCCEEDED))
+			sys_map_path((char*)"/dev_bdvd/PS3/UPDATE", (char*)"/dev_bdvd"); //redirect root of bdvd to /dev_bdvd/PS3/UPDATE
+
+		sys_map_path((char*)"/dev_bdvd/PS3_UPDATE", (char*)"/dev_bdvd"); //redirect firmware update to root of bdvd
 	}
 #endif
 

@@ -11,7 +11,7 @@ if exist webMAN_MOD_1.41.xx_Updater.pkg del webMAN_MOD_1.41.xx_Updater.pkg>nul
 ren updater.pkg webMAN_MOD_1.41.xx_Updater.pkg
 del updater.elf
 del updater.self
-del /s/q build>nul
-rd /q/s build
 
 pause
+del /s/q build>nul
+rd /q/s build
