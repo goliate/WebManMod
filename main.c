@@ -12894,7 +12894,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							if(split == 1)
 							{
 								unsigned int slot = val(param1);
-								if ( slot ) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)param1, (u64)param2, NULL, 0); }}
+								if ( slot ) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)slot, (u64)param2, NULL, 0); }}
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
 						}
@@ -12905,7 +12905,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						if(split == 1)
 						{
 							unsigned int slot = val(param2);
-							if ( slot ) {{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)param2); }}
+							if ( slot ) {{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)slot); }}
 							ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
