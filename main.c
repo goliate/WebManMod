@@ -8704,11 +8704,37 @@ loadvshplug_err_arg:
 				sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
 								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
-								HTML_INPUT("prx", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
+								HTML_INPUT("prx\" list=\"plugins", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
 								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" value=\" Load \"/></td></form></tr>", slot, "NULL", slot, slot);
 				strcat(buffer, templn);
 			}
 	}
+
+
+	//add plugins list
+	{
+		strcat(buffer, "<datalist id=\"plugins\">");
+		int fd; char paths[3][20] = {"/dev_hdd0", "/dev_hdd0/plugins", "/dev_hdd0/tmp"};
+
+		for(u8 i = 0; i < 3; i++)
+		if(cellFsOpendir(paths[i], &fd) == CELL_FS_SUCCEEDED)
+		{
+			CellFsDirent dir; u64 read = sizeof(CellFsDirent);
+
+			while(!cellFsReaddir(fd, &dir, &read))
+			{
+				if(!read) break;
+				if(strstr(dir.d_name, ".sprx"))
+				{
+					sprintf(templn, "<option>%s/%s</option>", paths[i], dir.d_name); strcat(buffer, templn);
+				}
+			}
+			cellFsClosedir(fd);
+		}
+
+		strcat(buffer, "</datalist>");
+	}
+
 	sprintf(templn, "%s", "</table><br>");
 	if(!is_ps3mapi_home) strcat(templn, "<hr color=\"#FF0000\"/>");
 	strcat(buffer, templn);
