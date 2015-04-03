@@ -1079,6 +1079,8 @@ static bool fix_aborted = false;
 static bool is_busy = false;
 static bool is_mounting = false;
 
+static char current_file[MAX_PATH_LEN];
+
 static char* game_name();
 static void show_msg(char* msg);
 //void show_msg2(char* msg);
@@ -1340,6 +1342,8 @@ static int filecopy(char *file1, char *file2, uint64_t maxbytes)
     uint64_t chunk_size=_64KB_; //64K
 
 	if(cellFsStat(file1, &buf)!=CELL_FS_SUCCEEDED) return ret;
+
+	sprintf(current_file, "%s", file2);
 
 	if(!memcmp(file1, "/dev_hdd0/", 10) && !memcmp(file2, "/dev_hdd0/", 10))
 	{
@@ -4203,6 +4207,8 @@ static void fix_game(char *path)
 		char filename[MAX_PATH_LEN];
 		CellFsDirent dir; u64 read = sizeof(CellFsDirent);
 
+		sprintf(current_file, "%s", path);
+
 		while(!cellFsReaddir(fd, &dir, &read))
 		{
 			if(!read || fix_aborted) break;
@@ -4277,6 +4283,8 @@ void fix_iso(char *iso_file, uint64_t maxbytes, bool patch_update)
 	if(fix_aborted || cellFsStat(iso_file, &buf)!=CELL_FS_SUCCEEDED) return;
 
 	int fd;
+
+	sprintf(current_file, "%s", iso_file);
 
 	cellFsChmod(iso_file, MODE); //fix file read-write permission
 
@@ -9263,6 +9271,7 @@ reboot:
 					else
 #endif //#ifdef COBRA_ONLY
 						fix_game(game_path);
+
 					fix_in_progress=false;
 
 					is_popup=1; is_binary=0;
@@ -11450,7 +11459,7 @@ static void poll_thread(uint64_t poll)
 								ss = (u32)((pTick.tick-(bb?gTick.tick:rTick.tick))/1000000); dd = (u32)(ss / 86400);
 								if(dd>100) {bb=false; ss = (u32)((pTick.tick-rTick.tick)/1000000); dd = (u32)(ss / 86400);}
 								ss = ss % 86400; hh = (u32)(ss / 3600); ss = ss % 3600; mm = (u32)(ss / 60); ss = ss % 60;
-								////////////////////////
+								/////////////////////////////
 
 								char cfw_info[20];
 #ifdef COBRA_ONLY
@@ -11485,6 +11494,22 @@ static void poll_thread(uint64_t poll)
 
 								show_msg(msg);
 								sys_timer_sleep(2);
+
+								/////////////////////////////
+								if(copy_in_progress)
+								{
+									sprintf((char*)msg, "%s %s", STR_COPYING, current_file);
+									show_msg(msg);
+									sys_timer_sleep(2);
+								}
+								else
+								if(fix_in_progress)
+								{
+									sprintf((char*)msg, STR_FIXING, current_file);
+									show_msg(msg);
+									sys_timer_sleep(2);
+								}
+								/////////////////////////////
 							}
 						}
 						else
