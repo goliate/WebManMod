@@ -8647,7 +8647,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			char uslot_str[3];
 			get_value(uslot_str, pos + 12, 2);
 			uslot = val(uslot_str);
-			if ( uslot !=0){{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)uslot);}}
+			if ( uslot ){{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)uslot);}}
 		}
 		else
 		{
@@ -8664,7 +8664,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			{
 				char prx_path[256];
 				get_value(prx_path, pos + 4, 256);
-				if ( uslot !=0){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}}
+				if ( uslot ){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}}
 			}
 		}
 	}
@@ -8696,7 +8696,7 @@ loadvshplug_err_arg:
 								"<td width=\"100\" style=\"text-align: right; float: right;\">"
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
 								"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" %s/></form></td></tr>",
-								slot, tmp_name, tmp_filename, slot, (slot == 0) ?  "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"");
+								slot, tmp_name, tmp_filename, slot, (slot) ?  "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"");
 				strcat(buffer, templn);
 			}
 			else
@@ -8706,7 +8706,7 @@ loadvshplug_err_arg:
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
 								HTML_INPUT("prx\" list=\"plugins", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
 								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" %s/></td></form></tr>",
-								slot, "NULL", slot, slot, (slot == 0) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
+								slot, "NULL", slot, slot, (slot) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
 				strcat(buffer, templn);
 			}
 	}
