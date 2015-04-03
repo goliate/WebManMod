@@ -12882,6 +12882,20 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						}
 						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
 					}
+					else if(strcasecmp(cmd, "LOADVSHPLUG") == 0)
+					{
+						if(split == 1)
+						{
+							split = ssplit(param2, param1, 383, param2, 383);
+							if(split == 1)
+							{
+								unsigned int slot = val(param1);
+								if ( slot !=0) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)param1, (u64)param2, NULL, 0); }}
+								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
+							}
+						}
+						else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
+					}
 					else if(strcasecmp(cmd, "UNLOADVSHPLUGS") == 0)
 					{
 						if(split == 1)
