@@ -1079,6 +1079,11 @@ static bool fix_aborted = false;
 static bool is_busy = false;
 static bool is_mounting = false;
 
+#ifdef COPY_PS3
+static char current_file[MAX_PATH_LEN];
+static u32 copied_count = 0;
+#endif
+
 static char* game_name();
 static void show_msg(char* msg);
 //void show_msg2(char* msg);
@@ -1221,18 +1226,20 @@ static inline void pokeq( uint64_t addr, uint64_t val);
 static inline uint64_t peek_lv1(uint64_t addr);
 static inline void poke_lv1( uint64_t addr, uint64_t val);
 
-static u32 lv2peek32(u64 addr);
+//static u32 lv2peek32(u64 addr);
 static void lv2poke32(u64 addr, u32 value);
 
 #ifdef DEBUG_MEM
 static void dump_mem(char *file, uint64_t start, uint32_t size_mb);
 #endif
 
+/*
 static u32 lv2peek32(u64 addr)
 {
     u32 ret = (u32) (peekq(addr) >> 32ULL);
     return ret;
 }
+*/
 
 static void lv2poke32(u64 addr, u32 value)
 {
@@ -1341,11 +1348,15 @@ static int filecopy(char *file1, char *file2, uint64_t maxbytes)
 
 	if(cellFsStat(file1, &buf)!=CELL_FS_SUCCEEDED) return ret;
 
+#ifdef COPY_PS3
+	sprintf(current_file, "%s", file2);
+#endif
+
 	if(!memcmp(file1, "/dev_hdd0/", 10) && !memcmp(file2, "/dev_hdd0/", 10))
 	{
 		if(strcmp(file1, file2)==0) return ret;
 
-		cellFsUnlink(file2);
+		cellFsUnlink(file2); copied_count++;
 		return sysLv2FsLink(file1, file2);
 	}
 
@@ -1385,7 +1396,7 @@ static int filecopy(char *file1, char *file2, uint64_t maxbytes)
 				if(copy_aborted)
 					cellFsUnlink(file2); //remove incomplete file
 				else
-					cellFsChmod(file2, MODE);
+					{cellFsChmod(file2, MODE); copied_count++;}
 
 				ret=size;
 			}
@@ -4203,6 +4214,10 @@ static void fix_game(char *path)
 		char filename[MAX_PATH_LEN];
 		CellFsDirent dir; u64 read = sizeof(CellFsDirent);
 
+#ifdef COPY_PS3
+		sprintf(current_file, "%s", path);
+#endif
+
 		while(!cellFsReaddir(fd, &dir, &read))
 		{
 			if(!read || fix_aborted) break;
@@ -4277,6 +4292,10 @@ void fix_iso(char *iso_file, uint64_t maxbytes, bool patch_update)
 	if(fix_aborted || cellFsStat(iso_file, &buf)!=CELL_FS_SUCCEEDED) return;
 
 	int fd;
+
+#ifdef COPY_PS3
+	sprintf(current_file, "%s", iso_file);
+#endif
 
 	cellFsChmod(iso_file, MODE); //fix file read-write permission
 
@@ -6274,6 +6293,18 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 					eid0_idps[0], eid0_idps[1],
 					IDPS[0], IDPS[1],
 					mac_address[13], mac_address[14], mac_address[15], mac_address[16], mac_address[17], mac_address[18]); strcat(buffer, templn);
+
+	/////////////////////////////
+	if(copy_in_progress)
+	{
+		sprintf( templn, "<hr>%s %s (%i %s)", STR_COPYING, current_file, copied_count, STR_FILES); strcat(buffer, templn);
+	}
+	else
+	if(fix_in_progress)
+	{
+		strcat(buffer, "<hr>"); sprintf( templn, STR_FIXING, current_file); strcat(buffer, templn);
+	}
+	/////////////////////////////
 }
 
 static void setup_parse_settings(char *param)
@@ -7249,7 +7280,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 				// show msg begin
 				sprintf(templn, "%s %s\n%s %s", STR_COPYING, param+plen, STR_CPYDEST, target);
 				show_msg((char*)templn);
-				copy_in_progress=true;
+				copy_in_progress=true; copied_count = 0;
 
 				// make target dir tree
 				for(u16 p=12; p<strlen(target); p++)
@@ -8647,7 +8678,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			char uslot_str[3];
 			get_value(uslot_str, pos + 12, 2);
 			uslot = val(uslot_str);
-			if ( uslot !=0){{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)uslot);}}
+			if ( uslot ){{system_call_2(8, SYSCALL8_OPCODE_UNLOAD_VSH_PLUGIN, (u64)uslot);}}
 		}
 		else
 		{
@@ -8664,7 +8695,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			{
 				char prx_path[256];
 				get_value(prx_path, pos + 4, 256);
-				if ( uslot !=0){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}}
+				if ( uslot ){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}}
 			}
 		}
 	}
@@ -8696,7 +8727,7 @@ loadvshplug_err_arg:
 								"<td width=\"100\" style=\"text-align: right; float: right;\">"
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
 								"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" %s/></form></td></tr>",
-								slot, tmp_name, tmp_filename, slot, (slot == 0) ?  "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"");
+								slot, tmp_name, tmp_filename, slot, (slot) ?  "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"");
 				strcat(buffer, templn);
 			}
 			else
@@ -8706,7 +8737,7 @@ loadvshplug_err_arg:
 								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
 								HTML_INPUT("prx\" list=\"plugins", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
 								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" %s/></td></form></tr>",
-								slot, "NULL", slot, slot, (slot == 0) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
+								slot, "NULL", slot, slot, (slot) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
 				strcat(buffer, templn);
 			}
 	}
@@ -9263,6 +9294,7 @@ reboot:
 					else
 #endif //#ifdef COBRA_ONLY
 						fix_game(game_path);
+
 					fix_in_progress=false;
 
 					is_popup=1; is_binary=0;
@@ -10231,7 +10263,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 							absPath(param, filename, cwd);
 							if((!copy_in_progress) && (strlen(source) > 0) && (strcmp(source, param) != 0) && cellFsStat(source, &s)==CELL_FS_SUCCEEDED)
 							{
-								copy_in_progress=true;
+								copy_in_progress=true; copied_count = 0;
 								ssend(conn_s_ftp, FTP_OK_250);
 
 								sprintf(buffer, "%s %s\n%s %s", STR_COPYING, source, STR_CPYDEST, param);
@@ -11450,7 +11482,7 @@ static void poll_thread(uint64_t poll)
 								ss = (u32)((pTick.tick-(bb?gTick.tick:rTick.tick))/1000000); dd = (u32)(ss / 86400);
 								if(dd>100) {bb=false; ss = (u32)((pTick.tick-rTick.tick)/1000000); dd = (u32)(ss / 86400);}
 								ss = ss % 86400; hh = (u32)(ss / 3600); ss = ss % 3600; mm = (u32)(ss / 60); ss = ss % 60;
-								////////////////////////
+								/////////////////////////////
 
 								char cfw_info[20];
 #ifdef COBRA_ONLY
@@ -11485,6 +11517,22 @@ static void poll_thread(uint64_t poll)
 
 								show_msg(msg);
 								sys_timer_sleep(2);
+
+								/////////////////////////////
+								if(copy_in_progress)
+								{
+									sprintf((char*)msg, "<hr>%s %s (%i %s)", STR_COPYING, current_file, copied_count, STR_FILES);
+									show_msg(msg);
+									sys_timer_sleep(2);
+								}
+								else
+								if(fix_in_progress)
+								{
+									sprintf((char*)msg, STR_FIXING, current_file);
+									show_msg(msg);
+									sys_timer_sleep(2);
+								}
+								/////////////////////////////
 							}
 						}
 						else
@@ -14153,7 +14201,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 		if(cellFsStat(PS2_CLASSIC_PLACEHOLDER, &s)==CELL_FS_SUCCEEDED)
 		{
 			sprintf(temp, "PS2 Classic\n%s", strrchr(_path, '/') + 1);
-			copy_in_progress=true;
+			copy_in_progress=true; copied_count = 0;
 			show_msg(temp);
 
 			if(c_firmware>=4.65f)

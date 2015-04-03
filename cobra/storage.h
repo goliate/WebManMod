@@ -294,12 +294,13 @@ static int sys_map_path(char *oldpath, char *newpath)
 	return (int)p1;
 }
 
+/*
 static int sys_map_paths(char *paths[], char *new_paths[], unsigned int num)
 {
 	system_call_4(8, SYSCALL8_OPCODE_MAP_PATHS, (uint64_t)(uint32_t)paths, (uint64_t)(uint32_t)new_paths, num);
 	return (int)p1;
 }
-
+*/
 
 #ifdef __cplusplus
 }
