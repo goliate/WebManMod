@@ -84,7 +84,7 @@ STR_ERROR			[Hiba!]
 
 STR_MYGAMES			[Játékaim]
 STR_LOADGAMES		[Játékok betöltése a webMAN-nel]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP			[webMAN beállítása]
 STR_WMSETUP2		[webMAN beállításai]

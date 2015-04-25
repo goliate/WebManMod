@@ -84,7 +84,7 @@ STR_ERROR			[에러!]
 
 STR_MYGAMES			[웹맨 게임]
 STR_LOADGAMES		[웹맨에서 게임 불러오기]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP			[웹맨 설정]
 STR_WMSETUP2		[웹맨 설정 및 설치]

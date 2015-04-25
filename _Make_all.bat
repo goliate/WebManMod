@@ -6,7 +6,19 @@ if not exist %CYGWIN%\bash.exe set CYGWIN=C:\msys\1.0\bin
 
 set CHERE_INVOKING=1
 
+cls
+
 del /q .\webftp_server*.*>nul
+
+del /q objs\cobra\*.d>nul
+del /q objs\cobra\*.o>nul
+rd objs\cobra>nul
+
+attrib -r objs\*.*
+
+del /q objs\*.d>nul
+del /q objs\*.o>nul
+rd objs>nul
 
 cls
 
@@ -17,9 +29,8 @@ if exist webftp_server.sprx ren webftp_server.sprx webftp_server_cobra.sprx
 del /q webftp_server.elf>nul
 del /q webftp_server.sym>nul
 
-del /q objs\cobra\*.d>nul
-del /q objs\cobra\*.o>nul
-rd objs\cobra>nul
+attrib +r objs\libc.ppu.*
+attrib +r objs\printf.ppu.*
 
 del /q objs\*.d>nul
 del /q objs\*.o>nul
@@ -105,6 +116,8 @@ del /q webftp_server.sym>nul
 del /q objs\cobra\*.d>nul
 del /q objs\cobra\*.o>nul
 rd objs\cobra>nul
+
+attrib -r objs\*.*
 
 del /q objs\*.d>nul
 del /q objs\*.o>nul

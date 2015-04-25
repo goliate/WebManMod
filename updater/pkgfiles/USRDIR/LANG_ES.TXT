@@ -84,7 +84,7 @@ STR_ERROR				[¡Error!]
 
 STR_MYGAMES		[Mis Juegos]
 STR_LOADGAMES	[Cargar juegos con webMAN]
-STR_FIXING		[Ajustando versión\n%s]
+STR_FIXING		[Ajustando versión\n]
 
 STR_WMSETUP		[Configuración de webMAN]
 STR_WMSETUP2	[Opciones de configuración de webMAN]

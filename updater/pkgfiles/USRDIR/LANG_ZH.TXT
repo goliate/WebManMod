@@ -84,7 +84,7 @@ STR_ERROR			[錯誤!]
 
 STR_MYGAMES			[我的遊戲]
 STR_LOADGAMES		[使用 webMAN 加載遊戲]
-STR_FIXING		[正在修復 %s]
+STR_FIXING		[正在修復]
 
 STR_WMSETUP			[webMAN 設定]
 STR_WMSETUP2		[設定 webMAN 選項]

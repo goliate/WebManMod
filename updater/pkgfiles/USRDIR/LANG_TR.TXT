@@ -84,7 +84,7 @@ STR_ERROR			[Hata!]
 
 STR_MYGAMES			[Oyunlarim]
 STR_LOADGAMES		[webMAN ile oyunlari yükler]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP			[webMAN Ayarlari]
 STR_WMSETUP2		[webMAN seçeneklerini ayarlar]

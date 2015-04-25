@@ -38,7 +38,8 @@ int memcmp(const void* s1, const void* s2, size_t n)
         if( *p1 != *p2 )
             return *p1 - *p2;
         else
-            *p1++,*p2++;
+            p1++, p2++;
+
     return 0;
 }
 
@@ -61,11 +62,15 @@ char *strchr(const char *s, int c)
 
 char *strrchr(const char *s, int c)
 {
-    char* ret=0;
-    do {
-        if( *s == (char)c )
-            ret=s;
-    } while(*s++);
+    char *ret=NULL;
+    char cc=(char)c;
+
+    do
+    {
+        if( *s == cc ) ret=(char*)s;
+    }
+    while(*s++);
+
     return ret;
 }
 
@@ -74,7 +79,7 @@ char *strstr(const char *s1, const char *s2)
     size_t n = strlen(s2);
     while(*s1)
         if(!memcmp(s1++,s2,n))
-            return s1-1;
+            return (char*)(s1-1);
     return 0;
 }
 
@@ -114,11 +119,11 @@ char *strcasestr(const char *s1, const char *s2)
     size_t n = strlen(s2);
     while(*s1)
         if(!strncasecmp(s1++,s2,n))
-            return s1-1;
+            return (char*)(s1-1);
     return 0;
 }
 
-int strncmp(const char* s1, const char* s2, size_t n)
+int strncmp(const char *s1, const char *s2, size_t n)
 {
 	if(n==0) return 0;
     while(*s1 && (*s1==*s2))
@@ -130,10 +135,10 @@ int strncmp(const char* s1, const char* s2, size_t n)
     return *(const unsigned char*)s1-*(const unsigned char*)s2;
 }
 
-int strcmp(const char* s1, const char* s2)
+int strcmp(const char *s1, const char *s2)
 {
     while(*s1 && (*s1==*s2))
-        s1++,s2++;
+        s1++, s2++;
     return *(const unsigned char*)s1-*(const unsigned char*)s2;
 }
 
@@ -141,18 +146,22 @@ int strcmp(const char* s1, const char* s2)
 char *strcpy(char *dest, const char* src)
 {
     char *ret = dest;
-    while (*dest++ = *src++)
-        ;
+
+    while ((*dest++ = *src++)) ;
+
     return ret;
 }
 
 char *strncpy(char *dest, const char *src, size_t n)
 {
     char *ret = dest;
-    do {
-        if (!n--)
-            return ret;
-    } while (*dest++ = *src++);
+
+    do
+    {
+        if (!n--) return ret;
+    }
+    while ((*dest++ = *src++));
+
     while (n--)
         *dest++ = 0;
     return ret;
@@ -161,24 +170,27 @@ char *strncpy(char *dest, const char *src, size_t n)
 char *strcat(char *dest, const char *src)
 {
     char *ret = dest;
-    while (*dest)
-        dest++;
-    while (*dest++ = *src++)
-        ;
+
+    while (*dest) dest++;
+
+    while ((*dest++ = *src++)) ;
+
     return ret;
 }
 
-char *strtok(char * str, const char * delim)
+char *strtok(char *str, const char *delim)
 {
     static char* p=0;
-    if(str)
-        p=str;
-    else if(!p)
-        return 0;
+
+    if(str) p=str;
+    else
+    if(!p) return 0;
+
     str=p+strspn(p,delim);
     p=str+strcspn(str,delim);
-    if(p==str)
-        return p=0;
+
+    if(p==str) return p=0;
+
     p = *p ? *p=0,p+1 : 0;
     return str;
 }
@@ -191,6 +203,7 @@ size_t strcspn(const char *s1, const char *s2)
             return ret;
         else
             s1++,ret++;
+
     return ret;
 }
 

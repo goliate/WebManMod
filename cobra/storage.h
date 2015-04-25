@@ -76,13 +76,13 @@ typedef struct
 int sys_storage_get_device_info(uint64_t device_id, sys_device_info_t *device_info);
 
 
-static inline int sys_storage_open(uint64_t device_id, uint64_t unk, sys_device_handle_t *device_handle, uint64_t unk2)
+static int sys_storage_open(uint64_t device_id, uint64_t unk, sys_device_handle_t *device_handle, uint64_t unk2)
 {
 	system_call_4(SYS_STORAGE_OPEN, device_id, unk, (uint64_t)(uint32_t)device_handle, unk2);
 	return (int)p1;
 }
 
-static inline int sys_storage_close(sys_device_handle_t device_handle)
+static int sys_storage_close(sys_device_handle_t device_handle)
 {
 	system_call_1(SYS_STORAGE_CLOSE, device_handle);
 	return (int)p1;
@@ -90,11 +90,11 @@ static inline int sys_storage_close(sys_device_handle_t device_handle)
 
 int sys_storage_read(sys_device_handle_t device_handle, uint64_t unk, uint64_t start_sector, uint32_t sector_count, void *buf, uint32_t *nread, uint64_t unk2);
 
-static inline int sys_storage_send_device_command(sys_device_handle_t device_handle, unsigned int command, void *indata, uint64_t inlen, void *outdata, uint64_t outlen)
+/* static int sys_storage_send_device_command(sys_device_handle_t device_handle, unsigned int command, void *indata, uint64_t inlen, void *outdata, uint64_t outlen)
 {
 	system_call_6(SYS_STORAGE_SEND_DEVICE_COMMAND, device_handle, command, (uint64_t)(uint32_t)indata, inlen, (uint64_t)(uint32_t)outdata, outlen);
 	return (int)p1;
-}
+} */
 
 int sys_storage_execute_device_command(sys_device_handle_t device_handle, unsigned int command, void *indata, uint64_t inlen, void *outdata, uint64_t outlen, uint64_t *ret);
 
@@ -107,78 +107,78 @@ typedef struct
 	char firstfile_path[MAX_PATH];
 } __attribute__((packed)) sys_emu_state_t;
 
-static inline int sys_storage_ext_get_disc_type(unsigned int *real_disctype, unsigned int *effective_disctype, unsigned int *fake_disctype)
+static int sys_storage_ext_get_disc_type(unsigned int *real_disctype, unsigned int *effective_disctype, unsigned int *fake_disctype)
 {
 	system_call_4(8, SYSCALL8_OPCODE_GET_DISC_TYPE, (uint64_t)(uint32_t)real_disctype, (uint64_t)(uint32_t)effective_disctype, (uint64_t)(uint32_t)fake_disctype);
 	return (int)p1;
 }
 
-static inline int sys_storage_ext_read_ps3_disc(void *buf, uint64_t start_sector, uint32_t count)
+/* static int sys_storage_ext_read_ps3_disc(void *buf, uint64_t start_sector, uint32_t count)
 {
 	system_call_4(8, SYSCALL8_OPCODE_READ_PS3_DISC, (uint64_t)(uint32_t)buf, start_sector, count);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_fake_storage_event(uint64_t event, uint64_t param, uint64_t device)
+static int sys_storage_ext_fake_storage_event(uint64_t event, uint64_t param, uint64_t device)
 {
 	system_call_4(8, SYSCALL8_OPCODE_FAKE_STORAGE_EVENT, event, param, device);
 	return (int)p1;
 }
 
-static inline int sys_storage_ext_get_emu_state(sys_emu_state_t *state)
+/* static int sys_storage_ext_get_emu_state(sys_emu_state_t *state)
 {
 	system_call_2(8, SYSCALL8_OPCODE_GET_EMU_STATE, (uint64_t)(uint32_t)state);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_mount_ps3_discfile(unsigned int filescount, char *files[])
+/* static int sys_storage_ext_mount_ps3_discfile(unsigned int filescount, char *files[])
 {
 	system_call_3(8, SYSCALL8_OPCODE_MOUNT_PS3_DISCFILE, filescount, (uint64_t)(uint32_t)files);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_mount_dvd_discfile(unsigned int filescount, char *files[])
+/* static int sys_storage_ext_mount_dvd_discfile(unsigned int filescount, char *files[])
 {
 	system_call_3(8, SYSCALL8_OPCODE_MOUNT_DVD_DISCFILE, filescount, (uint64_t)(uint32_t)files);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_mount_bd_discfile(unsigned int filescount, char *files[])
+/* static int sys_storage_ext_mount_bd_discfile(unsigned int filescount, char *files[])
 {
 	system_call_3(8, SYSCALL8_OPCODE_MOUNT_BD_DISCFILE, filescount, (uint64_t)(uint32_t)files);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_mount_psx_discfile(char *file, unsigned int trackscount, ScsiTrackDescriptor *tracks)
+/* static int sys_storage_ext_mount_psx_discfile(char *file, unsigned int trackscount, ScsiTrackDescriptor *tracks)
 {
 	system_call_4(8, SYSCALL8_OPCODE_MOUNT_PSX_DISCFILE, (uint64_t)(uint32_t)file, trackscount, (uint64_t)(uint32_t)tracks);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_mount_ps2_discfile(unsigned int filescount, char *files[], unsigned int trackscount, ScsiTrackDescriptor *tracks)
+/* static int sys_storage_ext_mount_ps2_discfile(unsigned int filescount, char *files[], unsigned int trackscount, ScsiTrackDescriptor *tracks)
 {
 	system_call_5(8, SYSCALL8_OPCODE_MOUNT_PS2_DISCFILE, filescount, (uint64_t)(uint32_t)files, trackscount, (uint64_t)(uint32_t)tracks);
 	return (int)p1;
-}
+} */
 
-static inline int sys_storage_ext_umount_discfile(void)
+static int sys_storage_ext_umount_discfile(void)
 {
 	system_call_1(8, SYSCALL8_OPCODE_UMOUNT_DISCFILE);
 	return (int)p1;
 }
 
-static inline int sys_storage_ext_mount_encrypted_image(char *image, char *mount_point, char *filesystem, uint64_t nonce)
+/* static int sys_storage_ext_mount_encrypted_image(char *image, char *mount_point, char *filesystem, uint64_t nonce)
 {
 	system_call_5(8, SYSCALL8_OPCODE_MOUNT_ENCRYPTED_IMAGE, (uint64_t)(uint32_t)image, (uint64_t)(uint32_t)mount_point, (uint64_t)(uint32_t)filesystem, nonce);
 	return (int)p1;
-}
+} */
 
 // Not really storage funcs, but...
-static inline int sys_ss_disc_auth(uint64_t func, uint64_t param)
+/* static int sys_ss_disc_auth(uint64_t func, uint64_t param)
 {
 	system_call_2(864, func, param);
 	return (int)p1;
-}
+} */
 
 typedef struct
 {
@@ -191,23 +191,23 @@ typedef struct
 int cellFsUtilMount(const char *block_dev, const char *filesystem, const char *mount_point, int unk, int read_only, int unk2, char *argv[], int argc);
 int cellFsUtilUmount(const char *mount_point, uint64_t unk, int force);
 
-static inline int cellFsUtilGetMountInfo(CellFsMountInfo *info, uint64_t size, uint64_t *rsize)
+/* static int cellFsUtilGetMountInfo(CellFsMountInfo *info, uint64_t size, uint64_t *rsize)
 {
 	system_call_3(842, (uint64_t)(uint32_t)info, size, (uint64_t)(uint32_t)rsize);
 	return (int)p1;
-}
+} */
 
-static inline int cellFsUtilGetMountInfoSize(uint64_t *size)
+/* static int cellFsUtilGetMountInfoSize(uint64_t *size)
 {
 	system_call_1(841, (uint64_t)(uint32_t)size);
 	return (int)p1;
-}
+} */
 
 int cellFsUtilGetSpaceInfo(const char *mount_point, uint64_t *total_size, uint64_t *free_size);
 
-static inline uint64_t get_device(char *name) __attribute__((unused));
+static uint64_t get_device(char *name) __attribute__((unused));
 
-static inline uint64_t get_device(char *name)
+static uint64_t get_device(char *name)
 {
 	if (strcmp(name, "CELL_FS_IOS:ATA_HDD") == 0)
 		return ATA_HDD;
@@ -294,13 +294,12 @@ static int sys_map_path(char *oldpath, char *newpath)
 	return (int)p1;
 }
 
-/*
-static int sys_map_paths(char *paths[], char *new_paths[], unsigned int num)
+/* static int sys_map_paths(char *paths[], char *new_paths[], unsigned int num)
 {
 	system_call_4(8, SYSCALL8_OPCODE_MAP_PATHS, (uint64_t)(uint32_t)paths, (uint64_t)(uint32_t)new_paths, num);
 	return (int)p1;
-}
-*/
+} */
+
 
 #ifdef __cplusplus
 }

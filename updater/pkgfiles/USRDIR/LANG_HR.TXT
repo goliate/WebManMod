@@ -84,7 +84,7 @@ STR_ERROR		[Greska!]
 
 STR_MYGAMES		[Igre]
 STR_LOADGAMES	[Ucitaj igre putem webMANa]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP		[webMAN Postavke]
 STR_WMSETUP2	[Postavke webMAN izbornika]

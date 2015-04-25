@@ -5,13 +5,38 @@ set PATH=%WIN_PS3SDK%/mingw/msys/1.0/bin;%WIN_PS3SDK%/mingw/bin;%WIN_PS3SDK%/ps3
 set PSL1GHT=%PS3SDK%/psl1ght
 set PS3DEV=%PS3SDK%/ps3dev
 
+if exist EP0001-UPDWEBMOD_00-0000000000000000.pkg del EP0001-UPDWEBMOD_00-0000000000000000.pkg>nul
+if exist webMAN_MOD_1.41.xx_Updater.pkg del webMAN_MOD_1.41.xx_Updater.pkg>nul
+
+if exist updater.elf del updater.elf>nul
+if exist updater.self del updater.self>nul
+if exist build del /s/q build\*.*>nul
+
 make pkg
 
-if exist webMAN_MOD_1.41.xx_Updater.pkg del webMAN_MOD_1.41.xx_Updater.pkg>nul
-ren updater.pkg webMAN_MOD_1.41.xx_Updater.pkg
-del updater.elf
-del updater.self
+ren build\pkg EP0001-UPDWEBMOD_00-0000000000000000
+param_sfo_editor.exe build\EP0001-UPDWEBMOD_00-0000000000000000\PARAM.SFO "ATTRIBUTE" 133
 
-pause
+if exist updater.elf del updater.elf>nul
+if exist updater.self del updater.self>nul
+if exist updater.pkg del updater.pkg>nul
+if exist build del /q build\*.*>nul
+if not exist build goto end
+
+echo ContentID = EP0001-UPDWEBMOD_00-0000000000000000>package.conf
+echo Klicensee = 000000000000000000000000000000000000>>package.conf
+echo PackageVersion = 01.00>>package.conf
+echo DRMType = Free>>package.conf
+echo ContentType = GameExec>>package.conf
+
+psn_package_npdrm.exe -n package.conf build\EP0001-UPDWEBMOD_00-0000000000000000
+
+del package.conf
+
+if exist webMAN_MOD_1.41.xx_Updater.pkg del webMAN_MOD_1.41.xx_Updater.pkg>nul
+move /y EP0001-UPDWEBMOD_00-0000000000000000.pkg webMAN_MOD_1.41.xx_Updater.pkg
+
 del /s/q build>nul
 rd /q/s build
+
+:end

@@ -3,14 +3,14 @@ typedef struct
 {
 	int (*DoUnk0)(int);
 	int (*DoUnk1)(int,int);
-	int (*DoUnk2)();
-	int (*DoUnk3)();
+	int (*DoUnk2)(void);
+	int (*DoUnk3)(void);
 	int (*DoUnk4)(void *,int,int,int,void *,int);
 	int (*DoUnk5)(char *,int,int,void*,int);
 	int (*DoUnk6_SetCallback)(void *,int);
 	int (*DoUnk7)(void *);
 	int (*DoUnk8)(char * username, char * password);
-	int (*DoUnk9)();
+	int (*DoUnk9)(void);
 	int (*DoUnk10)(void *);
 	int (*DoUnk11)(void *);
 	int (*DoUnk12)(void *);
@@ -23,11 +23,11 @@ typedef struct
 	int (*DoUnk19)(int * bgdl_id);
 	int (*DoUnk20_installerDrmActivation)(int drmActivationItemAction,int drmActivationItemTarget,int drmActivationItemOption);
 	int (*DoUnk21)(char *,const void * input,int len);
-	int (*DoUnk22_installerDownload)();
+	int (*DoUnk22_installerDownload)(void);
 	int (*DoUnk23)(int, void *);
 	int (*DoUnk24)(char *);
 	int (*DoUnk25)(int task_id, int flags);
-	int (*DoUnk26)();
+	int (*DoUnk26)(void);
 	int (*DoUnk27)(void *);
 	int (*DoUnk28)(char * path);
 	int (*DoUnk29)(unsigned long long *,unsigned long long *);

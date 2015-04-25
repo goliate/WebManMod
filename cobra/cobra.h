@@ -682,7 +682,7 @@ int cobra_get_ps2_emu_type(void);
  * ENOSYS -> not in cobra
  */
 int cobra_get_version(uint16_t *cobra_version, uint16_t *ps3_version);
-
+int sys_get_version2(uint16_t *version);
 
 /*
  * Reads the cobra configuration from RAM cache.

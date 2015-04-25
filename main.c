@@ -36,20 +36,21 @@
 
 #include "types.h"
 #include "common.h"
-#include "printf.h"
+#include "cobra/cobra.h"
 #include "cobra/storage.h"
 #include "vsh/game_plugin.h"
-//#include "vsh/xmb_plugin.h"
 
 #ifdef EXTRA_FEAT
  #include "vsh/system_plugin.h"
 #endif
 
-static char _game_name[0x120];
+#define _game_TitleID  _game_info+0x04
+#define _game_Title    _game_info+0x14
+
+static char _game_info[0x120];
 static char search_url[50] = "http://google.com/search?q=";
 
 #ifdef COBRA_ONLY
- #include "cobra/cobra.h"
  #include "cobra/netiso.h"
 
  #ifdef LITE_EDITION
@@ -97,7 +98,7 @@ SYS_MODULE_STOP(wwwd_stop);
 #define PS2_CLASSIC_ISO_PATH     "/dev_hdd0/game/PS2U10000/USRDIR/ISO.BIN.ENC"
 #define PS2_CLASSIC_ISO_ICON     "/dev_hdd0/game/PS2U10000/ICON0.PNG"
 
-#define WM_VERSION			"1.41.40 MOD"						// webMAN version
+#define WM_VERSION			"1.41.41 MOD"						// webMAN version
 #define MM_ROOT_STD			"/dev_hdd0/game/BLES80608/USRDIR"	// multiMAN root folder
 #define MM_ROOT_SSTL		"/dev_hdd0/game/NPEA00374/USRDIR"	// multiman SingStar® Stealth root folder
 #define MM_ROOT_STL			"/dev_hdd0/tmp/game_repo/main"		// stealthMAN root folder
@@ -190,6 +191,9 @@ SYS_MODULE_STOP(wwwd_stop);
 #define SYS_NET_EURUS_POST_COMMAND		(726)
 #define CMD_GET_MAC_ADDRESS				0x103f
 
+#define BEEP1 { system_call_3(SC_RING_BUZZER, 0x1004, 0x4,   0x6); }
+#define BEEP2 { system_call_3(SC_RING_BUZZER, 0x1004, 0x7,  0x36); }
+#define BEEP3 { system_call_3(SC_RING_BUZZER, 0x1004, 0xa, 0x1b6); }
 
 #ifdef PS3MAPI
 
@@ -377,6 +381,8 @@ typedef struct
 	uint8_t pad[6];
 	ScsiTrackDescriptor tracks[1];
 } __attribute__((packed)) netiso_args;
+
+int connect_to_remote_server(u8 server_id);
 #endif
 
 typedef struct
@@ -462,8 +468,6 @@ static u8 dex_mode=0;
 static u64 SYSCALL_TABLE = 0;
 
 #ifndef COBRA_ONLY
- static bool save_libfs_new=true;
-
  static u64 base_addr=0;
  static u64 open_hook=0;
 
@@ -606,7 +610,13 @@ static void no_singstar_icon(void);
 #endif
 #ifdef COBRA_ONLY
 static void select_ps1emu(void);
+uint64_t getlba(const char *s1, u16 n1, const char *s2, u16 n2, u16 start);
+void fix_iso(char *iso_file, uint64_t maxbytes, bool patch_update);
 #endif
+
+int extcmp(const char *s1, const char *s2, size_t n);
+int extcasecmp(const char *s1, const char *s2, size_t n);
+char *strcasestr(const char *s1, const char *s2);
 
 static void refresh_xml(char *msg);
 
@@ -762,7 +772,7 @@ static char STR_HOME[8] = "Home";
 
 #define STR_MYGAMES		"webMAN Games"
 #define STR_LOADGAMES	"Load games with webMAN"
-#define STR_FIXING		"Fixing %s"
+#define STR_FIXING		"Fixing"
 
 #define STR_WMSETUP		"webMAN Setup"
 #define STR_WMSETUP2	"Setup webMAN options"
@@ -928,7 +938,7 @@ static char STR_ERROR[30]			= "Error!";
 
 static char STR_MYGAMES[50]			= "webMAN Games";
 static char STR_LOADGAMES[80]		= "Load games with webMAN";
-static char STR_FIXING[50]			= "Fixing %s";
+static char STR_FIXING[50]			= "Fixing";
 
 static char STR_WMSETUP[50]			= "webMAN Setup";
 static char STR_WMSETUP2[50]		= "Setup webMAN options";
@@ -1000,10 +1010,6 @@ int wwwd_stop(void);
 static void stop_prx_module(void);
 static void unload_prx_module(void);
 
-#ifdef COBRA_ONLY
-static int remote_stat(int s, char *path, int *is_directory, int64_t *file_size, uint64_t *mtime, uint64_t *ctime, uint64_t *atime, int *abort_connection);
-#endif
-
 static void get_temperature(u32 _dev, u32 *_temp);
 static void fan_control(u8 temp0, u8 maxtemp);
 static void led(u64 color, u64 mode);
@@ -1019,15 +1025,17 @@ static int ssplit(const char* str, char* left, int lmaxlen, char* right, int rma
 static int slisten(int port, int backlog);
 static void sclose(int *socket_e);
 
-static void detect_firmware();
+static void detect_firmware(void);
 #ifndef ENGLISH_ONLY
-static void update_language();
+static bool language(const char *file_str, char *default_str);
+static void update_language(void);
+uint32_t get_system_language(uint8_t *lang);
 #endif
 #ifdef REMOVE_SYSCALLS
-static void remove_cfw_syscalls();
+static void remove_cfw_syscalls(void);
 #endif
 #ifdef SPOOF_CONSOLEID
-static void spoof_idps_psid();
+static void spoof_idps_psid(void);
 #endif
 #ifndef LITE_EDITION
 static int del(char *path, bool recursive);
@@ -1037,8 +1045,7 @@ static void  import_edats(char *path1, char *path2);
 #endif
 
 static void delete_history(bool delete_folders);
-static bool language(const char *file_str, char *default_str);
-static void block_online_servers();
+static void block_online_servers(void);
 
 static void add_query_html(char *buffer, char *param, char *label);
 static void add_xmb_entry(char *param, char *tempstr, char *templn, char *skey, u32 key, char *myxml_ps3, char *myxml_ps2, char *myxml_psx, char *myxml_psp, char *myxml_dvd, char *entry_name, u16 *item_count);
@@ -1065,11 +1072,20 @@ static void do_umount_ps2disc(bool mount);
 static bool mount_ps2disc(char *path);
 #endif
 
-static void mount_autoboot();
+static void enable_classic_ps2_mode(void);
+static void disable_classic_ps2_mode(void);
+
+static void mount_autoboot(void);
 static void do_umount(bool clean);
-static void do_umount_iso(void);
 static bool mount_with_mm(const char *_path, u8 do_eject);
 static void eject_insert(u8 eject, u8 insert);
+
+#ifdef COBRA_ONLY
+static void do_umount_iso(void);
+ #ifndef LITE_EDITION
+static int remote_stat(int s, char *path, int *is_directory, int64_t *file_size, uint64_t *mtime, uint64_t *ctime, uint64_t *atime, int *abort_connection);
+ #endif
+#endif
 
 static bool from_reboot = false;
 static bool copy_in_progress = false;
@@ -1084,7 +1100,7 @@ static u32 copied_count = 0;
 static char current_file[MAX_PATH_LEN];
 #endif
 
-static char* game_name();
+static char* get_game_info(void);
 static void show_msg(char* msg);
 //void show_msg2(char* msg);
 
@@ -1096,14 +1112,14 @@ uint32_t (*BgmPlaybackDisable)(int, void *) = NULL;
 uint32_t (*BgmPlaybackEnable)(int, void *) = NULL;
 #endif
 
-int (*vshmain_is_ss_enabled)() = NULL;
+int (*vshmain_is_ss_enabled)(void) = NULL;
 int (*set_SSHT_)(int) = NULL;
 
 int opd[2] = {0, 0};
 
-void * getNIDfunc(const char * vsh_module, uint32_t fnid, uint32_t offset);
+void * getNIDfunc(const char * vsh_module, uint32_t fnid, int32_t offset);
 
-void * getNIDfunc(const char * vsh_module, uint32_t fnid, uint32_t offset)
+void * getNIDfunc(const char * vsh_module, uint32_t fnid, int32_t offset)
 {
 	// 0x10000 = ELF
 	// 0x10080 = segment 2 start
@@ -1151,27 +1167,29 @@ static void show_msg(char* msg)
 		vshtask_notify(0, msg);
 }
 
-static char* game_name()
+static char* get_game_info(void)
 {
     int h = View_Find("game_plugin");
 
 	if(h)
 	{
 		game_interface = (game_plugin_interface *)plugin_GetInterface(h,1);
-		game_interface->DoUnk8(_game_name);
+		game_interface->gameInfo(_game_info);
 	}
 
-    return h;
+    return (char*)h;
 }
 
 
 /*
+#include "vsh/xmb_plugin.h"
+
 static void show_msg2(char* msg) // usage: show_msg2(L"text");
 {
 	if(View_Find("xmb_plugin") != 0)
 	{
 		xmb2_interface = (xmb_plugin_xmb2 *)plugin_GetInterface(View_Find("xmb_plugin"),'XMB2');
-		xmb2_interface->DoUnk22(msg);
+		xmb2_interface->showMsg(msg);
 	}
 }
 */
@@ -1198,7 +1216,7 @@ static void saveBMP()
 #endif
 
 /*
-void log(const char *fmt, char *text)
+void add_log(const char *fmt, char *text)
 {
 	char buffer[4096];
 
@@ -1269,7 +1287,7 @@ static void led(u64 color, u64 mode)
 
 static void get_temperature(u32 _dev, u32 *_temp)
 {
-	system_call_2(SC_GET_TEMPERATURE, (u64)_dev, (u64)_temp);
+	system_call_2(SC_GET_TEMPERATURE, (uint64_t)(u32) _dev, (uint64_t)(u32) _temp);
 }
 
 static int sys_sm_set_fan_policy(u8 arg0, u8 arg1, u8 arg2)
@@ -1280,7 +1298,7 @@ static int sys_sm_set_fan_policy(u8 arg0, u8 arg1, u8 arg2)
 
 static int sys_sm_get_fan_policy(u8 id, u8 *st, u8 *mode, u8 *speed, u8 *unknown)
 {
-    system_call_5(SC_GET_FAN_POLICY, (u64) id, (u64) st, (u64) mode, (u64) speed, (u64) unknown);
+    system_call_5(SC_GET_FAN_POLICY, (u64) id, (u64)(u32) st, (u64)(u32) mode, (u64)(u32) speed, (u64)(u32) unknown);
     return_to_user_prog(int);
 }
 
@@ -1297,17 +1315,17 @@ static inline sys_prx_id_t prx_get_module_id_by_address(void *addr)
 
 static int sysLv2FsLink(const char *oldpath,const char *newpath)
 {
-	system_call_2(SC_FS_LINK,(u64)oldpath,(u64)newpath);
+	system_call_2(SC_FS_LINK, (u64)(u32)oldpath, (u64)(u32)newpath);
 	return_to_user_prog(int);
 }
 
+/*
 s32 lv2_get_platform_info(struct platform_info *info)
 {
 	system_call_1(SC_GET_PLATFORM_INFO, (uint64_t) info);
 	return_to_user_prog(s32);
 }
 
-/*
 static u32 in_cobra(u32 *mode)
 {
 	system_call_2(SC_COBRA_SYSCALL8, (uint32_t) 0x7000, (uint32_t)mode);
@@ -1524,7 +1542,7 @@ static void import_edats(char *path1, char *path2)
 	else
 		return;
 
-	return CELL_FS_SUCCEEDED;
+	return;
 }
 #endif
 
@@ -1894,7 +1912,6 @@ static int64_t open_remote_file(char *path)
 	return res.file_size;
 }
 
-
 static int read_remote_file_critical(uint64_t offset, void *buf, uint32_t size)
 {
 	netiso_read_file_critical_cmd cmd;
@@ -1942,7 +1959,6 @@ static int process_read_cd_2048_cmd(uint8_t *buf, uint32_t start_sector, uint32_
 
 	return 0;
 }
-#endif //#ifndef LITE_EDITION
 
 static int process_read_iso_cmd(uint8_t *buf, uint64_t offset, uint32_t size)
 {
@@ -2047,7 +2063,7 @@ static int process_read_cd_2352_cmd(uint8_t *buf, uint32_t sector, uint32_t rema
 	cached_cd_sector = sector;
 	return 0;
 }
-
+#endif //#ifndef LITE_EDITION
 
 static int sys_storage_ext_mount_discfile_proxy(sys_event_port_t result_port, sys_event_queue_t command_queue, int emu_type, uint64_t disc_size_bytes, uint32_t read_size, unsigned int trackscount, ScsiTrackDescriptor *tracks)
 {
@@ -2144,8 +2160,6 @@ static void netiso_thread(uint64_t arg)
 	{
 		fake_eject_event(BDVD_DRIVE);
 	}
-
-	uint64_t original_discsize=discsize;
 
 	if(discsize % CD_SECTOR_SIZE_2352)
 	{
@@ -2789,6 +2803,8 @@ static inline void poke_lv1( uint64_t addr, uint64_t val)
 
 #define PLUGIN_NAME "rec_plugin"
 
+void toggle_video_rec(void);
+
 bool recording = false;
 
 uint32_t *recOpt = NULL;              // recording utility vsh options struct
@@ -2809,7 +2825,7 @@ bool rec_start()
 	char g[0x120];
 	game_interface = (game_plugin_interface *)plugin_GetInterface(View_Find("game_plugin"), 1);
 
-	game_interface->DoUnk8(g);
+	game_interface->gameInfo(g);
 
 	cellFsMkdir((char*)"/dev_hdd0/VIDEO", 0777);
 	sprintf((char*)&recOpt[0x6], "/dev_hdd0/VIDEO/%s_%04d.%02d.%02d_%02d_%02d_%02d.mp4",
@@ -2847,13 +2863,13 @@ bool rec_start()
 		}
 		else
 		{
-			show_msg("No rec_plugin view found.");
+			show_msg((char*)"No rec_plugin view found.");
 			return false;
 		}
 	}
 }
 
-void toggle_video_rec()
+void toggle_video_rec(void)
 {
 	if(View_Find("game_plugin") != 0)    // if game_plugin is loaded -> there is a game/app running and we can recording...
 	{
@@ -3057,7 +3073,7 @@ static bool language(const char *file_str, char *default_str)
 		if(webman_config->lang>22 && webman_config->lang!=99) return false;
 
 		const char lang_codes[24][3]={"EN", "FR", "IT", "ES", "DE", "NL", "PT", "RU", "HU", "PL", "GR", "HR", "BG", "IN", "TR", "AR", "CN", "KR", "JP", "ZH", "DK", "SK", "CZ", "XX"};
-		const char lang_path[34];
+		char lang_path[34];
 
 		i=webman_config->lang; if(i>23) i=23;
 
@@ -3112,7 +3128,7 @@ retry:
 	return true;
 }
 
-static void update_language()
+static void update_language(void)
 {
 	lang_pos=fh=0;
 
@@ -3369,7 +3385,7 @@ static void add_to_map(char *path1, char *path2)
 {
 	if(max_mapped==0) pokeq(MAP_BASE + 0x00, 0x0000000000000000ULL);
 
-	if(max_mapped<sizeof(file_to_map))
+	if(max_mapped<10)
 	{
 		for(u8 n=0; n<max_mapped; n++)
 		{
@@ -3442,7 +3458,7 @@ static int set_gamedata_status(u8 status, bool do_mount)
 			sys_map_path((char*)"/dev_hdd0/game", NULL);
 #endif
 			sprintf(msg, (char*)"gameDATA %s (no usb)", STR_ERROR);
-			show_msg((char*)msg);
+			show_msg((char*) msg);
 			return FAILED;
 		}
 	}
@@ -3461,7 +3477,7 @@ static int set_gamedata_status(u8 status, bool do_mount)
 
 	if(do_mount)
     {
-		show_msg((char*)msg);
+		show_msg((char*) msg);
 #ifndef COBRA_ONLY
 		mount_with_mm(gamei_path, MOUNT_EXT_GDATA);
 #endif
@@ -3470,7 +3486,7 @@ static int set_gamedata_status(u8 status, bool do_mount)
 }
 #endif //#ifdef EXT_GDATA
 
-static void detect_firmware()
+static void detect_firmware(void)
 {
 	if(c_firmware>3.40f) return;
 
@@ -3635,7 +3651,7 @@ static void detect_firmware()
 	}
 }
 
-static void block_online_servers()
+static void block_online_servers(void)
 {
 	u64 mem=0;
 	for(u64 addr=0x860000; addr<0xFFFFF8ULL; addr+=4)//16MB
@@ -3673,7 +3689,7 @@ static void block_online_servers()
 }
 
 #ifdef SPOOF_CONSOLEID
-static void spoof_idps_psid()
+static void spoof_idps_psid(void)
 {
 	if(webman_config->spsid)
 	{
@@ -3738,7 +3754,7 @@ static void spoof_idps_psid()
 #endif
 
 #ifdef REMOVE_SYSCALLS
-static void remove_cfw_syscalls()
+static void remove_cfw_syscalls(void)
 {
 	detect_firmware();
 
@@ -4022,27 +4038,29 @@ static int read_remote_dir(int s, sys_addr_t *data /*netiso_read_dir_result_data
 //MM_LOG("OK (%i entries)\n", res.dir_size );
 	if(res.dir_size > 0)
 	{
-		if(res.dir_size>866) res.dir_size=866;
-		len = (sizeof(netiso_read_dir_result_data)*res.dir_size);
 		sys_addr_t data1=0;
-		int len2= ((len+_64KB_)/_64KB_)*_64KB_;
-		if(sys_memory_allocate(len2, SYS_MEMORY_PAGE_SIZE_64K, &data1)==0)
+		for(int64_t retry=16; retry>0; retry--)
 		{
-			*data=data1;
-			u8 *data2=(u8*)data1;
-			//MM_LOG("dir_size=%i (%i bytes) (%i)\n", res.dir_size, len, s);
+			if(res.dir_size>retry*123) res.dir_size=retry*123;
 
-			if(recv(s, data2, len, MSG_WAITALL) != len)
+			len = (sizeof(netiso_read_dir_result_data)*res.dir_size);
+			int len2= ((len+_64KB_)/_64KB_)*_64KB_;
+			if(sys_memory_allocate(len2, SYS_MEMORY_PAGE_SIZE_64K, &data1)==0)
 			{
-				sys_memory_free(data1);
-				*data=NULL;
-				return FAILED;
-			}
-		}
-		else
-			*data=NULL;
+				*data=data1;
+				u8 *data2=(u8*)data1;
 
-		//MM_LOG("Receive done.\n");
+				if(recv(s, data2, len, MSG_WAITALL) != len)
+				{
+					sys_memory_free(data1);
+					*data=NULL;
+					return FAILED;
+				}
+				break;
+			}
+			else
+				*data=NULL;
+		}
 	}
 	else
 		*data=NULL;
@@ -4093,6 +4111,12 @@ static void add_option_item(const char *value, const char *label, bool selected,
 	str=(mem[0x8]+(mem[0x9]<<8)); \
 	dat=pos=(mem[0xc]+(mem[0xd]<<8));
 
+#define READ_SFO_HEADER2() \
+	if(!(mem[1]=='P' && mem[2]=='S' && mem[3]=='F')) return; \
+	u16 pos, str, dat, indx=0; \
+	str=(mem[0x8]+(mem[0x9]<<8)); \
+	dat=pos=(mem[0xc]+(mem[0xd]<<8));
+
 #define FOR_EACH_SFO_FIELD() \
 	while(str<4090) \
 	{ \
@@ -4106,7 +4130,7 @@ static void add_option_item(const char *value, const char *label, bool selected,
 
 static void parse_param_sfo(unsigned char *mem, char *titleID, char *title)
 {
-	READ_SFO_HEADER()
+	READ_SFO_HEADER2()
 
 	memset(titleID, 0, 10);
 	memset(title, 0, 64);
@@ -4201,10 +4225,6 @@ static bool fix_ps3_extra(unsigned char *mem)
 	return false;
 }
 
-#undef READ_SFO_HEADER()
-#undef FOR_EACH_SFO_FIELD()
-#undef READ_NEXT_SFO_FIELD()
-
 static void fix_game(char *path)
 {
 	int fd;
@@ -4236,7 +4256,7 @@ static void fix_game(char *path)
 					cellFsLseek(fdw, 0xC, CELL_FS_SEEK_SET, &msiz);
 					cellFsRead(fdw, (void *)&ps3_sys_version, 4, &msiz);
 
-					offset=(ps3_sys_version[0]<<32) + (ps3_sys_version[1]<<16) + (ps3_sys_version[2]<<8) + ps3_sys_version[3]; offset-=0x78;
+					offset=(ps3_sys_version[0]<<24) + (ps3_sys_version[1]<<16) + (ps3_sys_version[2]<<8) + ps3_sys_version[3]; offset-=0x78;
 
 					retry_offset:
 					if(offset < 0x90 || offset > 0x800) offset=!extcasecmp(dir.d_name, ".sprx", 5)?0x258:0x428;
@@ -4344,7 +4364,7 @@ void fix_iso(char *iso_file, uint64_t maxbytes, bool patch_update)
 
 					if(size>lba) size=lba;
 
-					sprintf(chunk, STR_FIXING, iso_file);
+					sprintf(chunk, "%s %s", STR_FIXING, iso_file);
 					show_msg(chunk);
 
 					lba=getlba(chunk, msiz1, "PS3_DISC.SFB;1", 14, 0); lba*=0x800ULL; chunk_size=0x800; //1 sector
@@ -4380,7 +4400,7 @@ void fix_iso(char *iso_file, uint64_t maxbytes, bool patch_update)
 						cellFsLseek(fd, lba, CELL_FS_SEEK_SET, &msiz2);
 						cellFsRead(fd, (void *)&chunk, chunk_size, &msiz1); if(msiz1<=0) break;
 
-    					offset=(chunk[0xC]<<32) + (chunk[0xD]<<16) + (chunk[0xE]<<8) + chunk[0xF]; offset-=0x78;
+    					offset=(chunk[0xC]<<24) + (chunk[0xD]<<16) + (chunk[0xE]<<8) + chunk[0xF]; offset-=0x78;
 	    				if(offset < 0x90 || offset > 0x800 || (chunk[offset] | chunk[offset+1] | chunk[offset+2] | chunk[offset+3] | chunk[offset+4] | chunk[offset+5])) offset=(t>2)?0x258:0x428;
 
 						for(u8 i=0;i<8;i++) ps3_sys_version[i]=chunk[offset+i];
@@ -4620,7 +4640,7 @@ static void get_iso_icon(char *icon, char *param, char *file, int isdir, int ns,
 					if(bytes_read)
 						cellFsWrite(fdw, (char*)tempstr, bytes_read, NULL);
 					boff+=bytes_read;
-					if(bytes_read<_4KB_ || abort_connection) break;
+					if(bytes_read<(int)_4KB_ || abort_connection) break;
 				}
 				cellFsClose(fdw);
 				if(boff<1 || abort_connection) cellFsUnlink(icon);
@@ -4645,7 +4665,7 @@ static bool get_cover_from_name(char *icon, char *name, char *titleid)
 	if(titleid[0]==0 && (strstr(name, "-[") || strstr(name, " [B") || strstr(name, " [N") || strstr(name, " [S")))
 	{
 		if(strstr(name, "-["))
-			{char *p=name; while(*p && p[9]!='-' && p[10]!='[' && p[9]!=0) *p++; strncpy(titleid, p, 10);}
+			{char *p=name; while(*p && p[9]!='-' && p[10]!='[' && p[9]!=0) p++; strncpy(titleid, p, 10);}
 		else if(strstr(name, " [B"))
 			strncpy(titleid, strstr(name, " [B") + 2, 10); //BCES/BLES/BCUS/BLUS/etc.
 		else if(strstr(name, " [N"))
@@ -4759,7 +4779,7 @@ static void waitfor(char *path, uint8_t timeout)
 	}
 }
 
-static void enable_classic_ps2_mode()
+static void enable_classic_ps2_mode(void)
 {
 	int fd;
 	if(cellFsOpen((char*)PS2_CLASSIC_TOGGLER, CELL_FS_O_CREAT| CELL_FS_O_TRUNC |CELL_FS_O_WRONLY, &fd, NULL, 0) == CELL_FS_SUCCEEDED)
@@ -4769,7 +4789,7 @@ static void enable_classic_ps2_mode()
 	}
 }
 
-static void disable_classic_ps2_mode()
+static void disable_classic_ps2_mode(void)
 {
 	cellFsUnlink((char*)PS2_CLASSIC_TOGGLER);
 /*
@@ -4828,7 +4848,7 @@ int connect_to_remote_server(u8 server_id)
 #endif //#ifndef LITE_EDITION
 #endif //#ifdef COBRA_ONLY
 
-static void mount_autoboot()
+static void mount_autoboot(void)
 {
 	struct CellFsStat s;
 	char path[MAX_PATH_LEN];
@@ -4985,6 +5005,8 @@ static void add_list_entry(char *tempstr, bool is_dir, char *ename, char *templn
 
 	urlenc(tempstr, templn); strncpy(templn, tempstr, MAX_LINE_LEN);
 	strcpy(tempstr, name);
+
+	htmlenc(name, tempstr, 0);
 
 	flen=strlen(name);
 
@@ -5293,7 +5315,7 @@ static bool update_mygames_xml(u64 conn_s_p)
 	set_buffer_sizes(webman_config->foot);
 
 	_meminfo meminfo;
-	{system_call_1(SC_GET_FREE_MEM, (uint64_t) &meminfo);}
+	{system_call_1(SC_GET_FREE_MEM, (uint64_t)(u32) &meminfo);}
 	if((meminfo.avail)<( (BUFFER_SIZE_ALL) + MIN_MEM)) set_buffer_sizes(3); //MIN+
 	if((meminfo.avail)<( (BUFFER_SIZE_ALL) + MIN_MEM)) set_buffer_sizes(1); //MIN
 	if((meminfo.avail)<( (BUFFER_SIZE_ALL) + MIN_MEM)) //leave if less than min memory
@@ -5475,7 +5497,7 @@ static bool update_mygames_xml(u64 conn_s_p)
 //
 			char param[MAX_PATH_LEN];
 
-			char ll[4]; bool ls=false; u8 li=0, subfolder=0;
+			bool ls=false; u8 li=0, subfolder=0;
 
 		subfolder_letter_xml:
 			subfolder = 0; uprofile = profile;
@@ -5484,7 +5506,7 @@ read_folder_xml:
 #ifndef LITE_EDITION
 			if(is_net)
 			{
-				if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
+				char ll[4]; if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
 				sprintf(param, "/%s%s%s",    paths[f1], SUFIX(uprofile), ll);
 			}
 			else
@@ -5535,13 +5557,13 @@ read_folder_xml:
 				uint64_t msiz = 0;
 				u8 is_iso=0;
 				char icon[MAX_PATH_LEN], enc_dir_name[1024], subpath[MAX_PATH_LEN]; int fd2;
-				char tempID[12], neth[8];
+				char tempID[12];
 
 #ifdef COBRA_ONLY
  #ifndef LITE_EDITION
 				sys_addr_t data2=0;
 				int v3_entries, v3_entry; v3_entries=v3_entry=0;
-				netiso_read_dir_result_data *data=NULL;
+				netiso_read_dir_result_data *data=NULL; char neth[8];
 
 				if(is_net)
 				{
@@ -6069,6 +6091,7 @@ static void get_value(char *text, char *url, u16 size)
 	text[n]=0;
 }
 
+#ifndef LITE_EDITION
 #ifdef WEB_CHAT
 static void webchat(char *buffer, char *templn, char *param, char *tempstr, sys_net_sockinfo_t conn_info_main)
 {
@@ -6138,8 +6161,9 @@ static void webchat(char *buffer, char *templn, char *param, char *tempstr, sys_
 					"</form><script>f.m.focus();</script>", user); strcat(buffer, templn);
 }
 #endif
+#endif
 
-static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
+static void cpu_rsx_stats(char *buffer, char *templn, char *param)
 {
 	u32 t1=0, t2=0, t1f=0, t2f=0;
 	get_temperature(0, &t1); // 3E030000 -> 3E.03°C -> 62.(03/256)°C
@@ -6150,7 +6174,7 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	t2f=(1.8f*(float)t2+32.f);
 
 	_meminfo meminfo;
-	{system_call_1(SC_GET_FREE_MEM, (uint64_t) &meminfo);}
+	{system_call_1(SC_GET_FREE_MEM, (uint64_t)(u32) &meminfo);}
 
 	if(!webman_config->fanc && (get_fan_policy_offset>0))
 	{
@@ -6192,8 +6216,7 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 #else
 		sprintf(templn, "<hr><H2><a href=\"%s", search_url); strcat(buffer, templn);
 #endif
-		game_name(); sprintf(templn, "%s\">", _game_name+0x14); strcat(buffer, templn);
-		game_name(); sprintf(templn, "%s %s</a></H2>", _game_name+0x04); strcat(buffer, templn);
+		get_game_info(); sprintf(templn, "%s\">%s %s</a></H2>", _game_Title, _game_TitleID, _game_Title); strcat(buffer, templn);
 	}
 
 	if(strstr(param, "?"))
@@ -6270,10 +6293,10 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 
 	// Get mac address [0xD-0x12]
 	u8 mac_address[0x13];
-	{system_call_3(SYS_NET_EURUS_POST_COMMAND, CMD_GET_MAC_ADDRESS, mac_address, 0x13);}
+	{system_call_3(SYS_NET_EURUS_POST_COMMAND, CMD_GET_MAC_ADDRESS, (u64)(u32)mac_address, 0x13);}
 
 #ifdef COBRA_ONLY
-    #define SYSCALL8_OPCODE_GET_MAMBA           0x7FFFULL
+    #define SYSCALL8_OPCODE_GET_MAMBA  0x7FFFULL
     bool is_mamba; {system_call_1(8, SYSCALL8_OPCODE_GET_MAMBA); is_mamba = ((int)p1 ==0x666);}
 
     uint16_t cobra_version; sys_get_version2(&cobra_version);
@@ -6303,7 +6326,7 @@ static bool cpu_rsx_stats(char *buffer, char *templn, char *param)
 	else
 	if(fix_in_progress)
 	{
-		strcat(buffer, "<hr>"); sprintf( templn, STR_FIXING, current_file); strcat(buffer, templn);
+		strcat(buffer, "<hr>"); sprintf( templn, "%s %s", STR_FIXING, current_file); strcat(buffer, templn);
 	}
 #endif
 	/////////////////////////////
@@ -7014,14 +7037,15 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 		int plen=10;
 #ifdef COPY_PS3
 		if(strstr(param, "copy.ps3")) plen=IS_COPY;
+		char target[MAX_PATH_LEN];
 #endif
-		char target[MAX_PATH_LEN], enc_dir_name[1024];
+		char enc_dir_name[1024];
 		bool mounted=false; max_mapped=0;
 		is_binary=1;
 
 		if(!(plen==IS_COPY && !copy_in_progress))
 		{
-			for(int n=0; n<(strlen(param)-9); n++)
+			for(int n=0; n<(int)(strlen(param)-9); n++)
 				if(memcmp(param + n, "/PS3_GAME", 9)==0) {param[n]=0; break;}
 #ifdef PS2_DISC
 			if(!memcmp(param, "/mount.ps2", 10))
@@ -7036,9 +7060,9 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 			}
 			else
 #endif
-			if(!forced_mount && game_name())
+			if(!forced_mount && get_game_info())
 			{
-				sprintf(templn, "<H3>%s : <a href=\"/mount.ps3/unmount\">%s %s</a></H3><hr><a href=\"/mount_ps3%s\">", STR_UNMOUNTGAME, _game_name+0x04, _game_name+0x14, param+plen); strcat(buffer, templn);
+				sprintf(templn, "<H3>%s : <a href=\"/mount.ps3/unmount\">%s %s</a></H3><hr><a href=\"/mount_ps3%s\">", STR_UNMOUNTGAME, _game_TitleID, _game_Title, param+plen); strcat(buffer, templn);
 			}
 			else
 				mounted=mount_with_mm(param+plen, 1);
@@ -7113,7 +7137,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 								poke_lv1(lv2_offset + 0x10, 0x6C76325F73656C66ULL);
 
 								working = 0;
-								{DELETE_TURNOFF}
+								{ DELETE_TURNOFF }
 								savefile((char*)WMNOSCAN, NULL, 0);
 								{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
 								sys_ppu_thread_exit(0);
@@ -7123,7 +7147,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 					plen=0; //do not copy
 				}
 				else
-#endif
+#endif // #ifdef SWAP_KERNEL
 				if(!extcmp(param+plen, ".p3t", 4))
 				{
 					if(is_copying_from_hdd)
@@ -7226,7 +7250,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 				if(strstr(target, "/webftp_server")) {strcat(buffer, tempstr); sprintf(tempstr, "<HR>%s", STR_SETTINGSUPD);}
 			}
 			else
-#endif
+#endif // #ifdef COPY_PS3
 			if(!extcmp(param, ".BIN.ENC", 8))
 				sprintf(tempstr, "%s: %s<hr><img src=\"%s\"><hr>%s", STR_GAMETOM, templn, enc_dir_name, mounted?STR_PS2LOADED:STR_ERROR);
 			else if(strstr(param, "/PSPISO") || strstr(param, "/ISO/"))
@@ -7270,7 +7294,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 					}
 				}
 			}
-#endif
+#endif // #ifdef PS2_DISC
 		}
 #ifdef COPY_PS3
 		if(plen==IS_COPY && !copy_in_progress)
@@ -7305,7 +7329,7 @@ static void game_mount(char *buffer, char *templn, char *param, char *tempstr, u
 					show_msg((char*)STR_CPYFINISH);
 			}
 		}
-#endif
+#endif //#ifdef COPY_PS3
 	}
 }
 
@@ -7334,9 +7358,9 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 		if(!(webman_config->cmask & PS1))   add_query_html(buffer, (char*)"PSXISO", (char*)"PSXISO");
 		if(!(webman_config->cmask & BLU))   add_query_html(buffer, (char*)"BDISO" , (char*)"BDISO" );
 		if(!(webman_config->cmask & DVD))   add_query_html(buffer, (char*)"DVDISO", (char*)"DVDISO");
-#ifndef LITE_EDITION
+ #ifndef LITE_EDITION
 		if(webman_config->netd0 || webman_config->netd1 || webman_config->netd2) add_query_html(buffer, (char*)"net", (char*)"NET");
-#endif
+ #endif
 		add_query_html(buffer, (char*)"hdd", (char*)"HDD");
 		add_query_html(buffer, (char*)"usb", (char*)"USB");
 		add_query_html(buffer, (char*)"ntfs", (char*)"NTFS");
@@ -7346,7 +7370,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 
 		add_query_html(buffer, (char*)"hdd", (char*)"HDD");
 		add_query_html(buffer, (char*)"usb", (char*)"USB");
-#endif
+#endif //#ifdef COBRA_ONLY
 		strcat(buffer, "</font><span style=\"white-space:normal;\">");
 	}
 	else
@@ -7486,7 +7510,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #endif
 				if(is_net && (ns<0)) break;
 
-				char ll[4]; bool ls=false; u8 li=0, subfolder=0;
+				bool ls=false; u8 li=0, subfolder=0;
 
 		subfolder_letter_html:
 				subfolder = 0; uprofile = profile;
@@ -7495,7 +7519,7 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 #ifndef LITE_EDITION
 				if(is_net)
 				{
-					if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
+					char ll[4]; if(li) sprintf(ll, "/%c", '@'+li); else ll[0]=0;
 					sprintf(param, "/%s%s%s",    paths[f1], SUFIX(uprofile), ll);
 				}
 				else
@@ -7515,13 +7539,13 @@ static bool game_listing(char *buffer, char *templn, char *param, int conn_s, ch
 				u64 read_e;
 				u8 is_iso=0;
 				char icon[MAX_PATH_LEN], enc_dir_name[1024], subpath[MAX_PATH_LEN]; int fd2;
-				char tempID[12], neth[8];
+				char tempID[12];
 				sys_addr_t data2=0;
 				int v3_entries, v3_entry; v3_entries=v3_entry=0;
 #ifdef COBRA_ONLY
 				uint64_t msiz = 0;
  #ifndef LITE_EDITION
-				netiso_read_dir_result_data *data=NULL;
+				netiso_read_dir_result_data *data=NULL; char neth[8];
 				if(is_net)
 				{
 					v3_entries = read_remote_dir(ns, &data2, &abort_connection);
@@ -7907,38 +7931,40 @@ static bool folder_listing(char *buffer, char *templn, char *param, int conn_s, 
 					netiso_read_dir_result_data *data=NULL;
 					int v3_entries=0;
 					v3_entries = read_remote_dir(ns, &data2, &abort_connection);
-					if(data2==NULL) goto just_leave;
-					data=(netiso_read_dir_result_data*)data2;
-
-					for(int n=0;n<v3_entries;n++)
+					if(data2!=NULL)
 					{
-						if(data[n].name[0]=='.' && data[n].name[1]==0) continue;
-						if(tlen>(BUFFER_SIZE-1024)) break;
-						if(idx>=(max_entries-3)) break;
+						data=(netiso_read_dir_result_data*)data2;
 
-						if(param[1]==0)
-							sprintf(templn, "/%s", data[n].name);
-						else
+						for(int n=0;n<v3_entries;n++)
 						{
-							sprintf(templn, "%s%s", param, data[n].name);
+							if(data[n].name[0]=='.' && data[n].name[1]==0) continue;
+							if(tlen>(BUFFER_SIZE-1024)) break;
+							if(idx>=(max_entries-3)) break;
+
+							if(param[1]==0)
+								sprintf(templn, "/%s", data[n].name);
+							else
+							{
+								sprintf(templn, "%s%s", param, data[n].name);
+							}
+							flen=strlen(templn)-1; if(templn[flen]=='/') templn[flen]=0;
+
+							cellRtcSetTime_t(&rDate, data[n].mtime);
+
+							sz=(unsigned long long)data[n].file_size; dir_size+=sz;
+
+							is_dir=data[n].is_directory; if(is_dir) dirs++;
+
+							add_list_entry(tempstr, is_dir, ename, templn, data[n].name, fsize, rDate, flen, sz, sf, true);
+
+							if(strlen(tempstr)>MAX_LINE_LEN) continue; //ignore lines too long
+							strncpy(line_entry[idx].path, tempstr, LINELEN); idx++;
+							tlen+=strlen(tempstr);
+
+							if(!working) break;
 						}
-						flen=strlen(templn)-1; if(templn[flen]=='/') templn[flen]=0;
-
-						cellRtcSetTime_t(&rDate, data[n].mtime);
-
-						sz=(unsigned long long)data[n].file_size; dir_size+=sz;
-
-						is_dir=data[n].is_directory; if(is_dir) dirs++;
-
-						add_list_entry(tempstr, is_dir, ename, templn, data[n].name, fsize, rDate, flen, sz, sf, true);
-
-						if(strlen(tempstr)>MAX_LINE_LEN) continue; //ignore lines too long
-						strncpy(line_entry[idx].path, tempstr, LINELEN); idx++;
-						tlen+=strlen(tempstr);
-
-						if(!working) break;
+						sys_memory_free(data2);
 					}
-					sys_memory_free(data2);
 				}
 				else //may be a file
 				{
@@ -8014,7 +8040,7 @@ static bool folder_listing(char *buffer, char *templn, char *param, int conn_s, 
 			}
 			cellFsClosedir(fd);
 		}
- just_leave:
+
 		if(strlen(param)<4)
 		{
 			for(u8 n=0; n<3; n++)
@@ -8106,7 +8132,7 @@ static void ps3mapi_home(char *buffer, char *templn)
 	int versionfw = 0;
 	if (syscall8_state>=0) {system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_VERSION); versionfw = (int)(p1);}
 	char fwtype[32];
-	if (syscall8_state>=0) {system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)fwtype);}
+	if (syscall8_state>=0) {system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)(u32)fwtype);}
 
 	//---------------------------------------------
 	//PS3 Commands---------------------------------
@@ -8117,33 +8143,32 @@ static void ps3mapi_home(char *buffer, char *templn)
 	strcat(buffer, templn);
 
 	//RingBuzzer
-	ps3mapi_buzzer(buffer, templn, " ");
+	ps3mapi_buzzer(buffer, templn, (char*)" ");
 
 	//LedRed
-	ps3mapi_led(buffer, templn, " ");
+	ps3mapi_led(buffer, templn, (char*)" ");
 
-	sprintf(templn, "%", "</td>");
+	sprintf(templn, "%s", "</td>");
 	strcat(buffer, templn);
 
 	//Notify
-    ps3mapi_notify(buffer, templn, " ");
+    ps3mapi_notify(buffer, templn, (char*)" ");
 
-	int ret_val = -1;
 	if (syscall8_state>=0 && syscall8_state<3 )
 	{
-        ps3mapi_syscall(buffer, templn, " ");
+        ps3mapi_syscall(buffer, templn, (char*)" ");
 	}
 	if (syscall8_state>=0)
 	{
 		//Syscall8
-		ps3mapi_syscall8(buffer, templn, " ");
+		ps3mapi_syscall8(buffer, templn, (char*)" ");
 	}
 	if (syscall8_state>=0 && syscall8_state<3 )
 	{
 		//IDPS/PSID
 		if (version >= 0x0120 )
 		{
-            ps3mapi_setidps(buffer, templn, " ");
+            ps3mapi_setidps(buffer, templn, (char*)" ");
 		}
 		else
 		{
@@ -8154,15 +8179,15 @@ static void ps3mapi_home(char *buffer, char *templn)
 		//Process Commands-----------------------------
 		//---------------------------------------------
 		//GetMem
-		ps3mapi_getmem(buffer, templn, " ");
+		ps3mapi_getmem(buffer, templn, (char*)" ");
 
 		//SetMem
-		ps3mapi_setmem(buffer, templn, " ");
+		ps3mapi_setmem(buffer, templn, (char*)" ");
 
 		//---------------------------------------------
 		//VSH Plugin-----------------------------------
 		//---------------------------------------------
-		ps3mapi_vshplugin(buffer, templn, " ");
+		ps3mapi_vshplugin(buffer, templn, (char*)" ");
 
 		sprintf(templn, "<hr color=\"#FF0000\"/>"
 						"Firmware: %X %s | PS3MAPI: webUI v%X, Server v%X, Core v%X | By NzV", versionfw, fwtype, PS3MAPI_WEBUI_VERSION, PS3MAPI_SERVER_VERSION, version);
@@ -8181,16 +8206,16 @@ static void ps3mapi_buzzer(char *buffer, char *templn, char *param)
 
 	if(strstr(param, "buzzer.ps3mapi?"))
 	{
-		if(strstr(param, "mode=1")) { system_call_3(SC_RING_BUZZER, 0x1004, 0x4,   0x6); } else
-		if(strstr(param, "mode=2")) { system_call_3(SC_RING_BUZZER, 0x1004, 0x7,  0x36); } else
-		if(strstr(param, "mode=3")) { system_call_3(SC_RING_BUZZER, 0x1004, 0xa, 0x1b6); }
+		if(strstr(param, "mode=1")) { BEEP1 } else
+		if(strstr(param, "mode=2")) { BEEP2 } else
+		if(strstr(param, "mode=3")) { BEEP3 }
 	}
 
 	if(!is_ps3mapi_home)
 		sprintf(templn, "<b>%s --> %s --> %s</b>"
 						"<hr color=\"#0099FF\"/>", "PS3MAPI", "PS3 Commands", "Buzzer");
     else
-		sprintf(templn, "<td width=\"260\" style=\"text-align: left; float: left;\"><u>%s:</u><br>", "Buzzer");
+		sprintf(templn, "<td width=\"260\" style=\"text-align:left; float:left;\"><u>%s:</u><br>", "Buzzer");
 	strcat(buffer, templn);
 
 	sprintf(templn, "<form id=\"buzzer\" action=\"/buzzer.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><br>"
@@ -8227,7 +8252,7 @@ static void ps3mapi_led(char *buffer, char *templn, char *param)
 		sprintf(templn, "<b>%s --> %s --> %s</b>"
 						"<hr color=\"#0099FF\"/>", "PS3MAPI", "PS3 Commands", "Led");
     else
-		sprintf(templn, "<td width=\"260\" style=\"text-align: left; float: left;\"><u>%s:</u><br>", "Led");
+		sprintf(templn, "<td width=\"260\" style=\"text-align:left; float:left;\"><u>%s:</u><br>", "Led");
 
 	strcat(buffer, templn);
 
@@ -8270,14 +8295,14 @@ static void ps3mapi_notify(char *buffer, char *templn, char *param)
 		sprintf(templn, "<b>%s --> %s --> %s</b>"
 						"<hr color=\"#0099FF\"/>", "PS3MAPI", "PS3 Commands", "Notify");
 	else
-		sprintf(templn, "<tr><td style=\"text-align: left; float: left;\"><br><u>%s:</u><br><br>", "Notify");
+		sprintf(templn, "<tr><td style=\"text-align:left; float:left;\"><br><u>%s:</u><br><br>", "Notify");
 
 	strcat(buffer, templn);
 
 	sprintf(templn, "<form action=\"/notify.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
-					"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\"><tr><td style=\"text-align: left; float: left;\">"
+					"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\"><tr><td style=\"text-align:left; float:left;\">"
 					"<textarea name=\"msg\" cols=\"111\" rows=\"2\" maxlength=\"199\">%s</textarea></td></tr>"
-					"<tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></table></form>", msg, "Send");
+					"<tr><td style=\"text-align:right; float:right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></table></form>", msg, "Send");
 
 	if(!is_ps3mapi_home) strcat(templn, "<hr color=\"#FF0000\"/>"); else strcat(templn, "</td>");
 	strcat(buffer, templn);
@@ -8301,52 +8326,52 @@ static void ps3mapi_syscall(char *buffer, char *templn, char *param)
 	if(!is_ps3mapi_home)
 		sprintf(templn, "<b>%s --> %s --> %s</b>"
 						"<hr color=\"#0099FF\"/>"
-                        "<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">", "PS3MAPI", "PS3 Commands", "CFW syscall");
+						"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">", "PS3MAPI", "PS3 Commands", "CFW syscall");
 	else
 		sprintf(templn, "<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
-						"<tr><td style=\"text-align: left; float: left;\"><u>%s:</u><br><br></td></tr>", "CFW syscall");
+						"<tr><td style=\"text-align:left; float:left;\"><u>%s:</u><br><br></td></tr>", "CFW syscall");
 
 	strcat(buffer, templn);
 
 	sprintf(templn, "<form id=\"syscall\" action=\"/syscall.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
-					"<br><tr><td width=\"260\" style=\"text-align: left; float: left;\">");
+					"<br><tr><td width=\"260\" style=\"text-align:left; float:left;\">");
 	strcat(buffer, templn);
 
 	int ret_val = -1;
 
     { system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 6); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc6", "1\" disabled=\"disabled", "[6]LV2 Peek", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc6", "1\" disabled=\"disabled", "[6]LV2 Peek", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc6", "1", "[6]LV2 Peek", NULL, false, buffer);}
 
     { system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 7); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc7", "1\" disabled=\"disabled", "[7]LV2 Poke", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc7", "1\" disabled=\"disabled", "[7]LV2 Poke", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc7", "1", "[7]LV2 Poke", NULL, false, buffer);}
 
-    strcat(buffer, "</td><td  width=\"260\"  valign=\"top\" style=\"text-align: left; float: left;\">");
+    strcat(buffer, "</td><td  width=\"260\"  valign=\"top\" style=\"text-align:left; float:left;\">");
 
     { system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 9); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc9", "1\" disabled=\"disabled", "[9]LV1 Poke", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc9", "1\" disabled=\"disabled", "[9]LV1 Poke", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc9", "1", "[9]LV1 Poke", NULL, false, buffer);}
 
     { system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 10); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc10", "1\" disabled=\"disabled", "[10]LV1 Call", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc10", "1\" disabled=\"disabled", "[10]LV1 Call", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc10", "1", "[10]LV1 Call", NULL, false, buffer);}
 
     { system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 11); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc11", "1\" disabled=\"disabled", "[11]LV1 Peek", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc11", "1\" disabled=\"disabled", "[11]LV1 Peek", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc11", "1", "[11]LV1 Peek", NULL, false, buffer);}
 
-    strcat(buffer, "</td><td  width=\"260\"  valign=\"top\" style=\"text-align: left; float: left;\">");
+    strcat(buffer, "</td><td  width=\"260\"  valign=\"top\" style=\"text-align:left; float:left;\">");
 
     { system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 35); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc35", "1\" disabled=\"disabled", "[35]Map Path", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc35", "1\" disabled=\"disabled", "[35]Map Path", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc35", "1", "[35]Map Path", NULL, false, buffer);}
 
 	{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_CHECK_SYSCALL, 36); ret_val = (int)p1;}
-	if( ret_val != 0) add_check_box("sc36", "1\" disabled=\"disabled", "[36]Map Game", NULL, true, buffer);
+	if( ret_val != 0 )  add_check_box("sc36", "1\" disabled=\"disabled", "[36]Map Game", NULL, true, buffer);
 	else {ret_val = -1; add_check_box("sc36", "1", "[36]Map Game", NULL, false, buffer);}
 
-	sprintf(templn, "</td></tr><tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form></table><br>", "Disable");
+	sprintf(templn, "</td></tr><tr><td style=\"text-align:right; float:right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form></table><br>", "Disable");
 	if(!is_ps3mapi_home) strcat(templn, "<hr color=\"#FF0000\"/>");
 	strcat(buffer, templn);
 }
@@ -8368,18 +8393,18 @@ static void ps3mapi_syscall8(char *buffer, char *templn, char *param)
 					"<hr color=\"#0099FF\"/>"
 					"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
 					"<form id=\"syscall8\" action=\"/syscall8.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
-					"<br><tr><td style=\"text-align: left; float: left;\">",
+					"<br><tr><td style=\"text-align:left; float:left;\">",
 					is_ps3mapi_home ? "" : "PS3MAPI --> ", "PS3 Commands", "CFW syscall 8");
 	strcat(buffer, templn);
 	int ret_val = -1;
 	{ system_call_2(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_PCHECK_SYSCALL8); ret_val = (int)p1;}
 	if(ret_val < 0)
 	{
-		add_radio_button("mode", "0\" disabled=\"disabled", "sc8_0", "Fully enabled", NULL, false, buffer);
-		add_radio_button("mode", "1\" disabled=\"disabled", "sc8_1", "Partially disabled : Keep only COBRA/MAMBA/PS3MAPI features", NULL, false, buffer);
-		add_radio_button("mode", "2\" disabled=\"disabled", "sc8_2", "Partially disabled : Keep only PS3MAPI features", NULL, false, buffer);
-		add_radio_button("mode", "3\" disabled=\"disabled", "sc8_3", "Fake disabled (can be re-enabled)", NULL, false, buffer);
-		add_radio_button("mode", "4\" disabled=\"disabled", "sc8_4", "Fully disabled (cant be re-enabled)", NULL, true, buffer);
+		add_radio_button("mode\" disabled=\"disabled", "0", "sc8_0", "Fully enabled", NULL, false, buffer);
+		add_radio_button("mode\" disabled=\"disabled", "1", "sc8_1", "Partially disabled : Keep only COBRA/MAMBA/PS3MAPI features", NULL, false, buffer);
+		add_radio_button("mode\" disabled=\"disabled", "2", "sc8_2", "Partially disabled : Keep only PS3MAPI features", NULL, false, buffer);
+		add_radio_button("mode\" disabled=\"disabled", "3", "sc8_3", "Fake disabled (can be re-enabled)", NULL, false, buffer);
+		add_radio_button("mode\" disabled=\"disabled", "4", "sc8_4", "Fully disabled (cant be re-enabled)", NULL, true, buffer);
 	}
 	else
 	{
@@ -8389,7 +8414,7 @@ static void ps3mapi_syscall8(char *buffer, char *templn, char *param)
 		add_radio_button("mode", "3", "sc8_3", "Fake disabled (can be re-enabled)", NULL, (ret_val == 3), buffer);
 		add_radio_button("mode", "4", "sc8_4", "Fully disabled (cant be re-enabled)", NULL, false, buffer);
 	}
-	sprintf(templn, "</td></tr><tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form></table><br>", "Set");
+	sprintf(templn, "</td></tr><tr><td style=\"text-align:right; float:right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></form></table><br>", "Set");
 	if(!is_ps3mapi_home) strcat(templn, "<hr color=\"#FF0000\"/>");
 	strcat(buffer, templn);
 }
@@ -8418,6 +8443,7 @@ static void ps3mapi_getmem(char *buffer, char *templn, char *param)
 			char len_tmp[20];
 			get_value(len_tmp, pos + 4, 19);
 			length = val(len_tmp);
+			length = RANGE(length, 0, 2048);
 		}
 		else goto getmem_err_arg;
 		pos=strstr(param, "proc=");
@@ -8448,14 +8474,14 @@ static void ps3mapi_getmem(char *buffer, char *templn, char *param)
 		strcat(buffer, "<select name=\"proc\">");
 		char pid_str[32];
 		u32 pid_list[16];
-		{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
+		{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)(u32)pid_list); }
 		for(int i = 0; i < 16; i++)
 		{
 			if(1 < pid_list[i])
 			{
 				memset(templn, 0, MAX_LINE_LEN);
 				memset(pid_str, 0, sizeof(pid_str));
-				{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)templn); }
+				{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)(u32)pid_list[i], (u64)(u32)templn); }
 				sprintf(pid_str, "%i", pid_list[i]);
 				if(1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
 			}
@@ -8465,12 +8491,12 @@ static void ps3mapi_getmem(char *buffer, char *templn, char *param)
 	else
 	{
 		memset(templn, 0, MAX_LINE_LEN);
-		{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)templn); }
+		{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)(u32)templn); }
 		strcat(buffer, templn);
 		sprintf(templn, "<input name=\"proc\" type=\"hidden\" value=\"%u\"><br><br>", pid);
 		strcat(buffer, templn);
 	}
-	sprintf(templn, "<b><u>%s:</u></b> " HTML_INPUT("addr", "%X", "16", "18")
+	sprintf(templn, "<b><u>%s:</u></b> " HTML_INPUT("addr", "%llX", "16", "18")
 					"   <b><u>%s:</u></b> <input name=\"len\" type=\"number\" value=\"%i\" min=\"1\" max=\"2048\">"
 					"   <input type=\"submit\" value=\" %s \"/></form>", "Address", address, "Length", length, "Get");
 	strcat(buffer, templn);
@@ -8482,7 +8508,7 @@ static void ps3mapi_getmem(char *buffer, char *templn, char *param)
 		char buffer_tmp[length + 1];
 		memset(buffer_tmp, 0, sizeof(buffer_tmp));
 		int retval = -1;
-		{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)pid, (u64)address, (u64)buffer_tmp, (u64)length); retval = (int)p1;}
+		{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)pid, (u64)address, (u64)(u32)buffer_tmp, (u64)length); retval = (int)p1;}
 		if(0 <= retval)
 		{
 			for(int i = 0; i < length; i++)
@@ -8497,7 +8523,7 @@ static void ps3mapi_getmem(char *buffer, char *templn, char *param)
 
 	if(!is_ps3mapi_home) strcat(buffer, "<br><hr color=\"#FF0000\"/>"); else strcat(buffer, "<br>");
 	strcat(buffer, "Dump: [<a href=\"/dump.ps3?mem\">Full Memory</a>] [<a href=\"/dump.ps3?lv1\">LV1</a>] [<a href=\"/dump.ps3?lv2\">LV2</a>]");
-	if(!is_ps3mapi_home) {sprintf(templn, " [<a href=\"/dump.ps3?%x\">LV1 Dump 0x%x</a>] [<a href=\"/peek.lv1?%x\">LV1 Peek 0x%x</a>]", address, address, address, address); strcat(buffer, templn);}
+	if(!is_ps3mapi_home) {sprintf(templn, " [<a href=\"/dump.ps3?%llx\">LV1 Dump 0x%llx</a>] [<a href=\"/peek.lv1?%llx\">LV1 Peek 0x%llx</a>]", address, address, address, address); strcat(buffer, templn);}
 	strcat(buffer, "<p>");
 }
 
@@ -8557,14 +8583,14 @@ static void ps3mapi_setmem(char *buffer, char *templn, char *param)
 		strcat(buffer, "<select name=\"proc\">");
 		char pid_str[32];
 		u32 pid_list[16];
-		{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
+		{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)(u32)pid_list); }
 		for(int i = 0; i < 16; i++)
 		{
 			if(1 < pid_list[i])
 			{
 				memset(templn, 0, MAX_LINE_LEN);
 				memset(pid_str, 0, sizeof(pid_str));
-				{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)templn); }
+				{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid_list[i], (u64)(u32)templn); }
 				sprintf(pid_str, "%i", pid_list[i]);
 				if(1 < strlen(templn))add_option_item(pid_str , templn, true, buffer);
 			}
@@ -8574,24 +8600,24 @@ static void ps3mapi_setmem(char *buffer, char *templn, char *param)
 	else
 	{
 		memset(templn, 0, MAX_LINE_LEN);
-		{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)templn); }
+		{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)(u32)templn); }
 		strcat(buffer, templn);
 		sprintf(templn, "<input name=\"proc\" type=\"hidden\" value=\"%u\"><br><br>", pid);
 		strcat(buffer, templn);
 	}
 	if(strlen(val_tmp) < 1) sprintf(val_tmp, "%02X", 0);
-	sprintf(templn, "<b><u>%s:</u></b> "  HTML_INPUT("addr", "%X", "16", "18")
+	sprintf(templn, "<b><u>%s:</u></b> "  HTML_INPUT("addr", "%llX", "16", "18")
 					"<br><br><b><u>%s:</u></b><br><br>"
 					"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
-					"<tr><td style=\"text-align: left; float: left;\">"
+					"<tr><td style=\"text-align:left; float:left;\">"
 					"<textarea name=\"val\" cols=\"111\" rows=\"3\" maxlength=\"199\">%s</textarea></td></tr>"
-					"<tr><td style=\"text-align: right; float: right;\"><br>"
+					"<tr><td style=\"text-align:right; float:right;\"><br>"
 					"<input type=\"submit\" value=\" %s \"/></td></tr></table></form>", "Address", address, "Value", val_tmp, "Set");
 	strcat(buffer, templn);
 	if(pid != 0 && length != 0)
 	{
 		int retval = -1;
-		{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PROC_MEM, (u64)pid, (u64)address, (u64)value, (u64)length); retval = (int)p1;}
+		{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PROC_MEM, (u64)pid, (u64)address, (u64)(u32)value, (u64)length); retval = (int)p1;}
 		if(0 <= retval) sprintf(templn, "<br><b><u>%s!</u></b>", "Done");
 		else sprintf(templn, "<br><b><u>%s: %i</u></b>", "Error", retval);
 		strcat(buffer, templn);
@@ -8656,11 +8682,11 @@ static void ps3mapi_setidps(char *buffer, char *templn, char *param)
 	sprintf(templn, "<b>%s%s --> %s</b>"
 					"<hr color=\"#0099FF\"/>"
 					"<form action=\"/setidps.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><br>"
-					"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\"><tr><td width=\"400\" style=\"text-align: left; float: left;\">"
-	                "<br><b><u>%s:</u></b><br>" HTML_INPUT("idps1", "%016llX", "16", "18") HTML_INPUT("idps2", "%016llX", "16", "18") "       </td>"
-					"<td style=\"text-align: left; float: left;\">"
+					"<table width=\"800\" border=\"0\" cellspacing=\"2\" cellpadding=\"0\"><tr><td width=\"400\" style=\"text-align:left; float:left;\">"
+	                "<br><b><u>%s:</u></b><br>" HTML_INPUT("idps1", "%016llX", "16", "18") HTML_INPUT("idps2", "%016llX", "16", "18") "</td>"
+					"<td style=\"text-align:left; float:left;\">"
 	                "<br><b><u>%s:</u></b><br>" HTML_INPUT("psid1", "%016llX", "16", "18") HTML_INPUT("psid2", "%016llX", "16", "18") "</td></tr>"
-	                "<tr><td style=\"text-align: right; float: right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></table></form><br>",
+	                "<tr><td style=\"text-align:right; float:right;\"><br><input type=\"submit\" value=\" %s \"/></td></tr></table></form><br>",
 					is_ps3mapi_home ? "" : "PS3MAPI --> ", "PS3 Commands", "Set IDPS/PSID", "IDPS", _new_IDPS[0], _new_IDPS[1], "PSID", _new_PSID[0], _new_PSID[1], "Set");
 	if(!is_ps3mapi_home) strcat(templn, "<hr color=\"#FF0000\"/>");
 	strcat(buffer, templn);
@@ -8697,7 +8723,7 @@ static void ps3mapi_vshplugin(char *buffer, char *templn, char *param)
 			{
 				char prx_path[256];
 				get_value(prx_path, pos + 4, 256);
-				if ( uslot ){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)prx_path, NULL, 0);}}
+				if ( uslot ){{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)uslot, (u64)(u32)prx_path, NULL, 0);}}
 			}
 		}
 	}
@@ -8707,10 +8733,10 @@ loadvshplug_err_arg:
 	sprintf(templn, "<b>%s%s </b>"
 					"<hr color=\"#0099FF\"/><br>"
 					"<table border=\"0\" cellspacing=\"2\" cellpadding=\"0\">"
-					"<tr><td width=\"75\" style=\"text-align: left; float: left;\">%s</td>"
-					"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
-					"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
-					"<td width=\"125\" style=\"text-align: right; float: right;\"> </td></tr>",
+					"<tr><td width=\"75\" style=\"text-align:left; float:left;\">%s</td>"
+					"<td width=\"100\" style=\"text-align:left; float:left;\">%s</td>"
+					"<td width=\"500\" style=\"text-align:left; float:left;\">%s</td>"
+					"<td width=\"125\" style=\"text-align:right; float:right;\"> </td></tr>",
 					is_ps3mapi_home ? "" : "PS3MAPI --> ", "VSH Plugins", "Slot", "Name", "File name");
 
 	strcat(buffer, templn);
@@ -8720,47 +8746,46 @@ loadvshplug_err_arg:
 	{
 		memset(tmp_name, 0, sizeof(tmp_name));
 		memset(tmp_filename, 0, sizeof(tmp_filename));
-		{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_VSH_PLUGIN_INFO, (u64)slot, (u64)tmp_name, (u64)tmp_filename); }
+		{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_VSH_PLUGIN_INFO, (u64)slot, (u64)(u32)tmp_name, (u64)(u32)tmp_filename); }
 		if (strlen(tmp_filename) > 0)
-			{
-				sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
-								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
-								"<td width=\"500\" style=\"text-align: left; float: left;\">%s</td>"
-								"<td width=\"100\" style=\"text-align: right; float: right;\">"
-								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
-								"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" %s/></form></td></tr>",
-								slot, tmp_name, tmp_filename, slot, (slot) ?  "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"");
-				strcat(buffer, templn);
-			}
-			else
- 			{
-				sprintf(templn, "<tr><td width=\"75\" style=\"text-align: left; float: left;\">%i</td>"
-								"<td width=\"100\" style=\"text-align: left; float: left;\">%s</td>"
-								"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align: left; float: left;\">"
-								HTML_INPUT("prx\" list=\"plugins", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
-								"<td width=\"100\" style=\"text-align: right; float: right;\"><input type=\"submit\" %s/></td></form></tr>",
-								slot, "NULL", slot, slot, (slot) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
-				strcat(buffer, templn);
-			}
+		{
+			sprintf(templn, "<tr><td width=\"75\" style=\"text-align:left; float:left;\">%i</td>"
+							"<td width=\"100\" style=\"text-align:left; float:left;\">%s</td>"
+							"<td width=\"500\" style=\"text-align:left; float:left;\">%s</td>"
+							"<td width=\"100\" style=\"text-align:right; float:right;\">"
+							"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\">"
+							"<input name=\"unload_slot\" type=\"hidden\" value=\"%i\"><input type=\"submit\" %s/></form></td></tr>",
+							slot, tmp_name, tmp_filename, slot, (slot) ? "value=\" Unload \"" : "value=\" Reserved \" disabled=\"disabled\"" );
+		}
+		else
+ 		{
+			sprintf(templn, "<tr><td width=\"75\" style=\"text-align:left; float:left;\">%i</td>"
+							"<td width=\"100\" style=\"text-align:left; float:left;\">%s</td>"
+							"<form action=\"/vshplugin.ps3mapi\" method=\"get\" enctype=\"application/x-www-form-urlencoded\" target=\"_self\"><td width=\"500\" style=\"text-align:left; float:left;\">"
+							HTML_INPUT("prx\" list=\"plugins", "/dev_hdd0/tmp/my_plugin_%i.sprx", "128", "75") "<input name=\"load_slot\" type=\"hidden\" value=\"%i\"></td>"
+							"<td width=\"100\" style=\"text-align:right; float:right;\"><input type=\"submit\" %s/></td></form></tr>",
+							slot, "NULL", slot, slot, (slot) ? "value=\" Load \"" : "value=\" Reserved \" disabled=\"disabled\"" );
+		}
+			strcat(buffer, templn);
 	}
 
 
 	//add plugins list
 	{
 		strcat(buffer, "<datalist id=\"plugins\">");
-		int fd; char paths[3][20] = {"/dev_hdd0", "/dev_hdd0/plugins", "/dev_hdd0/tmp"};
+		int fd, cnt = 0; char paths[6][32] = {"/dev_hdd0", "/dev_hdd0/plugins", "/dev_usb000", "/dev_usb001", "/dev_hdd0/game/UPDWEBMOD/USRDIR", "/dev_hdd0/tmp"};
 
-		for(u8 i = 0; i < 3; i++)
+		for(u8 i = 0; i < 6; i++)
 		if(cellFsOpendir(paths[i], &fd) == CELL_FS_SUCCEEDED)
 		{
 			CellFsDirent dir; u64 read = sizeof(CellFsDirent);
 
 			while(!cellFsReaddir(fd, &dir, &read))
 			{
-				if(!read) break;
+				if(!read || cnt>50) break;
 				if(strstr(dir.d_name, ".sprx"))
 				{
-					sprintf(templn, "<option>%s/%s</option>", paths[i], dir.d_name); strcat(buffer, templn);
+					sprintf(templn, "<option>%s/%s</option>", paths[i], dir.d_name); strcat(buffer, templn); cnt++;
 				}
 			}
 			cellFsClosedir(fd);
@@ -8938,9 +8963,9 @@ static void ps3mapi_find_peek_poke(char *buffer, char *templn, char *param)
 		p++; if(p>=0x10) p=0;
 	}
 	strcat(buffer, "<hr>Dump: [<a href=\"/dump.ps3?mem\">Full Memory</a>] [<a href=\"/dump.ps3?lv1\">LV1</a>] [<a href=\"/dump.ps3?lv2\">LV2</a>]");
-	sprintf(templn, " [<a href=\"/dump.ps3?%x\">Dump 0x%x</a>]", (u32)address, (u32)address); strcat(buffer, templn);
-	sprintf(templn, " <a href=\"/peek.lv%i?%x\">&lt;&lt;</a> <a href=\"/peek.lv%i?%x\">&lt;Back</a>", lv1?1:2, (u32)((address-0x1000)>=0)?(address-0x1000):0, lv1?1:2, ((address-0x200)>=0)?(address-0x200):0); strcat(buffer, templn);
-	sprintf(templn, " <a href=\"/peek.lv%i?%x\">Next&gt;</a> <a href=\"/peek.lv%i?%x\">&gt;&gt;</a></pre>", lv1?1:2, (u32)((address+0x400)<upper_memory)?(address+0x200):(upper_memory-0x200), lv1?1:2, ((lv1+0x1200)<upper_memory)?(address+0x1000):(upper_memory-0x200)); strcat(buffer, templn);
+	sprintf(templn, " [<a href=\"/dump.ps3?%llx\">Dump 0x%llx</a>]", address, address); strcat(buffer, templn);
+	sprintf(templn, " <a href=\"/peek.lv%i?%llx\">&lt;&lt;</a> <a href=\"/peek.lv%i?%llx\">&lt;Back</a>", lv1?1:2, ((int)(address-0x1000)>=0)?(address-0x1000):0, lv1?1:2, ((int)(address-0x200)>=0)?(address-0x200):0); strcat(buffer, templn);
+	sprintf(templn, " <a href=\"/peek.lv%i?%llx\">Next&gt;</a> <a href=\"/peek.lv%i?%llx\">&gt;&gt;</a></pre>", lv1?1:2, ((int)(address+0x400)<(int)upper_memory)?(address+0x200):(upper_memory-0x200), lv1?1:2, ((int)(lv1+0x1200)<(int)upper_memory)?(address+0x1000):(upper_memory-0x200)); strcat(buffer, templn);
 }
 #endif
 
@@ -9113,7 +9138,7 @@ static void handleclient(u64 conn_s_p)
 	_meminfo meminfo;
 	u8 retries=0;
 again3:
-	{system_call_1(SC_GET_FREE_MEM, (uint64_t) &meminfo);}
+	{system_call_1(SC_GET_FREE_MEM, (uint64_t)(u32) &meminfo);}
 	if((meminfo.avail)<( (_64KB_) + MIN_MEM)) //leave if less than min memory
 	{
 #ifdef USE_DEBUG
@@ -9235,8 +9260,8 @@ quit:
 			{
 				http_response(conn_s, header, param, 200, param);
 				working = 0;
-				{DELETE_TURNOFF}
-				{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
+				{ DELETE_TURNOFF } { BEEP1 }
+				{system_call_4(SC_SYS_POWER, SYS_SHUTDOWN, 0, 0, 0);}
 				sys_ppu_thread_exit(0);
 				break;
 			}
@@ -9265,7 +9290,7 @@ quit:
 				http_response(conn_s, header, param, 200, param);
 restart:
 				working = 0;
-				{DELETE_TURNOFF}
+				{ DELETE_TURNOFF } { BEEP2 }
 				if(strstr(param,"?0")==NULL) savefile((char*)WMNOSCAN, NULL, 0);
 				{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
 				sys_ppu_thread_exit(0);
@@ -9276,7 +9301,7 @@ restart:
 				http_response(conn_s, header, param, 200, param);
 reboot:
 				working = 0;
-				{DELETE_TURNOFF}
+				{ DELETE_TURNOFF } { BEEP2 }
 				{system_call_3(SC_SYS_POWER, SYS_HARD_REBOOT, NULL, 0);}
 				sys_ppu_thread_exit(0);
 				break;
@@ -9408,7 +9433,7 @@ mobile_response:
 				{
 					c_len=0;
 					is_binary=0;
-					http_response(conn_s, header, param, is_busy ? 503:400, is_busy ? "503 Server is Busy":"400 Bad Request");
+					http_response(conn_s, header, param, is_busy ? 503:400, is_busy ? (char*)"503 Server is Busy":(char*)"400 Bad Request");
 					loading_html--;
 					sys_ppu_thread_exit(0);
 				}
@@ -9493,7 +9518,7 @@ html_response:
 					set_buffer_sizes(webman_config->foot);
 
 					_meminfo meminfo;
-					{system_call_1(SC_GET_FREE_MEM, (uint64_t) &meminfo);}
+					{system_call_1(SC_GET_FREE_MEM, (uint64_t)(u32) &meminfo);}
 
 					if((meminfo.avail)<( (BUFFER_SIZE_ALL) + MIN_MEM)) set_buffer_sizes(3); //MIN+
 					if((meminfo.avail)<( (BUFFER_SIZE_ALL) + MIN_MEM)) set_buffer_sizes(1); //MIN
@@ -9784,13 +9809,13 @@ bgm_status:
 						else if(strstr(param, "?uninstall"))
 						{
 							if(cellFsStat((char*)"/dev_hdd0/boot_plugins.txt", &buf)==CELL_FS_SUCCEEDED && buf.st_size<40) cellFsUnlink((char*)"/dev_hdd0/boot_plugins.txt");
-							cellFsUnlink((char)"/dev_hdd0/webftp_server.sprx");
-							cellFsUnlink((char)"/dev_hdd0/plugins/webftp_server.sprx");
-							cellFsUnlink((char)WMCONFIG);
-							del(WMTMP, true);
-							del("/dev_hdd0/xmlhost", true);
-							del("/dev_hdd0/tmp/wm_lang", true);
-							del("/dev_hdd0/tmp/wm_icons", true);
+							cellFsUnlink((char*)"/dev_hdd0/webftp_server.sprx");
+							cellFsUnlink((char*)"/dev_hdd0/plugins/webftp_server.sprx");
+							cellFsUnlink((char*)WMCONFIG);
+							del((char*)WMTMP, true);
+							del((char*)"/dev_hdd0/xmlhost", true);
+							del((char*)"/dev_hdd0/tmp/wm_lang", true);
+							del((char*)"/dev_hdd0/tmp/wm_icons", true);
 							http_response(conn_s, header, param, 200, param);
 							goto restart;
 						}
@@ -10145,8 +10170,8 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 							ssend(conn_s_ftp, FTP_OK_221);
 
 							working = 0;
-							{DELETE_TURNOFF}
-							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
+							{ DELETE_TURNOFF } { BEEP1 }
+							{system_call_4(SC_SYS_POWER, SYS_SHUTDOWN, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
 						}
 						else
@@ -10155,7 +10180,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 							ssend(conn_s_ftp, FTP_OK_221);
 
 							working = 0;
-							{DELETE_TURNOFF}
+							{ DELETE_TURNOFF } { BEEP2 }
 							if(strcasecmp(cmd, "REBOOT")) savefile((char*)WMNOSCAN, NULL, 0);
 							{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
 							sys_ppu_thread_exit(0);
@@ -10252,7 +10277,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 						if(strcasecmp(cmd, "COPY") == 0)
 						{
 							sprintf(buffer, "%s %s", STR_COPYING, filename);
-							show_msg((char*)buffer);
+							show_msg(buffer);
 
 							absPath(source, filename, cwd);
 							ssend(conn_s_ftp, FTP_OK_200);
@@ -10269,7 +10294,7 @@ static void handleclient_ftp(u64 conn_s_ftp_p)
 								ssend(conn_s_ftp, FTP_OK_250);
 
 								sprintf(buffer, "%s %s\n%s %s", STR_COPYING, source, STR_CPYDEST, param);
-								show_msg((char*)buffer);
+								show_msg(buffer);
 
 								if(isDir(source))
 									folder_copy(source, param);
@@ -10973,7 +10998,7 @@ static void dump_mem(char *file, uint64_t start, uint32_t size_mb)
 		}
 		sys_memory_free((sys_addr_t)sys_mem);
 		show_msg((char*)"Memory dump completed!");
-		{ system_call_3(SC_RING_BUZZER, 0x1004, 0x7, 0x36); }
+		{ BEEP2 }
 	}
 }
 #endif
@@ -11007,13 +11032,13 @@ static void refresh_xml(char *msg)
 	webman_config->profile=profile; save_settings();
 
 	sprintf(msg, "%s XML%s: %s", STR_REFRESH, SUFIX2(profile), STR_SCAN2);
-	show_msg((char*)msg);
+	show_msg((char*) msg);
 	init_running = 1;
 	sys_ppu_thread_t id3;
 	sys_ppu_thread_create(&id3, handleclient, (u64)REFRESH_CONTENT, -0x1d8, 0x20000, 0, "wwwd2");
 	while(init_running && working) sys_timer_usleep(300000);
 	sprintf(msg, "%s XML%s: OK", STR_REFRESH, SUFIX2(profile));
-	show_msg((char*)msg);
+	show_msg((char*) msg);
 }
 
 static void enable_dev_blind(char *msg)
@@ -11220,8 +11245,11 @@ static void poll_thread(uint64_t poll)
  Normal Mode Switcher : L3+L2+O
  DEBUG  Menu Switcher : L3+L2+X
 */
-		struct CellFsStat s;
 		bool reboot = false;
+
+#ifdef COBRA_ONLY
+		struct CellFsStat s;
+#endif
 
 		for(u8 n=0;n<10;n++)
 		{
@@ -11273,7 +11301,7 @@ static void poll_thread(uint64_t poll)
 							)
 						{
 							cellFsUnlink(WMCONFIG);
-							system_call_3(SC_RING_BUZZER, 0x1004, 0x4, 0x6);
+							{ BEEP1 }
 							show_msg((char*)STR_RMVWMCFG);
 							sys_timer_sleep(2);
 							show_msg((char*)STR_RMVWMCFGOK);
@@ -11298,8 +11326,8 @@ static void poll_thread(uint64_t poll)
 								enable_classic_ps2_mode();
 							}
 
-							sprintf(msg, "PS2 Classic %s", classic_ps2_enabled ? STR_DISABLED : STR_ENABLED);
-							show_msg((char*)msg);
+							sprintf((char*) msg, (char*)"PS2 Classic %s", classic_ps2_enabled ? STR_DISABLED : STR_ENABLED);
+							show_msg((char*) msg);
 							sys_timer_sleep(3);
 						}
 						else
@@ -11426,7 +11454,7 @@ static void poll_thread(uint64_t poll)
 							if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] == CELL_PAD_CTRL_R1) profile=3; else
 							if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] == CELL_PAD_CTRL_L1) profile=4; else profile=0;
 
-							refresh_xml(msg);
+							refresh_xml((char*)msg);
 						}
                         else
 						if(!(webman_config->combo & SHOW_TEMP) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & (CELL_PAD_CTRL_R3 | CELL_PAD_CTRL_START))) // SELECT+START show temperatures / hdd space
@@ -11472,7 +11500,7 @@ static void poll_thread(uint64_t poll)
 									}
 								}
 								_meminfo meminfo;
-								{system_call_1(SC_GET_FREE_MEM, (uint64_t) &meminfo);}
+								{system_call_1(SC_GET_FREE_MEM, (uint64_t)(u32) &meminfo);}
 
 								// detect aprox. time when a game is launched
 								if(View_Find("game_plugin")==0) gTick=rTick; else if(gTick.tick==rTick.tick) cellRtcGetCurrentTick(&gTick);
@@ -11514,25 +11542,25 @@ static void poll_thread(uint64_t poll)
 									ss = (u32)((pTick.tick-gTick.tick)/1000000);
 									dd = (u32)(ss / 86400); ss = ss % 86400; hh = (u32)(ss / 3600); ss = ss % 3600; mm = (u32)(ss / 60); ss = ss % 60;
 
-									if(dd<100) {char gname[200]; game_name(); sprintf(gname, "%s %s\r\n\r\n", _game_name+0x04); sprintf(msg, "%sPlay: %id %02d:%02d:%02d\r\n%s", gname, dd, hh, mm, ss, tmp); }
+									if(dd<100) {char gname[200]; get_game_info(); sprintf(gname, "%s %s\r\n\r\n", _game_TitleID, _game_Title); sprintf((char*) msg, "%sPlay: %id %02d:%02d:%02d\r\n%s", gname, dd, hh, mm, ss, tmp); }
 								}
 
-								show_msg(msg);
+								show_msg((char*) msg);
 								sys_timer_sleep(2);
 
 								/////////////////////////////
 #ifdef COPY_PS3
 								if(copy_in_progress)
 								{
-									sprintf((char*)msg, "<hr>%s %s (%i %s)", STR_COPYING, current_file, copied_count, STR_FILES);
-									show_msg(msg);
+									sprintf((char*) msg, "<hr>%s %s (%i %s)", STR_COPYING, current_file, copied_count, STR_FILES);
+									show_msg((char*) msg);
 									sys_timer_sleep(2);
 								}
 								else
 								if(fix_in_progress)
 								{
-									sprintf((char*)msg, STR_FIXING, current_file);
-									show_msg(msg);
+									sprintf((char*) msg, "%s %s", STR_FIXING, current_file);
+									show_msg((char*) msg);
 									sys_timer_sleep(2);
 								}
 #endif
@@ -11547,7 +11575,7 @@ static void poll_thread(uint64_t poll)
 								if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2) max_temp+=5; else max_temp+=1;
 								if(max_temp>85) max_temp=85;
 								webman_config->temp1=max_temp;
-								sprintf((char*)msg, "%s\r\n%s %i°C", STR_FANCH0, STR_FANCH1, max_temp);
+								sprintf((char*) msg, "%s\r\n%s %i°C", STR_FANCH0, STR_FANCH1, max_temp);
 							}
 							else
 							{
@@ -11556,10 +11584,10 @@ static void poll_thread(uint64_t poll)
 								webman_config->temp0= (u8)(((float)webman_config->manu * 255.f)/100.f);
 								webman_config->temp0=RANGE(webman_config->temp0, 0x33, MAX_FANSPEED);
 								fan_control(webman_config->temp0, 0);
-								sprintf((char*)msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH2, webman_config->manu);
+								sprintf((char*) msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH2, webman_config->manu);
 							}
 							save_settings();
-							show_msg((char*)msg);
+							show_msg((char*) msg);
 							sys_timer_sleep(2);
 						}
 						else
@@ -11569,7 +11597,7 @@ static void poll_thread(uint64_t poll)
 							{
 								if(max_temp>30) {if(data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_R2) max_temp-=5; else max_temp-=1;}
 								webman_config->temp1=max_temp;
-								sprintf((char*)msg, "%s\r\n%s %i°C", STR_FANCH0, STR_FANCH1, max_temp);
+								sprintf((char*) msg, "%s\r\n%s %i°C", STR_FANCH0, STR_FANCH1, max_temp);
 							}
 							else
 							{
@@ -11578,30 +11606,30 @@ static void poll_thread(uint64_t poll)
 								if(webman_config->temp0<0x33) webman_config->temp0=0x33;
 								if(webman_config->temp0>MAX_FANSPEED) webman_config->temp0=MAX_FANSPEED;
 								fan_control(webman_config->temp0, 0);
-								sprintf((char*)msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH2, webman_config->manu);
+								sprintf((char*) msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH2, webman_config->manu);
 							}
 							save_settings();
-							show_msg((char*)msg);
+							show_msg((char*) msg);
 							sys_timer_sleep(2);
 						}
 						else
 						if(webman_config->minfan && !(webman_config->combo & MINDYNFAN) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_LEFT) ) // SELECT+LEFT decrease Minfan
 						{
 							if(webman_config->minfan-5>=MIN_FANSPEED) webman_config->minfan-=5;
-							sprintf((char*)msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH3, webman_config->minfan);
+							sprintf((char*) msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH3, webman_config->minfan);
 
 							save_settings();
-							show_msg((char*)msg);
+							show_msg((char*) msg);
 							sys_timer_sleep(2);
 						}
 						else
 						if(webman_config->minfan && !(webman_config->combo & MINDYNFAN) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_RIGHT) ) // SELECT+RIGHT increase Minfan
 						{
 							if(webman_config->minfan+5<100) webman_config->minfan+=5;
-							sprintf((char*)msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH3, webman_config->minfan);
+							sprintf((char*) msg, "%s\r\n%s %i%%", STR_FANCH0, STR_FANCH3, webman_config->minfan);
 
 							save_settings();
-							show_msg((char*)msg);
+							show_msg((char*) msg);
 							sys_timer_sleep(2);
 						}
 						else
@@ -11633,13 +11661,14 @@ static void poll_thread(uint64_t poll)
 						{
 							// power off
 							working = 0;
-							{DELETE_TURNOFF}
-							{system_call_4(SC_SYS_POWER,SYS_SHUTDOWN, 0, 0, 0);}
+							{ DELETE_TURNOFF } { BEEP1 }
+							{system_call_4(SC_SYS_POWER, SYS_SHUTDOWN, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
 						}
 						else if(!(webman_config->combo & RESTARTPS) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_CIRCLE) ) // L3+R2+O (restart)
 						{
 							// reboot
+							{ BEEP2 }
 							goto reboot;
 						}
 						else if(!(webman_config->combo & UNLOAD_WM) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL1] & CELL_PAD_CTRL_R3) ) // L3+R3+R2 (quit webMAN)
@@ -11665,15 +11694,15 @@ static void poll_thread(uint64_t poll)
 							{
 								if(webman_config->temp0==0) max_temp=webman_config->temp1; else max_temp=0;
 								fan_control(webman_config->temp0, 0);
-								sprintf((char*)msg, "%s %s", STR_FANCTRL3, STR_ENABLED);
+								sprintf((char*) msg, "%s %s", STR_FANCTRL3, STR_ENABLED);
 							}
 							else
 							{
 								restore_fan(0); //syscon
-								sprintf((char*)msg, "%s %s", STR_FANCTRL3, STR_DISABLED);
+								sprintf((char*) msg, "%s %s", STR_FANCTRL3, STR_DISABLED);
 							}
 							save_settings();
-							show_msg((char*)msg);
+							show_msg((char*) msg);
 							sys_timer_sleep(2);
 							break;
 						}
@@ -11685,7 +11714,7 @@ static void poll_thread(uint64_t poll)
 						{
 							// soft reboot
 							working = 0;
-							{DELETE_TURNOFF}
+							{ DELETE_TURNOFF }
 							{system_call_4(SC_SYS_POWER,SYS_SOFT_REBOOT, 0, 0, 0);}
 							sys_ppu_thread_exit(0);
 						}
@@ -11702,7 +11731,7 @@ static void poll_thread(uint64_t poll)
 						if(!(webman_config->combo & DISABLESH) && (data.button[CELL_PAD_BTN_OFFSET_DIGITAL2] & CELL_PAD_CTRL_TRIANGLE) ) // R2+TRIANGLE Disable CFW Sycalls
 						{
 							if(peekq(0x8000000000003000ULL)==SYSCALLS_UNAVAILABLE) {
-								system_call_3(SC_RING_BUZZER, 0x1004, 0x7, 0x36);
+								{ BEEP2 }
 								show_msg((char*)STR_CFWSYSALRD);
 								sys_timer_sleep(2);
 							} else {
@@ -11710,11 +11739,11 @@ static void poll_thread(uint64_t poll)
 								remove_cfw_syscalls();
 								delete_history(true);
 								if(peekq(0x8000000000003000ULL)==SYSCALLS_UNAVAILABLE) {
-									system_call_3(SC_RING_BUZZER, 0x1004, 0x4, 0x6);
+									{ BEEP1 }
 									show_msg((char*)STR_RMVCFWSYS);
 									sys_timer_sleep(2);
 								} else {
-									system_call_3(SC_RING_BUZZER, 0x1004, 0x7, 0x36);
+									{ BEEP2 }
 									show_msg((char*)STR_RMVCFWSYSF);
 									sys_timer_sleep(2);
 								}
@@ -11764,13 +11793,13 @@ static void poll_thread(uint64_t poll)
 							get_idps_psid();
 
 							#define SEP "\n                  "
-							sprintf(msg, "IDPS EID0 : %016llX" SEP
-													 "%016llX\n"
-										 "IDPS LV2  : %016llX" SEP
-													 "%016llX\r\n"
-										 "PSID LV2 : %016llX" SEP
-													"%016llX", eid0_idps[0], eid0_idps[1], IDPS[0], IDPS[1], PSID[0], PSID[1]);
-							show_msg((char*)msg);
+							sprintf((char*) msg, "IDPS EID0 : %016llX" SEP
+															 "%016llX\n"
+												 "IDPS LV2  : %016llX" SEP
+															 "%016llX\r\n"
+												 "PSID LV2 : %016llX" SEP
+															"%016llX", eid0_idps[0], eid0_idps[1], IDPS[0], IDPS[1], PSID[0], PSID[1]);
+							show_msg((char*) msg);
 							sys_timer_sleep(2);
 						}
 					}
@@ -11981,10 +12010,9 @@ static void poll_thread(uint64_t poll)
 					show_msg((char*)"Switching successful! Reboot now...");
 					sys_timer_sleep(3);
 					{system_call_3(SC_FS_UMOUNT, (u64)(char*)"/dev_blind", 0, 1);}
-					{system_call_3(SC_RING_BUZZER, 0x1004, 0x4, 0x6);}
 reboot:
 					working = 0;
-					{DELETE_TURNOFF}
+					{ DELETE_TURNOFF }
 					savefile((char*)WMNOSCAN, NULL, 0);
 					{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0);}
 					sys_ppu_thread_exit(0);
@@ -12005,8 +12033,8 @@ reboot:
 			{
 				if(!webman_config->warn)
 				{
-					sprintf((char*)msg, "%s\r\n CPU: %i°C   RSX: %i°C", STR_OVERHEAT, t1, t2);
-					show_msg((char*)msg);
+					sprintf((char*) msg, "%s\r\n CPU: %i°C   RSX: %i°C", STR_OVERHEAT, t1, t2);
+					show_msg((char*) msg);
 					sys_timer_sleep(2);
 				}
 				if(t1>85 || t2>85)
@@ -12444,7 +12472,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
-						{DELETE_TURNOFF}
+						{ DELETE_TURNOFF }
 						{system_call_4(SC_SYS_POWER, SYS_SHUTDOWN, 0, 0, 0); }
 						sys_ppu_thread_exit(0);
 					}
@@ -12452,7 +12480,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
-						{DELETE_TURNOFF}
+						{ DELETE_TURNOFF }
 						{system_call_3(SC_SYS_POWER, SYS_REBOOT, NULL, 0); }
 						sys_ppu_thread_exit(0);
 					}
@@ -12460,7 +12488,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
-						{DELETE_TURNOFF}
+						{ DELETE_TURNOFF }
 						{system_call_3(SC_SYS_POWER, SYS_SOFT_REBOOT, NULL, 0); }
 						sys_ppu_thread_exit(0);
 					}
@@ -12468,7 +12496,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					{
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 						working = 0;
-						{DELETE_TURNOFF}
+						{ DELETE_TURNOFF }
 						{system_call_3(SC_SYS_POWER, SYS_HARD_REBOOT, NULL, 0); }
 						sys_ppu_thread_exit(0);
 					}
@@ -12482,7 +12510,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					else if(strcasecmp(cmd, "GETFWTYPE") == 0)
 					{
 						memset(param2, 0, sizeof(param2));
-						{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)param2); }
+						{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_FW_TYPE, (u64)(u32)param2); }
 						sprintf(buffer, "200 %s\r\n", param2);
 						ssend(conn_s_ps3mapi, buffer);
 					}
@@ -12497,17 +12525,17 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					}
 					else if(strcasecmp(cmd, "BUZZER1") == 0)
 					{
-						{ system_call_3(SC_RING_BUZZER, 0x1004, 0x4, 0x6); }
+						{ BEEP1 }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
 					else if(strcasecmp(cmd, "BUZZER2") == 0)
 					{
-						{ system_call_3(SC_RING_BUZZER, 0x1004, 0x7, 0x36); }
+						{ BEEP2 }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
 					else if(strcasecmp(cmd, "BUZZER3") == 0)
 					{
-						{ system_call_3(SC_RING_BUZZER, 0x1004, 0xa, 0x1b6); }
+						{ BEEP3 }
 						ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 					}
 					else if(strcasecmp(cmd, "LED") == 0)
@@ -12594,7 +12622,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					else if(strcasecmp(cmd, "GETIDPS") == 0)
 					{
 						u64 _new_idps[2] = { 0, 0};
-						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_IDPS, (u64)_new_idps);}
+						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_IDPS, (u64)(u32)_new_idps);}
 						sprintf(buffer, "200 %016llX%016llX\r\n", _new_idps[0], _new_idps[1]);
 						ssend(conn_s_ps3mapi, buffer);
 					}
@@ -12607,7 +12635,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							{
 								u64 part1 = convertH(param1);
 								u64 part2 = convertH(param2);
-								{ system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_IDPS, (u64)part1, (u64)part2);}
+								{ system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_IDPS, part1, part2);}
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
 							else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
@@ -12617,7 +12645,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 					else if(strcasecmp(cmd, "GETPSID") == 0)
 					{
 						u64 _new_psid[2] = { 0, 0};
-						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PSID, (u64)_new_psid);}
+						{ system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PSID, (u64)(u32)_new_psid);}
 						sprintf(buffer, "200 %016llX%016llX\r\n", _new_psid[0], _new_psid[1]);
 						ssend(conn_s_ps3mapi, buffer);
 					}
@@ -12655,7 +12683,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						{
 							u32 pid = val(param2);
 							memset(param2, 0, sizeof(param2));
-							{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)param2); }
+							{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_NAME_BY_PID, (u64)pid, (u64)(u32)param2); }
 							sprintf(buffer, "200 %s\r\n", param2);
 							ssend(conn_s_ps3mapi, buffer);
 						}
@@ -12666,7 +12694,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 						u32 pid_list[16];
 						memset(buffer, 0, sizeof(buffer));
 						sprintf(buffer, "200 ");
-						{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)pid_list); }
+						{system_call_3(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_PID, (u64)(u32)pid_list); }
 						for(int i = 0; i < 16; i++)
 						{
 							sprintf(buffer + strlen(buffer), "%i|", pid_list[i]);
@@ -12700,7 +12728,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 									if(split == 1)
 									{
 										u64 offset = convertH(param1);
-										int size = val(param2);
+										u32 size = val(param2);
 										int rr = -4;
 										sys_addr_t sysmem = 0;
 										if(sys_memory_allocate(BUFFER_SIZE_PS3MAPI, SYS_MEMORY_PAGE_SIZE_64K, &sysmem) == 0)
@@ -12712,12 +12740,12 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 											{
 												if(size > BUFFER_SIZE_PS3MAPI)
 												{
-													int sizetoread = BUFFER_SIZE_PS3MAPI;
-													int leftsize = size;
+													u32 sizetoread = BUFFER_SIZE_PS3MAPI;
+													u32 leftsize = size;
 													if(size < BUFFER_SIZE_PS3MAPI) sizetoread = size;
 													while(0 < leftsize)
 													{
-														system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)attached_pid, offset, (u64)buffer2, (u64)sizetoread);
+														system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)attached_pid, offset, (u64)(u32)buffer2, (u64)sizetoread);
 														if(send(data_s, buffer2, sizetoread, 0)<0) { rr = -3; break; }
 														offset += sizetoread;
 														leftsize -= sizetoread;
@@ -12728,7 +12756,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 												}
 												else
 												{
-													system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)attached_pid, (u64)offset, (u64)buffer2, (u64)size);
+													system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MEM, (u64)attached_pid, (u64)offset, (u64)(u32)buffer2, (u64)size);
 													if(send(data_s, buffer2, size, 0)<0) { rr = -3; break; }
 													break;
 												}
@@ -12770,7 +12798,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 										{
 											if((read_e = (u64)recv(data_s, buffer2, BUFFER_SIZE_PS3MAPI, MSG_WAITALL)) > 0)
 											{
-												system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PROC_MEM, (u64)attached_pid, offset, (u64)buffer2, (u64)read_e);
+												system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_SET_PROC_MEM, (u64)attached_pid, offset, (u64)(u32)buffer2, read_e);
 												offset += read_e;
 											}
 											else
@@ -12811,7 +12839,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 								u32 pid = val(param1);
 								s32 prxid = val(param2);
 								memset(param2, 0, sizeof(param2));
-								{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MODULE_NAME, (u64)pid, (u64)prxid, (u64)param2); }
+								{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MODULE_NAME, (u64)pid, (u64)prxid, (u64)(u32)param2); }
 								sprintf(buffer, "200 %s\r\n", param2);
 								ssend(conn_s_ps3mapi, buffer);
 							}
@@ -12829,7 +12857,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 								u32 pid = val(param1);
 								s32 prxid = val(param2);
 								memset(param2, 0, sizeof(param2));
-								{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MODULE_FILENAME, (u64)pid, (u64)prxid, (u64)param2); }
+								{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_PROC_MODULE_FILENAME, (u64)pid, (u64)prxid, (u64)(u32)param2); }
 								sprintf(buffer, "200 %s\r\n", param2);
 								ssend(conn_s_ps3mapi, buffer);
 							}
@@ -12845,7 +12873,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							u32 pid = val(param2);
 							memset(buffer, 0, sizeof(buffer));
 							sprintf(buffer, "200 ");
-							{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_MODULE_PID, (u64)pid, (u64)prxid_list); }
+							{system_call_4(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_ALL_PROC_MODULE_PID, (u64)pid, (u64)(u32)prxid_list); }
 							for(int i = 0; i < 128; i++)
 							{
 								sprintf(buffer + strlen(buffer), "%i|", prxid_list[i]);
@@ -12863,7 +12891,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							if(split == 1)
 							{
 								u32 pid = val(param1);
-								{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_LOAD_PROC_MODULE, (u64)pid, (u64)param2, NULL, 0); }
+								{system_call_6(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_LOAD_PROC_MODULE, (u64)pid, (u64)(u32)param2, NULL, 0); }
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
 							else ssend(conn_s_ps3mapi, PS3MAPI_ERROR_501);
@@ -12894,7 +12922,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							if(split == 1)
 							{
 								unsigned int slot = val(param1);
-								if ( slot ) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)slot, (u64)param2, NULL, 0); }}
+								if ( slot ) {{system_call_5(8, SYSCALL8_OPCODE_LOAD_VSH_PLUGIN, (u64)slot, (u64)(u32)param2, NULL, 0); }}
 								ssend(conn_s_ps3mapi, PS3MAPI_OK_200);
 							}
 						}
@@ -12917,7 +12945,7 @@ static void handleclient_ps3mapi(u64 conn_s_ps3mapi_p)
 							unsigned int slot = val(param2);
 							memset(param1, 0, sizeof(param1));
 							memset(param2, 0, sizeof(param2));
-							{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_VSH_PLUGIN_INFO, (u64)slot, (u64)param1, (u64)param2); }
+							{system_call_5(8, SYSCALL8_OPCODE_PS3MAPI, PS3MAPI_OPCODE_GET_VSH_PLUGIN_INFO, (u64)slot, (u64)(u32)param1, (u64)(u32)param2); }
 							sprintf(buffer, "200 %s|%s\r\n", param1, param2);
 							ssend(conn_s_ps3mapi, buffer);
 						}
@@ -13083,7 +13111,9 @@ static void wwwd_thread(uint64_t arg)
 
 	View_Find = (void*)((int)getNIDfunc("paf", 0xF21655F3, 0));
 	plugin_GetInterface = (void*)((int)getNIDfunc("paf", 0x23AFB290, 0));
+#ifdef EXTRA_FEAT
 	vsh_sprintf = (void*)((int)getNIDfunc("stdc", 0x273B9711, 0)); // sprintf
+#endif
 
 	//pokeq(0x8000000000003560ULL, 0x386000014E800020ULL); // li r3, 0 / blr
 	//pokeq(0x8000000000003D90ULL, 0x386000014E800020ULL); // li r3, 0 / blr
@@ -13143,7 +13173,7 @@ again_debug:
 
 	led(GREEN, ON);
 
-//	{DELETE_TURNOFF}
+//	{ DELETE_TURNOFF }
 
 	int list_s = FAILED;
 
@@ -13268,10 +13298,9 @@ static void stop_prx_module(void)
 	show_msg((char*)STR_WMUNL);
 
 	sys_prx_id_t prx = prx_get_module_id_by_address(stop_prx_module);
-	int *result;
+	int *result = NULL;
 
-	{system_call_6(SC_STOP_PRX_MODULE, (u64)prx, 0, NULL, (u64)result, 0, NULL);}
-
+	{system_call_6(SC_STOP_PRX_MODULE, (u64)(u32)prx, 0, NULL, (u64)(u32)result, 0, NULL);}
 }
 
 static void unload_prx_module(void)
@@ -13341,7 +13370,7 @@ static void select_ps1emu(void)
 		sprintf(msg, "ps1_emu.self %s",    STR_ENABLED);
 	}
 
-	show_msg((char*)msg);
+	show_msg((char*) msg);
 }
 #endif
 
@@ -13351,7 +13380,7 @@ static void eject_insert(u8 eject, u8 insert)
 	u8* atapi_cmnd = atapi_cmnd2;
 	int dev_id;
 
-	{system_call_4(SC_STORAGE_OPEN, BDVD_DRIVE, 0, (uint64_t) &dev_id, 0);}
+	{system_call_4(SC_STORAGE_OPEN, BDVD_DRIVE, 0, (uint64_t)(u32) &dev_id, 0);}
 
 	if(eject)
 	{
@@ -13362,7 +13391,7 @@ static void eject_insert(u8 eject, u8 insert)
 		atapi_cmnd[0x23]=0x0c;
 
 		// Eject disc
-		{system_call_7(SC_STORAGE_INSERT_EJECT, dev_id, 1, (uint64_t) atapi_cmnd, 56, NULL, 0, NULL);}
+		{system_call_7(SC_STORAGE_INSERT_EJECT, dev_id, 1, (uint64_t)(u32) atapi_cmnd, 56, NULL, 0, NULL);}
 	}
 
 	sys_timer_sleep(2);
@@ -13376,7 +13405,7 @@ static void eject_insert(u8 eject, u8 insert)
 		atapi_cmnd[0x23]=0x0c;
 
 		// Insert disc
-		{system_call_7(SC_STORAGE_INSERT_EJECT, dev_id, 1, (uint64_t) atapi_cmnd, 56, NULL, 0, NULL);}
+		{system_call_7(SC_STORAGE_INSERT_EJECT, dev_id, 1, (uint64_t)(u32) atapi_cmnd, 56, NULL, 0, NULL);}
 	}
 
 	{system_call_1(SC_STORAGE_CLOSE, dev_id);}
@@ -14187,7 +14216,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 					cobra_load_vsh_plugin(0, (char*)raw_iso_sprx[n], sprx_data, msiz);
 
 					_path[strlen(_path)-13]=0;
-					sprintf(sprx_data, "\"%s\" %s", _path+20, STR_LOADED2);
+					sprintf((char*)sprx_data, "\"%s\" %s", _path+20, STR_LOADED2);
 					show_msg((char*)sprx_data);
 					goto patch;
 				}
@@ -14711,7 +14740,7 @@ static bool mount_with_mm(const char *_path0, u8 do_eject)
 				{
 					savefile(filename, paramsfo, msiz);
 
-					sprintf(filename, STR_FIXING, _path);
+					sprintf(filename, "%s %s", STR_FIXING, _path);
 					show_msg(filename);
 
 					// fix game folder
@@ -14993,7 +15022,7 @@ patch:
 		{
 			savefile(filename, paramsfo, msiz);
 
-			sprintf(filename, STR_FIXING, _path);
+			sprintf(filename, "%s %s", STR_FIXING, _path);
 			show_msg(filename);
 
 			// fix game folder
@@ -15131,7 +15160,7 @@ patch:
 exit_mount:
 	if(ret && extcmp(_path, ".BIN.ENC", 8))
 	{
-		waitfor("/dev_bdvd", 6);
+		waitfor((char*)"/dev_bdvd", 6);
 		if(!isDir("/dev_bdvd")) ret = false;
 	}
 

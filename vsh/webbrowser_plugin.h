@@ -4,7 +4,7 @@ typedef struct
 	int (*PluginWakeup)(int);
 	int (*PluginWakeupWithUrl)(const char *);
 	int (*PluginWakeupWithUrlAndRestriction)(const char *, int);
-	int (*Shutdown)();
+	int (*Shutdown)(void);
 	int (*SetMotionType)(int);
 	int (*DoUnk5)(char *);
 	int (*PluginWakeupWithUrlString)(int *);

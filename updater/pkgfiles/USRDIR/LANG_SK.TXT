@@ -84,7 +84,7 @@ STR_ERROR			[Error!]
                 	
 STR_MYGAMES			[webMAN Hry]
 STR_LOADGAMES		[Načítať hry s webMAN]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP			[webMAN Nastavenie]
 STR_WMSETUP2		[Možnosti nastavenia Webman]

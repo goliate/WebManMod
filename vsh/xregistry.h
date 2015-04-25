@@ -1,8 +1,8 @@
 // Mysis xRegistry.h v0.1
 typedef struct
 {
-	int (*GetProductCode)();
-	int (*GetProductSubCode)(); // Model Type, Mobo Id
+	int (*GetProductCode)(void);
+	int (*GetProductSubCode)(void); // Model Type, Mobo Id
 	int (*GetUnk1)(void *) ; // uint8_t [0x1C] { hdmi, ieee802.11, msslot, sdslot, cfslot }
 	int (*SetUnk2)(void *) ;
 	int (*GetEnterButtonAssign)(int *) ;
@@ -204,49 +204,49 @@ class xsetting_C1008335_class
 class xsetting_CC56EB2D_class
 {
 public:
-	int (*DoUnk0)();
-	int (*DoUnk1)();
-	int (*DoUnk2)();
-	int (*DoUnk3)();
-	int (*DoUnk4)();
-	int (*DoUnk5)();
-	int (*DoUnk6)();
-	int (*DoUnk7)();
-	int (*DoUnk8)();
-	int (*DoUnk9)();
-	int (*DoUnk10)();
-	int (*DoUnk11)();
-	int (*GetCurrentUserNumber)();
-	int (*DoUnk13)();
-	int (*DoUnk14)();
-	int (*DoUnk15)();
+	int (*DoUnk0)(void);
+	int (*DoUnk1)(void);
+	int (*DoUnk2)(void);
+	int (*DoUnk3)(void);
+	int (*DoUnk4)(void);
+	int (*DoUnk5)(void);
+	int (*DoUnk6)(void);
+	int (*DoUnk7)(void);
+	int (*DoUnk8)(void);
+	int (*DoUnk9)(void);
+	int (*DoUnk10)(void);
+	int (*DoUnk11)(void);
+	int (*GetCurrentUserNumber)(void);
+	int (*DoUnk13)(void);
+	int (*DoUnk14)(void);
+	int (*DoUnk15)(void);
 	int (*DoUnk16_GetRegistryValue)(int userid,int packetid,int * value);
 	int (*DoUnk17_GetRegistryString)(int userid,int packetid,char * value, int maxlen);
 	int (*DoUnk18_SetRegistryValue)(int userid,int packetid,int value);
 	int (*DoUnk19_SetRegistryString)(int userid,int packetid,char * value, int maxlen);
-	int (*DoUnk20)();
-	int (*DoUnk21)();
-	int (*DoUnk22)();
-	int (*DoUnk23)();
-	int (*DoUnk24)();
-	int (*DoUnk25)();
-	int (*DoUnk26)();
-	int (*DoUnk27)();
-	int (*DoUnk28)();
-	int (*DoUnk29)();
-	int (*DoUnk30)();
-	int (*DoUnk31)();
+	int (*DoUnk20)(void);
+	int (*DoUnk21)(void);
+	int (*DoUnk22)(void);
+	int (*DoUnk23)(void);
+	int (*DoUnk24)(void);
+	int (*DoUnk25)(void);
+	int (*DoUnk26)(void);
+	int (*DoUnk27)(void);
+	int (*DoUnk28)(void);
+	int (*DoUnk29)(void);
+	int (*DoUnk30)(void);
+	int (*DoUnk31)(void);
 	int (*DoUnk32_GetRegistryHomePath)(int userid,char * path);
-	int (*DoUnk33)();
-	int (*DoUnk34)();
-	int (*DoUnk35)();
-	int (*DoUnk36)();
-	int (*DoUnk37)();
-	int (*DoUnk38)();
-	int (*DoUnk39)();
-	int (*DoUnk40)();
-	int (*DoUnk41)();
-	int (*DoUnk42)();
+	int (*DoUnk33)(void);
+	int (*DoUnk34)(void);
+	int (*DoUnk35)(void);
+	int (*DoUnk36)(void);
+	int (*DoUnk37)(void);
+	int (*DoUnk38)(void);
+	int (*DoUnk39)(void);
+	int (*DoUnk40)(void);
+	int (*DoUnk41)(void);
+	int (*DoUnk42)(void);
 
 	int GetRegistryKeyboardType()	{int v; DoUnk16_GetRegistryValue(0,0x14, &v);return v;}
 	int GetRegistryKeyboardJapaneseInput()	{int v; DoUnk16_GetRegistryValue(0,0x15, &v);return v;}

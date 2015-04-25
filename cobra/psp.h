@@ -20,7 +20,7 @@ static uint32_t emulator_supported_tags355[] =
 	0x03FD0480, /* 2.71 */
 	0xF00516D9, /* 2.80 */
 	0xF00616D9, /* 3.00 */
-	0xF00A16D9, 
+	0xF00A16D9,
 	0xF00B16D9,
 };
 
@@ -73,19 +73,19 @@ static PSPKey psp_extra_keys[] =
 #define NUM_SUPPORTED_TAGS	(sizeof(emulator_supported_tags355)/sizeof(uint32_t))
 #define NUM_EXTRA_KEYS		(sizeof(psp_extra_keys)/sizeof(PSPKey))
 
-static inline int sys_psp_set_umdfile(char *file, char *id, int prometheus)
+static int sys_psp_set_umdfile(char *file, char *id, int prometheus)
 {
 	system_call_4(8, SYSCALL8_OPCODE_SET_PSP_UMDFILE, (uint64_t)(uint32_t)file, (uint64_t)(uint32_t)id, prometheus);
 	return (int)p1;
 }
 
-static inline int sys_psp_set_decrypt_options(int decrypt_patch, uint32_t tag, uint8_t *keys, uint8_t code, uint32_t tag2, uint8_t *keys2, uint8_t code2)
+static int sys_psp_set_decrypt_options(int decrypt_patch, uint32_t tag, uint8_t *keys, uint8_t code, uint32_t tag2, uint8_t *keys2, uint8_t code2)
 {
 	system_call_8(8, SYSCALL8_OPCODE_SET_PSP_DECRYPT_OPTIONS, decrypt_patch, tag, (uint64_t)(uint32_t)keys, code, tag2, (uint64_t)(uint32_t)keys2, code2);
 	return (int)p1;
 }
 
-static inline int sys_psp_change_emu_path(const char *path)
+static int sys_psp_change_emu_path(const char *path)
 {
 	system_call_2(8, SYSCALL8_OPCODE_PSP_CHANGE_EMU, (uint64_t)(uint32_t)path);
 	return (int)p1;

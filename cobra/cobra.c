@@ -1,21 +1,21 @@
-#include <sys/return_code.h>
+// #include <sys/return_code.h>
 #include <sys/timer.h>
 #include <sys/memory.h>
 
 #include <cell/cell_fs.h>
-#include <cell/usbd.h>
+// #include <cell/usbd.h>
 
-#include <stdio.h>
-#include <string.h>
-#include <cell/hash/libmd5.h>
+// #include <stdio.h>
+// #include <string.h>
+// #include <cell/hash/libmd5.h>
 
 #include "cobra.h"
 #include "storage.h"
-#include "syscall8.h"
-#include "scsi.h"
-#include "ufi.h"
 #include "psp.h"
-#include "base_mds.h"
+// #include "syscall8.h"
+// #include "scsi.h"
+// #include "ufi.h"
+// #include "base_mds.h"
 
 #define TYPE_HOST2DEV (USB_REQTYPE_DIR_TO_DEVICE|USB_REQTYPE_TYPE_VENDOR)
 #define TYPE_DEV2HOST (USB_REQTYPE_DIR_TO_HOST|USB_REQTYPE_TYPE_VENDOR)
@@ -100,6 +100,62 @@ typedef struct
 	uint8_t pad[6];
 	ScsiTrackDescriptor tracks[1];
 } __attribute__((packed)) netiso_args;
+
+
+// storage.h inline functions merged
+static int sys_storage_ext_get_emu_state(sys_emu_state_t *state)
+{
+	system_call_2(8, SYSCALL8_OPCODE_GET_EMU_STATE, (uint64_t)(uint32_t)state);
+	return (int)p1;
+}
+
+static int sys_ss_disc_auth(uint64_t func, uint64_t param)
+{
+	system_call_2(864, func, param);
+	return (int)p1;
+}
+
+static int sys_storage_ext_mount_ps3_discfile(unsigned int filescount, char *files[])
+{
+	system_call_3(8, SYSCALL8_OPCODE_MOUNT_PS3_DISCFILE, filescount, (uint64_t)(uint32_t)files);
+	return (int)p1;
+}
+
+static int sys_storage_ext_mount_dvd_discfile(unsigned int filescount, char *files[])
+{
+	system_call_3(8, SYSCALL8_OPCODE_MOUNT_DVD_DISCFILE, filescount, (uint64_t)(uint32_t)files);
+	return (int)p1;
+}
+
+static int sys_storage_ext_mount_bd_discfile(unsigned int filescount, char *files[])
+{
+	system_call_3(8, SYSCALL8_OPCODE_MOUNT_BD_DISCFILE, filescount, (uint64_t)(uint32_t)files);
+	return (int)p1;
+}
+
+static int sys_storage_ext_mount_psx_discfile(char *file, unsigned int trackscount, ScsiTrackDescriptor *tracks)
+{
+	system_call_4(8, SYSCALL8_OPCODE_MOUNT_PSX_DISCFILE, (uint64_t)(uint32_t)file, trackscount, (uint64_t)(uint32_t)tracks);
+	return (int)p1;
+}
+
+static int sys_storage_ext_mount_ps2_discfile(unsigned int filescount, char *files[], unsigned int trackscount, ScsiTrackDescriptor *tracks)
+{
+	system_call_5(8, SYSCALL8_OPCODE_MOUNT_PS2_DISCFILE, filescount, (uint64_t)(uint32_t)files, trackscount, (uint64_t)(uint32_t)tracks);
+	return (int)p1;
+}
+
+static int sys_map_paths(char *paths[], char *new_paths[], unsigned int num)
+{
+	system_call_4(8, SYSCALL8_OPCODE_MAP_PATHS, (uint64_t)(uint32_t)paths, (uint64_t)(uint32_t)new_paths, num);
+	return (int)p1;
+}
+
+static int sys_storage_ext_mount_encrypted_image(char *image, char *mount_point, char *filesystem, uint64_t nonce)
+{
+	system_call_5(8, SYSCALL8_OPCODE_MOUNT_ENCRYPTED_IMAGE, (uint64_t)(uint32_t)image, (uint64_t)(uint32_t)mount_point, (uint64_t)(uint32_t)filesystem, nonce);
+	return (int)p1;
+}
 
 /*
 #define N_TITLE_IDS	102
@@ -286,7 +342,7 @@ static uint8_t lambda_md5[16] =
 	0xE1, 0x99, 0xCA, 0x7D, 0x48, 0x3B, 0xC0, 0x7B, 0x4D, 0xC6, 0xE7, 0x4A, 0xE5, 0x53, 0x76, 0xCE
 };
 */
-static inline int translate_type(unsigned int type)
+static int translate_type(unsigned int type)
 {
 	if (type == 0)
 		return DISC_TYPE_NONE;
@@ -332,20 +388,7 @@ static char *get_blank_iso_path(void)
 {
 	char *s = malloc(32);
 
-	strcpy(s, "/dev_hdd0/vsh/task.dat");
-	s[10] = 'v';
-	s[11] = 's';
-	s[12] = 'h';
-	s[13] = '/';
-	s[14] = 't';
-	s[15] = 'a';
-	s[16] = 's';
-	s[17] = 'k';
-	s[18] = '.';
-	s[19] = 'd';
-	s[20] = 'a';
-	s[21] = 't';
-	s[22] = 0;
+	strcpy(s, "/dev_hdd0/vsh/task.dat\0");
 
 	return s;
 }
@@ -355,8 +398,7 @@ static void build_blank_iso(char *title_id)
 {
 	sys_addr_t sysmem=0;
 	if(sys_memory_allocate(_128KB_, SYS_MEMORY_PAGE_SIZE_64K, &sysmem)!=0) return;
-	//uint8_t buf_[_128KB_];
-	uint8_t *buf = (uint8_t*)sysmem;//malloc(_128KB_);
+	uint8_t *buf = (uint8_t*)sysmem;
 
 	memset(buf, 0, _128KB_);
 
@@ -497,6 +539,7 @@ static void build_blank_iso(char *title_id)
 
 static int copy_file(char *src, char *dst)
 {
+
 	int ret;
 	int fd_s, fd_d;
 	const uint32_t buf_size = _16KB_;
@@ -565,14 +608,14 @@ static int sys_get_version2(uint16_t *version)
 	return (int)p1;
 }
 */
-static inline int sys_read_cobra_config(CobraConfig *cfg)
+static int sys_read_cobra_config(CobraConfig *cfg)
 {
 	cfg->size = sizeof(CobraConfig);
 	system_call_2(8, SYSCALL8_OPCODE_READ_COBRA_CONFIG, (uint64_t)(uint32_t)cfg);
 	return (int)p1;
 }
 
-static inline int sys_write_cobra_config(CobraConfig *cfg)
+static int sys_write_cobra_config(CobraConfig *cfg)
 {
 	system_call_2(8, SYSCALL8_OPCODE_WRITE_COBRA_CONFIG, (uint64_t)(uint32_t)cfg);
 	return (int)p1;
@@ -662,19 +705,19 @@ static int parse_param_sfo(char *file, const char *field, char *title_name)
 }
 */
 /*
-static inline int sys_permissions_get_access(void)
+static int sys_permissions_get_access(void)
 {
 	system_call_1(8, SYSCALL8_OPCODE_GET_ACCESS);
 	return (int)p1;
 }
 
-static inline int sys_permissions_remove_access(void)
+static int sys_permissions_remove_access(void)
 {
 	system_call_1(8, SYSCALL8_OPCODE_REMOVE_ACCESS);
 	return (int)p1;
 }
 
-static inline int cobra_usb_command(uint8_t command, int requestType, uint32_t addr, void *buf, uint16_t size)
+static int cobra_usb_command(uint8_t command, int requestType, uint32_t addr, void *buf, uint16_t size)
 {
 	system_call_6(8, SYSCALL8_OPCODE_COBRA_USB_COMMAND, command, requestType, addr, (uint64_t)(uint32_t)buf, size);
 	return (int)p1;
@@ -852,7 +895,7 @@ int cobra_mount_psx_disc_image_iso(char *file, TrackDef *tracks, unsigned int nu
 
 	memset(scsi_tracks, 0, sizeof(scsi_tracks));
 
-	for (int i = 0; i < num_tracks; i++)
+	for (unsigned int i = 0; i < num_tracks; i++)
 	{
 		scsi_tracks[i].adr_control = (!tracks[i].is_audio) ? 0x14 : 0x10;
 		scsi_tracks[i].track_number = i+1;
@@ -871,7 +914,7 @@ int cobra_mount_psx_disc_image(char *file, TrackDef *tracks, unsigned int num_tr
 
 	memset(scsi_tracks, 0, sizeof(scsi_tracks));
 
-	for (int i = 0; i < num_tracks; i++)
+	for (unsigned int i = 0; i < num_tracks; i++)
 	{
 		scsi_tracks[i].adr_control = (!tracks[i].is_audio) ? 0x14 : 0x10;
 		scsi_tracks[i].track_number = i+1;
@@ -887,7 +930,7 @@ int cobra_mount_ps2_disc_image(char *files[], int num, TrackDef *tracks, unsigne
 
 	if (tracks)
 	{
-		for (int i = 0; i < num_tracks; i++)
+		for (unsigned int i = 0; i < num_tracks; i++)
 		{
 			scsi_tracks[i].adr_control = (!tracks[i].is_audio) ? 0x14 : 0x10;
 			scsi_tracks[i].track_number = i+1;
@@ -1434,15 +1477,15 @@ int cobra_map_game(char *path, char *title_id, int *special_mode)
 
 	build_blank_iso(title_id);
 
-	ret = sys_map_path("/dev_bdvd", path);
+	ret = sys_map_path((char*)"/dev_bdvd", path);
 	if (ret != 0) return ret;
 
 	if(special_mode)
-		sys_map_path("/app_home", path);
+		sys_map_path((char*)"/app_home", path);
 	else
-		sys_map_path("/app_home", NULL);
+		sys_map_path((char*)"/app_home", NULL);
 
-	sys_map_path("//dev_bdvd", path);
+	sys_map_path((char*)"//dev_bdvd", path);
 	//sys_map_path("//app_home", path);
 
 	sys_storage_ext_get_disc_type(&real_disctype, NULL, NULL);
@@ -1855,7 +1898,7 @@ int cobra_set_psp_umd2(char *path, char *umd_root, char *icon_save_path, uint64_
 			return EIO;
 		}
 
-		root = "/dev_bdvd";
+		root = (char*)"/dev_bdvd";
 	}
 	else
 	{
@@ -1967,7 +2010,7 @@ int cobra_set_psp_umd2(char *path, char *umd_root, char *icon_save_path, uint64_
 //			if (check_lambda() < 0)
 //				return ECANCELED;
 
-			sys_storage_ext_mount_encrypted_image(PSPL_LAMBDA, "/dev_moo", "CELL_FS_FAT", PSPL_LAMBDA_NONCE);
+			sys_storage_ext_mount_encrypted_image((char*)PSPL_LAMBDA, (char*)"/dev_moo", (char*)"CELL_FS_FAT", PSPL_LAMBDA_NONCE);
 			sys_psp_change_emu_path("/dev_moo/pspemu");
 		}
 
@@ -1986,7 +2029,7 @@ int cobra_unset_psp_umd(void)
 
 	sys_psp_set_umdfile(NULL, NULL, 0);
 	sys_psp_change_emu_path(NULL);
-	sys_storage_ext_mount_encrypted_image(NULL, "/dev_moo", NULL, 0);
+	sys_storage_ext_mount_encrypted_image(NULL, (char*)"/dev_moo", NULL, 0);
 
 	return 0;
 }
@@ -2216,6 +2259,7 @@ int cobra_build_netiso_params(void *param_buf, char *server, uint16_t port, char
 	return 0;
 }
 */
+
 int sys_get_version2(uint16_t *version)
 {
 	system_call_2(8, SYSCALL8_OPCODE_GET_VERSION2, (uint64_t)(uint32_t)version);

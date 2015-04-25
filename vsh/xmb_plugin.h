@@ -89,7 +89,7 @@ typedef struct
 	int (*DoUnk22)(int) ;
 	int (*DoUnk23)(const char *,int) ;
 	int (*DoUnk24)(const char *,int) ;
-	int (*DoUnk25)() ;
+	int (*DoUnk25)(void) ;
 } xmb_plugin_xmm0;
 
 xmb_plugin_xmm0 * xmm0_interface;
@@ -99,33 +99,33 @@ typedef struct
 	int (*DoUnk0)(int);
 	int (*DoUnk1)(int,int);
 	int (*DoUnk2)(int, float);
-	int (*DoUnk3)();
-	int (*DoUnk4)();
+	int (*DoUnk3)(void);
+	int (*DoUnk4)(void);
 	int (*DoUnk5)(float);
-	float (*DoUnk6)();
+	float (*DoUnk6)(void);
 	int (*DoUnk7)(int,int);
-	int (*DoUnk8)();
+	int (*DoUnk8)(void);
 	int (*DoUnk9)(int*,void*,const wchar_t *);
-	int (*DoUnk10)();
+	int (*DoUnk10)(void);
 	int (*DoUnk11)(int);
 	int (*DoUnk12)(int);
-	int (*DoUnk13)();
-	int (*DoUnk14)();
+	int (*DoUnk13)(void);
+	int (*DoUnk14)(void);
 	int (*DoUnk15)(int,int);
 	int (*DoUnk16)(void *, int, int);
-	int (*DoUnk17)();
+	int (*DoUnk17)(void);
 	int (*DoUnk18)(int,int,float);
 	int (*DoUnk19)(int,int);
 	int (*DoUnk20)(void *);
 	int (*DoUnk21)(void *);
-	int (*DoUnk22)(const wchar_t *);
-	void * (*DoUnk23)();
-	int (*DoUnk24)();
-	void * (*DoUnk25)();
+	int (*showMsg)(const wchar_t *);
+	void * (*DoUnk23)(void);
+	int (*DoUnk24)(void);
+	void * (*DoUnk25)(void);
 	int (*DoUnk26)(int);
-	int (*DoUnk27)();
+	int (*DoUnk27)(void);
 	int (*DoUnk28)(const char *);
-	int (*DoUnk29)();
+	int (*DoUnk29)(void);
 	int (*DoUnk30)(void *, int*);
 	int (*DoUnk31)(int);
 	int (*DoUnk32)(int);
@@ -135,8 +135,8 @@ xmb_plugin_xmb2 * xmb2_interface;
 
 typedef struct
 {
-	int (*DoUnk0)();
-	int (*DoUnk1)();
+	int (*DoUnk0)(void);
+	int (*DoUnk1)(void);
 } xmb_plugin_mod0;
 
 xmb_plugin_mod0 * mod0_interface;

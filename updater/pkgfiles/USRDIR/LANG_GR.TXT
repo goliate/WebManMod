@@ -84,7 +84,7 @@ STR_ERROR       [Σφάλμα!]
 
 STR_MYGAMES		[Τα παιχνίδια μου]
 STR_LOADGAMES	[Φόρτωση των παιχνιδιών μέσω webMAN]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP		[Ρυθμίσεις του webMAN]
 STR_WMSETUP2	[Ρυθμίσεις του webMAN]

@@ -84,7 +84,7 @@ STR_ERROR					[Błąd!]
 
 STR_MYGAMES				[Moje Gry]
 STR_LOADGAMES			[Ładuj gry webMANem]
-STR_FIXING		[Patchowanie %s]
+STR_FIXING		[Patchowanie]
 
 STR_WMSETUP				[Funkcje webMANa]
 STR_WMSETUP2			[]

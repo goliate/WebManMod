@@ -79,7 +79,7 @@ STR_SETTINGSUPD [Indstillinger opdateret.<br><br>Klik <a href="/restart.ps3">her
 STR_ERROR [Fejl!]
 STR_MYGAMES [webMAN Spil]
 STR_LOADGAMES [Load spil med webMAN]
-STR_FIXING "Fixing %s"
+STR_FIXING [Fixieren]
 STR_WMSETUP [webMAN Opsætning]
 STR_WMSETUP2 [Opsætning webMAN]
 STR_EJECTDISC [Skub disk ud]

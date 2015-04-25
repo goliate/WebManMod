@@ -84,7 +84,7 @@ STR_ERROR		[Fout!]
 
 STR_MYGAMES		[Mijn SPELLEN]
 STR_LOADGAMES	[Laadt spellen met webMAN]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP		[webMAN Setup]
 STR_WMSETUP2	[Setup webMAN opties]

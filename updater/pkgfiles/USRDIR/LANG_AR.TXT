@@ -84,7 +84,7 @@ STR_ERROR			[ﺄﻄﺧ]
 
 STR_MYGAMES			[ﻲﺑﺎﻌﻟا]
 STR_LOADGAMES		[ﻥﺎﻣ ﺐﻳﻮﻟا ﻦﻣ ﺏﺎﻌﻟﺎﻟا ﻞﻴﻐﺸﺗ]
-STR_FIXING		[Fixing %s]
+STR_FIXING		[Fixing]
 
 STR_WMSETUP			[ﻥﺎﻣ ﺐﻳﻮﻟا ﻂﺒﺿ]
 STR_WMSETUP2		[ﻥﺎﻣ ﺐﻳﻮﻟا ﺕاﺭﺎﻴﺧ ﻂﺒﺿ]
